@@ -1,0 +1,25 @@
+# Investment Alpha Pipeline — Python dependencies
+# Install: pip install -r requirements.txt
+
+# ── Data & numerics ────────────────────────────────────────────────────────
+yfinance>=0.2.40
+pandas>=2.0.0
+numpy>=1.26.0
+pyarrow>=14.0.0          # parquet cache support
+
+# ── Output formats ─────────────────────────────────────────────────────────
+openpyxl>=3.1.0          # Excel generation
+
+# ── Broker integration ─────────────────────────────────────────────────────
+alpaca-py>=0.20.0        # Alpaca paper + live trading
+python-dotenv>=1.0.0     # loads .env credentials file
+
+# ── HTTP / API calls ───────────────────────────────────────────────────────
+requests>=2.31.0         # SEC EDGAR insider, Capitol Trades, Discord webhook
+
+# ── Sentiment / fundamentals ───────────────────────────────────────────────
+finnhub-python>=2.4.19   # analyst sentiment (Phase 2)
+
+# ── API server (optional — only needed if running api/server.py) ───────────
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
