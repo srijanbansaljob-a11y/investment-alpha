@@ -59,6 +59,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10   # kill if it hangs (shouldn't take >3 min normally)
 
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
