@@ -1,0 +1,58 @@
+name: Daily Portfolio Summary
+
+# Posts a portfolio status embed to Discord every weekday morning at 9 AM ET.
+# Two cron entries cover both DST phases; the guard step skips the run whose
+# local New York hour isn't 9, so you get exactly one summary per day.
+
+on:
+  schedule:
+    - cron: "0 13 * * 1-5"   # 9 AM EDT (summer)
+    - cron: "0 14 * * 1-5"   # 9 AM EST (winter)
+  workflow_dispatch:
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Check it's 9 AM in New York
+        id: tz
+        run: |
+          HOUR=$(TZ=America/New_York date +%H)
+          echo "Local NY hour: $HOUR"
+          if [ "$HOUR" = "09" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "go=true" >> $GITHUB_OUTPUT
+          else
+            echo "go=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout code
+        if: steps.tz.outputs.go == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        if: steps.tz.outputs.go == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        if: steps.tz.outputs.go == 'true'
+        run: pip install -r requirements.txt
+
+      - name: Post morning summary
+        if: steps.tz.outputs.go == 'true'
+        env:
+          ALPACA_API_KEY:      ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:   ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL:     ${{ secrets.ALPACA_BASE_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_BOT_TOKEN:   ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:  ${{ secrets.DISCORD_CHANNEL_ID }}
+          FINNHUB_API_KEY:     ${{ secrets.FINNHUB_API_KEY }}
+          COMMAND_PAYLOAD:     '{"command": "status"}'
+        run: |
+          python broker/remote_commands.py

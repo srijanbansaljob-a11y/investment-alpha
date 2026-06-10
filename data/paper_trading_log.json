@@ -2616,5 +2616,192 @@
       "start_date": "2026-05-01",
       "end_date": "2026-07-30"
     }
+  },
+  {
+    "timestamp": "2026-06-03T14:07:40.150738+00:00",
+    "run_date": "2026-05-01",
+    "regime": "unknown",
+    "total_capital": 1000.0,
+    "portfolio_value": 999.72,
+    "realised_pnl": 0.0,
+    "total_portfolio_value": 999.72,
+    "total_return_pct": -0.028,
+    "benchmark_return_pct": 4.9233,
+    "alpha_pct": -4.9513,
+    "sharpe_ratio": 0.0068,
+    "max_drawdown_pct": -1.337,
+    "win_rate_pct": 50.0,
+    "avg_gain_pct": 1.05,
+    "avg_loss_pct": -1.13,
+    "positions": [
+      {
+        "ticker": "NEM",
+        "weight": 0.058185,
+        "entry_price": 109.5,
+        "current_price": 108.14,
+        "cost_basis": 58.19,
+        "current_value": 57.46,
+        "unrealised_pnl": -0.72,
+        "unrealised_pct": -1.24,
+        "score": 0.6185,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "weight": 0.088172,
+        "entry_price": 15.69,
+        "current_price": 15.57,
+        "cost_basis": 88.17,
+        "current_value": 87.5,
+        "unrealised_pnl": -0.67,
+        "unrealised_pct": -0.76,
+        "score": 0.6133,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "HST",
+        "weight": 0.122097,
+        "entry_price": 23.65,
+        "current_price": 23.695,
+        "cost_basis": 122.1,
+        "current_value": 122.33,
+        "unrealised_pnl": 0.23,
+        "unrealised_pct": 0.19,
+        "score": 0.6038,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "FDX",
+        "weight": 0.083568,
+        "entry_price": 329.0,
+        "current_price": 327.4749,
+        "cost_basis": 83.57,
+        "current_value": 83.18,
+        "unrealised_pnl": -0.39,
+        "unrealised_pct": -0.46,
+        "score": 0.5928,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "VZ",
+        "weight": 0.154709,
+        "entry_price": 47.87,
+        "current_price": 47.045,
+        "cost_basis": 154.71,
+        "current_value": 152.04,
+        "unrealised_pnl": -2.67,
+        "unrealised_pct": -1.72,
+        "score": 0.5841,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "moderate",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "MTCH",
+        "weight": 0.091102,
+        "entry_price": 35.32,
+        "current_price": 34.8,
+        "cost_basis": 91.1,
+        "current_value": 89.76,
+        "unrealised_pnl": -1.34,
+        "unrealised_pct": -1.47,
+        "score": 0.5799,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "EIX",
+        "weight": 0.128074,
+        "entry_price": 70.92,
+        "current_price": 72.245,
+        "cost_basis": 128.07,
+        "current_value": 130.47,
+        "unrealised_pnl": 2.39,
+        "unrealised_pct": 1.87,
+        "score": 0.5745,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "MRK",
+        "weight": 0.113333,
+        "entry_price": 115.65,
+        "current_price": 116.625,
+        "cost_basis": 113.33,
+        "current_value": 114.29,
+        "unrealised_pnl": 0.96,
+        "unrealised_pct": 0.84,
+        "score": 0.5742,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "CHRD",
+        "weight": 0.064929,
+        "entry_price": 137.99,
+        "current_price": 139.41,
+        "cost_basis": 64.93,
+        "current_value": 65.6,
+        "unrealised_pnl": 0.67,
+        "unrealised_pct": 1.03,
+        "score": 0.5723,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "EOG",
+        "weight": 0.095832,
+        "entry_price": 138.58,
+        "current_price": 140.405,
+        "cost_basis": 95.83,
+        "current_value": 97.09,
+        "unrealised_pnl": 1.26,
+        "unrealised_pct": 1.32,
+        "score": 0.5653,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      }
+    ],
+    "closed_positions": [],
+    "paper_trading": {
+      "in_validation": true,
+      "days_elapsed": 33,
+      "days_remaining": 57,
+      "start_date": "2026-05-01",
+      "end_date": "2026-07-30"
+    }
   }
 ]

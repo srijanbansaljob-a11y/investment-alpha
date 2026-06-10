@@ -8,14 +8,20 @@ Alpaca positions every N minutes against three triggers:
   2. PROFIT TARGET hit   → position is up >= PROFIT_TARGET_PCT from entry
   3. SHARP INTRADAY MOVE → stock moves ±INTRADAY_MOVE_ALERT_PCT from today's open
 
-When a breach is detected:
+When a breach is detected (ALERT-ONLY — nothing executes automatically):
   - Posts a rich Discord embed alert immediately
-  - Logs the pending action to data/pending_actions.json
-  - Waits AUTO_EXECUTE_DELAY_MINUTES for you to override
-  - Auto-executes (market sell via Alpaca) if no override received
+  - Stop-loss / profit-target alerts carry ✅ Approve / ❌ Reject buttons
+    (requires DISCORD_BOT_TOKEN + DISCORD_CHANNEL_ID; falls back to a
+    plain webhook alert if the bot isn't configured)
+  - The sell ONLY happens when you press Approve — the button press goes
+    through the Cloudflare Worker → GitHub Actions → remote_commands.py
 
-Sharp intraday moves are ALERT-ONLY — they never trigger auto-execute,
-since big intraday swings are often reversals worth watching, not acting on.
+The old 5-minute auto-sell countdown was REMOVED: GitHub Actions runs are
+stateless, so a countdown could never be enforced reliably in the cloud,
+and silent auto-selling contradicts the approval-first design.
+
+Duplicate-alert suppression is also stateless now: the monitor reads the
+Discord channel's recent history instead of data/pending_actions.json.
 
 Usage
 -----
@@ -63,6 +69,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
 from broker.alpaca_client import get_client, get_positions, is_market_open
 from broker.stop_loss import _compute_atr, _load_portfolio_state
+from broker import discord_notify as dn
 
 log = logging.getLogger(__name__)
 
@@ -146,10 +153,10 @@ def send_test_message() -> bool:
             {"name": "Stop-loss",         "value": "ATR-based (regime-adjusted)",         "inline": True},
             {"name": "Profit target",     "value": f"+{PROFIT_TARGET_PCT*100:.0f}%",       "inline": True},
             {"name": "Intraday alert",    "value": f"±{INTRADAY_MOVE_PCT*100:.0f}% today", "inline": True},
-            {"name": "Auto-execute delay","value": f"{AUTO_EXECUTE_DELAY_MIN} minutes",    "inline": True},
+            {"name": "Execution",         "value": "Approval-only (✅/❌ buttons)",         "inline": True},
             {"name": "Check interval",    "value": f"Every {MONITOR_INTERVAL_SEC//60} min","inline": True},
-            {"name": "Override command",
-             "value": "`python broker/monitor.py --override TICKER`",
+            {"name": "Buttons",
+             "value": "✅ enabled" if dn.bot_configured() else "⚠️ bot not configured — webhook alerts only",
              "inline": False},
         ],
     )
@@ -311,8 +318,15 @@ def check_positions(client, dry_run: bool = False) -> int:
         total_plpc = pos["unrealized_plpc"]     # fractional P&L from entry
         today_open = today_opens.get(ticker)
 
-        # Helper to check if this ticker already has an active (non-executed, non-overridden) alert
+        # Dedupe: in the cloud (bot configured) read channel history — stateless,
+        # works across independent GitHub Actions runs. Locally fall back to
+        # the pending-actions file.
         def _already_pending(trigger_types=None):
+            if dn.bot_configured():
+                for tt in (trigger_types or [""]):
+                    if dn.recent_alert_exists(ticker, tt):
+                        return True
+                return False
             a = pending.get(ticker, {})
             if a.get("executed") or a.get("override"):
                 return False
@@ -333,8 +347,7 @@ def check_positions(client, dry_run: bool = False) -> int:
                     title=f"🛑 STOP-LOSS BREACHED — {ticker}",
                     description=(
                         f"**{ticker}** has dropped below its ATR-based stop level.\n"
-                        f"A **market SELL** will be submitted in **{AUTO_EXECUTE_DELAY_MIN} minutes** "
-                        f"unless you override."
+                        f"**Nothing will execute automatically** — tap a button below to decide."
                     ),
                     color=_RED,
                     fields=[
@@ -343,16 +356,11 @@ def check_positions(client, dry_run: bool = False) -> int:
                         {"name": "Loss from Entry",   "value": f"{loss_pct:+.1f}%",         "inline": True},
                         {"name": "Entry Price",       "value": f"${entry:.2f}",             "inline": True},
                         {"name": "Unrealised P&L",    "value": f"${unrealized:,.2f}",        "inline": True},
-                        {"name": "Auto-execute in",   "value": f"{AUTO_EXECUTE_DELAY_MIN} min", "inline": True},
-                        {
-                            "name":   "⚠️ To cancel auto-sell:",
-                            "value":  f"`python broker/monitor.py --override {ticker}`",
-                            "inline": False,
-                        },
+                        {"name": "Suggested action",  "value": "SELL (stop breached)",      "inline": True},
                     ],
                 )
-                new_alerts.append(embed)
-                _register_pending(pending, ticker, "stop_loss", current, stop_price, loss_pct)
+                new_alerts.append({"embed": embed, "ticker": ticker, "trigger": "stop_loss", "needs_approval": True})
+                _register_pending(pending, ticker, "stop_loss", current, stop_price, loss_pct, alert_only=True)
                 num_sent += 1
             continue  # stop-loss takes priority — skip other checks
 
@@ -367,8 +375,7 @@ def check_positions(client, dry_run: bool = False) -> int:
                     description=(
                         f"**{ticker}** is up **{gain_pct:.1f}%** from your entry — "
                         f"at or above the **{PROFIT_TARGET_PCT*100:.0f}% target**.\n"
-                        f"A **market SELL** will be submitted in **{AUTO_EXECUTE_DELAY_MIN} minutes** "
-                        f"unless you override."
+                        f"**Nothing will execute automatically** — tap a button below to decide."
                     ),
                     color=_GREEN,
                     fields=[
@@ -377,18 +384,14 @@ def check_positions(client, dry_run: bool = False) -> int:
                         {"name": "Total Gain",       "value": f"+{gain_pct:.1f}%",    "inline": True},
                         {"name": "Unrealised P&L",   "value": f"${unrealized:,.2f}",  "inline": True},
                         {"name": "Target was",       "value": f"+{PROFIT_TARGET_PCT*100:.0f}%", "inline": True},
-                        {"name": "Auto-execute in",  "value": f"{AUTO_EXECUTE_DELAY_MIN} min", "inline": True},
-                        {
-                            "name":   "⚠️ To cancel auto-sell:",
-                            "value":  f"`python broker/monitor.py --override {ticker}`",
-                            "inline": False,
-                        },
+                        {"name": "Suggested action", "value": "SELL (take profit)",   "inline": True},
                     ],
                 )
-                new_alerts.append(embed)
+                new_alerts.append({"embed": embed, "ticker": ticker, "trigger": "profit_target", "needs_approval": True})
                 _register_pending(
                     pending, ticker, "profit_target",
                     current, entry * (1 + PROFIT_TARGET_PCT), gain_pct,
+                    alert_only=True,
                 )
                 num_sent += 1
 
@@ -427,100 +430,46 @@ def check_positions(client, dry_run: bool = False) -> int:
                         ],
                         footer="Investment Alpha Monitor — Alert Only (no auto-execute for sharp moves)",
                     )
-                    new_alerts.append(embed)
+                    new_alerts.append({"embed": embed, "ticker": ticker, "trigger": trigger_name, "needs_approval": False})
                     _register_pending(
                         pending, ticker, trigger_name,
                         current, today_open, move_pct,
-                        alert_only=True,   # never auto-execute sharp moves
+                        alert_only=True,   # informational only
                     )
                     num_sent += 1
 
-    # Send all alerts in batches of 10 (Discord hard limit per request)
-    for i in range(0, len(new_alerts), 10):
-        batch = new_alerts[i : i + 10]
-        _send_discord(batch, dry_run=dry_run)
-        if i + 10 < len(new_alerts):
-            time.sleep(1)  # Discord rate-limit: small pause between batches
+    # Send alerts. Approval alerts go via the bot (buttons require a bot
+    # message); informational alerts and bot-less fallback use the webhook.
+    webhook_batch = []
+    for alert in new_alerts:
+        if alert["needs_approval"] and dn.bot_configured() and not dry_run:
+            sent = dn.post_message(
+                [alert["embed"]],
+                components=dn.approval_buttons(alert["ticker"], alert["trigger"]),
+            )
+            if not sent:  # bot post failed — fall back to webhook (no buttons)
+                webhook_batch.append(alert["embed"])
+        else:
+            webhook_batch.append(alert["embed"])
+
+    for i in range(0, len(webhook_batch), 10):  # Discord limit: 10 embeds/request
+        _send_discord(webhook_batch[i : i + 10], dry_run=dry_run)
+        if i + 10 < len(webhook_batch):
+            time.sleep(1)
 
     return num_sent
 
 
 def process_auto_executions(client, dry_run: bool = False) -> list:
     """
-    Check pending_actions.json for entries past their execute_after deadline.
-    Auto-execute (sell) any that haven't been overridden.
+    REMOVED (BA critical gap #1): the 5-minute auto-sell countdown could not
+    be enforced from stateless GitHub Actions runs, and silent auto-selling
+    contradicts the approval-first design. Sells now happen ONLY when you
+    press the ✅ Approve button on an alert (handled by remote_commands.py).
 
-    Returns list of tickers that were executed.
+    Kept as a no-op so any external caller doesn't break.
     """
-    pending = _load_pending()
-    now = datetime.now(timezone.utc)
-    executed_tickers = []
-
-    for ticker, action in list(pending.items()):
-        # Skip if already handled or overridden
-        if action.get("executed") or action.get("override"):
-            continue
-        # Sharp moves are alert-only — never auto-execute
-        if action.get("trigger") in ("sharp_move_up", "sharp_move_down"):
-            continue
-
-        execute_after = datetime.fromisoformat(action["execute_after"])
-        if now < execute_after:
-            remaining_sec = (execute_after - now).total_seconds()
-            log.info(
-                "  %s — auto-execute in %.0f min (trigger=%s)",
-                ticker, remaining_sec / 60, action["trigger"],
-            )
-            continue
-
-        # Deadline passed — execute
-        queued_mins = (now - datetime.fromisoformat(action["queued_at"])).total_seconds() / 60
-        log.warning(
-            "AUTO-EXECUTING: %s (trigger=%s, %.1f min since alert)",
-            ticker, action["trigger"], queued_mins,
-        )
-
-        success = False
-        if not dry_run:
-            try:
-                alpaca_client_obj = client  # already authenticated TradingClient
-                alpaca_client_obj.close_position(ticker)
-                success = True
-                log.info("  Alpaca close_position(%s): OK", ticker)
-            except Exception as exc:
-                log.error("  Alpaca close_position(%s) FAILED: %s", ticker, exc)
-        else:
-            log.info("  [DRY-RUN] Would close position: %s", ticker)
-            success = True
-
-        action["executed"]       = True
-        action["executed_at"]    = now.isoformat()
-        action["execute_success"] = success
-        action["dry_run"]        = dry_run
-
-        # Discord confirmation
-        status_emoji = "✅" if success else "❌"
-        embed = _make_embed(
-            title=f"{status_emoji} AUTO-EXECUTED — {ticker}",
-            description=(
-                f"**{ticker}** position has been "
-                f"{'closed (paper order submitted)' if not dry_run else 'closed [DRY RUN — no real order]'}."
-            ),
-            color=_BLUE if success else _ORANGE,
-            fields=[
-                {"name": "Trigger",         "value": action["trigger"].replace("_", " ").title(), "inline": True},
-                {"name": "Status",          "value": "✅ Executed" if success else "❌ Failed",    "inline": True},
-                {"name": "Price at alert",  "value": f"${action['price']:.2f}",                   "inline": True},
-                {"name": "Queued",          "value": f"{queued_mins:.1f} min ago",                "inline": True},
-            ],
-        )
-        _send_discord([embed], dry_run=False)  # always send confirmations, even in dry-run mode
-        executed_tickers.append(ticker)
-
-    if executed_tickers:
-        _save_pending(pending)
-
-    return executed_tickers
+    return []
 
 
 # ── Entry Point ────────────────────────────────────────────────────────────
@@ -588,8 +537,7 @@ Examples:
     print(f"{'='*58}")
     print(f"  Profit target    : +{PROFIT_TARGET_PCT*100:.0f}% from entry")
     print(f"  Sharp move alert : ±{INTRADAY_MOVE_PCT*100:.0f}% from today's open")
-    print(f"  Auto-execute     : {AUTO_EXECUTE_DELAY_MIN} min after alert "
-          f"{'[DISABLED — dry-run mode]' if args.dry_run else ''}")
+    print(f"  Execution        : approval-only — sells require your ✅ button press")
     print(f"  Check interval   : every {MONITOR_INTERVAL_SEC // 60} min")
     print(f"  Discord          : {'✅ configured' if DISCORD_WEBHOOK_URL else '⚠️  NOT configured'}")
     print(f"{'='*58}\n")
@@ -622,17 +570,13 @@ Examples:
             log.info("━━━ Check #%d at %s UTC ━━━", check_count, now.strftime("%H:%M:%S"))
 
             try:
-                # 1. Check positions and fire alerts
+                # Check positions and fire alerts (alert-only — sells happen
+                # exclusively via your ✅ Approve button press)
                 n_alerts = check_positions(client, dry_run=args.dry_run)
                 if n_alerts:
                     log.info("  %d new alert(s) sent", n_alerts)
                 else:
                     log.info("  All positions within bounds ✓")
-
-                # 2. Process pending auto-executions
-                executed = process_auto_executions(client, dry_run=args.dry_run)
-                if executed:
-                    log.info("  Auto-executed: %s", executed)
 
             except Exception as exc:
                 log.error("Check cycle error: %s", exc, exc_info=True)

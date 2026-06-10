@@ -138,8 +138,8 @@ def _exit_via_alpaca(ticker: str) -> bool:
     Returns True on success, False on error.
     """
     try:
-        from broker.alpaca_client import get_trading_client
-        client = get_trading_client()
+        from broker.alpaca_client import get_client
+        client = get_client()
         client.close_position(ticker)
         logger.info("Alpaca: closed position %s", ticker)
         return True

@@ -1,0 +1,54 @@
+name: Discord Command
+
+# Triggered by the Cloudflare Worker (repository_dispatch) whenever you press
+# an approval button or run a slash command in Discord. The Worker has
+# ALREADY verified the request signature and that the user is YOU (owner ID
+# check) before this ever fires — nothing here runs for anyone else.
+#
+# Payload arrives in github.event.client_payload and is handed to
+# broker/remote_commands.py, which sources all portfolio state from the
+# Alpaca API (no local files needed on the runner).
+
+on:
+  repository_dispatch:
+    types: [discord-command]
+
+concurrency:
+  # Never run two trade-affecting commands at once
+  group: discord-commands
+  cancel-in-progress: false
+
+jobs:
+  run-command:
+    name: ${{ github.event.client_payload.command }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Dispatch command
+        env:
+          ALPACA_API_KEY:      ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:   ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL:     ${{ secrets.ALPACA_BASE_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_BOT_TOKEN:   ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:  ${{ secrets.DISCORD_CHANNEL_ID }}
+          FINNHUB_API_KEY:     ${{ secrets.FINNHUB_API_KEY }}
+          COMMAND_PAYLOAD:     ${{ toJson(github.event.client_payload) }}
+        run: |
+          python broker/remote_commands.py
