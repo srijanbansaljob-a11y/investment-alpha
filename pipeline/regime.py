@@ -63,18 +63,27 @@ def _get_credit_spread_signal():
 
 
 def _safe_fallback(reason):
-    """Return a BULL regime so the rest of the pipeline keeps running."""
-    logger.warning("Regime fallback to BULL: %s", reason)
+    """
+    Return a NEUTRAL regime so the rest of the pipeline keeps running.
+
+    NOTE: this used to default to BULL, meaning a yfinance outage silently
+    reported maximum-risk-on. Data failure now means caution: NEUTRAL
+    position counts and NEUTRAL stops until data returns.
+    (Exception: REGIME_ENABLED=False is a deliberate user choice → BULL.)
+    """
+    fallback = "bull" if reason == "REGIME_ENABLED=False" else \
+               getattr(config, "REGIME_FALLBACK", "neutral")
+    logger.warning("Regime fallback to %s: %s", fallback.upper(), reason)
     return {
-        "regime":                 "bull",
+        "regime":                 fallback,
         "vix_current":            None,
         "spx_price":              None,
         "spx_200ma":              None,
         "spx_vs_200ma_pct":       None,
         "yield_curve_spread":     None,
         "credit_spread_momentum": None,
-        "active_top_n":           config.REGIME_TOP_N["bull"],
-        "active_stop_loss":       config.STOP_LOSS_PCT["bull"],
+        "active_top_n":           config.REGIME_TOP_N[fallback],
+        "active_stop_loss":       config.STOP_LOSS_PCT[fallback],
         "timestamp":              datetime.now(timezone.utc).isoformat(),
         "notes":                  "Fallback - " + reason,
     }

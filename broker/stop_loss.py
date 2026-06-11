@@ -69,24 +69,14 @@ def _load_portfolio_state() -> dict:
 
 
 def _get_current_prices(tickers: list) -> dict:
-    """Fetch latest close prices for a list of tickers via yfinance."""
+    """Latest prices via the real-time layer (Alpaca IEX → Finnhub → yfinance)."""
     if not tickers:
         return {}
     try:
-        raw = yf.download(tickers, period="2d", auto_adjust=True, progress=False)
-        prices = {}
-        if len(tickers) == 1:
-            close = raw["Close"].squeeze()
-            prices[tickers[0]] = float(close.iloc[-1])
-        else:
-            for t in tickers:
-                try:
-                    prices[t] = float(raw["Close"][t].dropna().iloc[-1])
-                except Exception:
-                    logger.warning("Could not get price for %s", t)
-        return prices
+        from broker import market_data
+        return market_data.get_latest_prices(tickers)
     except Exception as exc:
-        logger.error("yfinance price fetch failed: %s", exc)
+        logger.error("Price fetch failed: %s", exc)
         return {}
 
 
@@ -108,25 +98,13 @@ def _log_exit(log_entries: list) -> None:
 
 def _compute_atr(ticker: str, period: int = 14) -> float | None:
     """
-    Compute Average True Range (ATR) for a ticker over `period` days.
-    Uses 60 days of OHLC data to ensure enough history after any gaps.
-    Returns the ATR in price units, or None on error.
+    Average True Range via the real-time data layer (Alpaca daily bars,
+    yfinance fallback inside market_data). Kept here for backward
+    compatibility — monitor.py and remote_commands.py import it.
     """
     try:
-        raw = yf.download(ticker, period="60d", auto_adjust=True, progress=False)
-        if raw.empty or len(raw) < period + 1:
-            return None
-        high  = raw["High"].squeeze()
-        low   = raw["Low"].squeeze()
-        close = raw["Close"].squeeze()
-        prev_close = close.shift(1)
-        tr = (
-            (high - low).abs()
-            .combine((high - prev_close).abs(), max)
-            .combine((low  - prev_close).abs(), max)
-        )
-        atr = float(tr.rolling(period).mean().iloc[-1])
-        return round(atr, 4) if not (atr != atr) else None  # NaN guard
+        from broker import market_data
+        return market_data.compute_atr(ticker, period=period)
     except Exception as exc:
         logger.debug("ATR compute error for %s: %s", ticker, exc)
         return None

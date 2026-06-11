@@ -1,5 +1,5 @@
 # 🧠 Agent Memory — Investment Alpha Trading System
-# Last Updated: 2026-05-15 (Session 005 — Alpaca Reconciliation, Congressional Signal, Ticker Pruning)
+# Last Updated: 2026-06-10 (Session 006 — Discord approval system, learning overhaul, strategy sleeves)
 # Purpose: Persistent context for the trading agent to learn from user decisions and constraints
 
 ---

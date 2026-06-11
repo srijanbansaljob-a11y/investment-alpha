@@ -1,0 +1,75 @@
+name: Strategy Sleeves
+
+# Daily after the US close: mean-reversion scan posts BUY/EXIT proposals
+# with approval buttons to Discord. On the first weekday of each month the
+# dual-momentum compass card posts too. NOTHING trades without your tap.
+
+on:
+  schedule:
+    - cron: "30 21 * * 1-5"   # 21:30 UTC = 4:30 PM EST / 5:30 PM EDT
+  workflow_dispatch:
+
+permissions:
+  contents: write   # commit sleeve/journal state back to the repo
+
+concurrency:
+  group: discord-commands     # share the trade lock with command runs
+  cancel-in-progress: false
+
+jobs:
+  sleeves:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Mean-reversion scan
+        env:
+          ALPACA_API_KEY:      ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:   ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL:     ${{ secrets.ALPACA_BASE_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_BOT_TOKEN:   ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:  ${{ secrets.DISCORD_CHANNEL_ID }}
+          FINNHUB_API_KEY:     ${{ secrets.FINNHUB_API_KEY }}
+        run: python strategies/mean_reversion.py
+
+      - name: Dual momentum compass (first weekday of month)
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_BOT_TOKEN:   ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:  ${{ secrets.DISCORD_CHANNEL_ID }}
+        run: |
+          DOM=$(date -u +%d)
+          DOW=$(date -u +%u)
+          # run on days 1-3 only if it's the first weekday window
+          if [ "$DOM" -le 03 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python strategies/dual_momentum.py
+          else
+            echo "Not the monthly window — skipping compass"
+          fi
+
+      - name: Commit state back (sleeve, shadow, journal)
+        run: |
+          git config user.name "investment-alpha-bot"
+          git config user.email "actions@github.com"
+          git add data/*.json || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: strategy state update [skip ci]"
+            git pull --rebase origin main || true
+            git push
+          else
+            echo "No state changes to commit"
+          fi

@@ -348,3 +348,41 @@ Files created/modified:
 - Consider automating monitor startup via Windows Task Scheduler (starts at market open 9:30 ET)
 
 ---
+
+## SESSION 006 — 2026-06-10 — Discord Approval System + Learning Overhaul + Strategy Sleeves
+
+**What was done** (two waves, both deployed via Cowork):
+
+*Wave 1 — Discord button approval system:*
+- monitor.py is now ALERT-ONLY: the 5-min auto-sell countdown was REMOVED (GitHub Actions is stateless, countdown unenforceable; approval-first design). Stop-loss/profit-target alerts carry ✅ Approve / ❌ Reject buttons.
+- New broker/discord_notify.py (bot-API messages with buttons, channel-history dedupe replacing pending_actions.json in cloud).
+- New broker/remote_commands.py (cloud dispatcher; ALL state from Alpaca API).
+- New worker/ (Cloudflare Worker: Ed25519 verification, OWNER_ID lock, GitHub repository_dispatch bridge). Deployed at investment-alpha-bot.srijan-alpha.workers.dev.
+- Slash commands: /status /regime /monitor /stoploss /pipeline /help (scripts/register_discord_commands.py). Execute-class commands require a confirm button.
+- Workflows: command.yml (repository_dispatch), daily_summary.yml (9AM ET, DST-safe), monitor.yml cron widened to 13:00–21:45 UTC (DST gap fixed).
+- Fixed latent bug: stop_loss.py imported nonexistent get_trading_client (→ get_client).
+- End-to-end verified: /status works from Discord; routing tests pass (stranger blocked, reject never trades, execute needs confirm).
+
+*Wave 2 — correctness + learning + strategies:*
+- regime.py _safe_fallback now returns NEUTRAL (was BULL — data outage meant silent max-risk-on). REGIME_FALLBACK in config.
+- /regime card shows inputs (VIX, SPX vs 200MA, yield curve, credit) + why.
+- New broker/market_data.py: real-time prices/opens/ATR via Alpaca IEX → Finnhub → yfinance. monitor.py + stop_loss.py rewired (fixes 15-min Yahoo lag for intraday decisions).
+- New pipeline/shadow.py: logs top-30 with factor scores every run (3× observations, kills selection bias). Hooked into main.py Stage 5B.
+- New pipeline/learning.py: weekly, per-regime weights (bull/neutral/bear), EWMA IC, gentle 2% drift; exports active regime's weights to learned_weights.json (scoring.py unchanged).
+- New pipeline/postmortem.py: stop-loss post-mortem (recovered = too tight → ATR multiplier suggestions, STOP_TUNING_AUTO=False) + decision journal review (human vs model scoring).
+- Decision journal: every ✅/❌ logged to data/decision_journal.json, committed back to repo by workflows.
+- New strategies/mean_reversion.py: RSI(2)<10 dips in uptrends, 10% sleeve, 5 slots, button-approved buys (approve_buy flow added to worker + remote_commands), exits on 5-day MA snap-back or time stop.
+- New strategies/dual_momentum.py: monthly SPY/VEU/AGG vs BIL compass, advisory only.
+- New workflows: strategies.yml (daily 21:30 UTC), learning.yml (Sat 12:00 UTC); both + command.yml commit data/*.json state back to the repo.
+
+**Key decisions**:
+- Nothing trades without an explicit owner button press. No auto-execution anywhere.
+- Data failure = NEUTRAL regime, never BULL.
+- GitHub repo doubles as the persistence layer for journals/sleeve state (commit-back pattern).
+- TradersPost evaluated as off-the-shelf alternative; rejected in favor of custom Discord buttons ($0, full control).
+
+**Watch-outs**:
+- OneDrive sync corrupts/truncates files (null bytes AND truncation observed this session). Always verify after writes.
+- Discord interaction tokens expire ~15 min: long pipeline runs fall back to fresh channel messages.
+
+**Next steps**: push to GitHub, redeploy worker, watch first MR sleeve proposals and Saturday learning report. Go/no-go live review ~2026-08-01.

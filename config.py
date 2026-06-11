@@ -325,6 +325,25 @@ for t in SP500_TICKERS + CUSTOM_TICKERS + MIDCAP_TICKERS:
         _seen.add(t)
         ALL_TICKERS.append(t)
 
+# ── Regime safety ──────────────────────────────────────────────────────────
+# Regime to assume when market data is UNAVAILABLE (yfinance outage etc).
+# Used to be BULL — a data failure silently meant maximum risk-on. Now NEUTRAL.
+REGIME_FALLBACK = "neutral"
+
+# ── Mean-reversion sleeve (strategies/mean_reversion.py) ───────────────────
+MR_ENABLED       = True    # daily scan posts BUY/EXIT proposals to Discord
+MR_SLEEVE_PCT    = 0.10    # fraction of equity allocated to the sleeve
+MR_MAX_POSITIONS = 5       # sleeve slots (per-trade = MR_SLEEVE_PCT / slots)
+MR_RSI_ENTRY     = 10      # RSI(2) below this = oversold dip in an uptrend
+MR_MAX_HOLD_DAYS = 10      # time stop (trading days)
+# MR_UNIVERSE   = [...]    # optional override; defaults to liquid mega-caps
+
+# ── Dual momentum compass (strategies/dual_momentum.py) ────────────────────
+DM_ENABLED = True          # monthly advisory card (never trades)
+
+# ── Stop-loss post-mortem (pipeline/postmortem.py) ─────────────────────────
+STOP_TUNING_AUTO = False   # suggestions only; you change multipliers manually
+
 # ── Output ─────────────────────────────────────────────────────────────────
 OUTPUT_JSON_FILE  = OUTPUT_DIR / "trading_output.json"
 OUTPUT_HTML_FILE  = OUTPUT_DIR / "trading_output.html"

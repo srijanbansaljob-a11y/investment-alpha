@@ -248,7 +248,9 @@ def _get_stop_price(ticker: str, entry_price: float) -> float | None:
     atr_mult = atr_mults.get(regime, 2.0)
 
     if use_atr:
-        atr = _compute_atr(ticker, period=atr_period)
+        # Real-time-capable ATR (Alpaca bars → yfinance fallback)
+        from broker import market_data
+        atr = market_data.compute_atr(ticker, period=atr_period)
         if atr and atr > 0:
             return entry_price - (atr_mult * atr)
 
@@ -261,34 +263,11 @@ def _get_stop_price(ticker: str, entry_price: float) -> float | None:
 
 def _get_today_opens(tickers: list) -> dict:
     """
-    Fetch today's opening price for each ticker using 5-minute bars.
-    Returns {ticker: open_price} — value is None if data unavailable.
+    Today's opening price per ticker via the real-time data layer
+    (Alpaca IEX → Finnhub → yfinance). {ticker: open_price or None}
     """
-    if not tickers:
-        return {}
-    try:
-        raw = yf.download(
-            tickers,
-            period="1d",
-            interval="5m",
-            progress=False,
-            auto_adjust=True,
-        )
-        result = {}
-        if len(tickers) == 1:
-            col = raw["Open"].squeeze()
-            result[tickers[0]] = float(col.iloc[0]) if not col.empty else None
-        else:
-            for t in tickers:
-                try:
-                    col = raw["Open"][t].dropna()
-                    result[t] = float(col.iloc[0]) if not col.empty else None
-                except Exception:
-                    result[t] = None
-        return result
-    except Exception as exc:
-        log.warning("Could not fetch today's opens via yfinance: %s", exc)
-        return {t: None for t in tickers}
+    from broker import market_data
+    return market_data.get_today_opens(tickers)
 
 
 # ── Core Check Loop ────────────────────────────────────────────────────────

@@ -225,6 +225,15 @@ def run_pipeline(
         log.error("Pipeline aborted: Stage 5 (Selection) failed")
         return {"error": "selection_failed"}
 
+    # Stage 5B: Shadow portfolio snapshot — top-30 with factor scores.
+    # Feeds the weekly learning loop with ~3x more observations than
+    # bought-only feedback, including the stocks the model skipped.
+    try:
+        from pipeline import shadow as shadow_module
+        shadow_module.record(filter_result, regime_result=regime_result, top_k=30)
+    except Exception as exc:
+        log.warning("Shadow snapshot failed (non-fatal): %s", exc)
+
     # Stage 6: Portfolio (score-weighted or equal, entry_price recorded)
     port_result = portfolio.run(sel_result, regime_result=regime_result)
     if port_result["status"] == "failed":

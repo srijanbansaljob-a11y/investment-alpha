@@ -43,6 +43,18 @@ If the same breach persists, you'll get at most **one alert per ticker per day**
 
 ---
 
+## New cards you'll see (June 2026 upgrade)
+
+| Card | When | What to do |
+|---|---|---|
+| 📉→📈 **MR SLEEVE BUY** | Daily after close, when a liquid uptrend stock has a sharp dip | ✅ buys ~2% of equity · ❌ skips. Max 5 sleeve positions (10% of equity total) |
+| 🔁 **MR SLEEVE EXIT** | When a sleeve stock snaps back above its 5-day MA (or 10-day time stop) | ✅ closes the sleeve position |
+| 🧭 **Monthly Asset Compass** | First weekday of each month | Advisory only. RISK-ON = carry on. DEFENSIVE = consider fewer positions/tighter stops |
+| 🔬 **Stop-Loss Post-Mortem** | Saturdays (when there are matured exits) | If stops look too tight, it suggests a new ATR multiplier — your call to change config |
+| 🧠 **Human vs Model** | Saturdays | Scores your past ✅/❌ decisions vs what actually happened |
+
+`/regime` now shows its inputs (VIX, SPX vs 200MA, yield curve, credit spreads) and **why** — remember it measures the structural trend, not today's candle. Data failures now read NEUTRAL, never BULL.
+
 ## Typical weekly routine
 
 1. **Every morning 9 AM ET** — summary card posts automatically. Glance, done.

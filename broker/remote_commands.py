@@ -15,9 +15,9 @@ KEY DESIGN RULES (from the BA analysis):
 Payload (JSON via --payload or COMMAND_PAYLOAD env var):
   {
     "command": "status|regime|monitor_check|stoploss_check|stoploss_execute|
-                pipeline_dry|pipeline_execute|approve_sell|reject",
-    "ticker": "AAPL",                  # approve_sell / reject only
-    "trigger": "stop_loss",            # approve_sell / reject only
+                pipeline_dry|pipeline_execute|approve_sell|approve_buy|reject",
+    "ticker": "AAPL",                  # approval buttons only
+    "trigger": "stop_loss",            # approval buttons only
     "message_id": "...",               # original alert message (to edit)
     "channel_id": "...",
     "application_id": "...",           # deferred slash commands
@@ -86,20 +86,47 @@ def _stop_price(ticker: str, entry: float, regime: str) -> tuple[float, str]:
     return entry * pct, f"fixed {pct:.0%}"
 
 
-def _detect_regime() -> str:
-    """Lightweight regime read: SPY vs 50/200-day SMA (no local state needed)."""
+def _full_regime() -> dict:
+    """Full pipeline regime (VIX + SPX 200MA + yield curve + credit spreads).
+    Falls back to a light SPY-only check, then NEUTRAL."""
+    try:
+        from pipeline import regime as regime_module
+        return regime_module.run()
+    except Exception as exc:
+        log.warning("Full regime failed (%s) — using light fallback", exc)
     try:
         import yfinance as yf
         spy = yf.download("SPY", period="300d", auto_adjust=True, progress=False)["Close"].squeeze()
         price, sma50, sma200 = float(spy.iloc[-1]), float(spy.rolling(50).mean().iloc[-1]), float(spy.rolling(200).mean().iloc[-1])
-        if price > sma50 > sma200:
-            return "bull"
-        if price < sma200:
-            return "bear"
-        return "neutral"
+        regime = "bull" if price > sma50 > sma200 else ("bear" if price < sma200 else "neutral")
+        return {"regime": regime, "notes": "light fallback: SPY vs 50/200 SMA only"}
     except Exception as exc:
-        log.warning("Regime detect failed (%s) — defaulting to neutral", exc)
-        return "neutral"
+        log.warning("Light regime failed too (%s) — NEUTRAL", exc)
+        return {"regime": "neutral", "notes": "all regime data unavailable — defaulting to caution"}
+
+
+def _detect_regime() -> str:
+    return _full_regime().get("regime", "neutral")
+
+
+# ── Decision journal (persisted via workflow commit-back) ──────────────────
+
+def _journal(event: dict) -> None:
+    """Append a decision/action record to data/decision_journal.json.
+    The command workflow commits this file back to the repo after each run,
+    so your approvals/rejections accumulate into a learning dataset."""
+    try:
+        path = config.DATA_DIR / "decision_journal.json"
+        entries = []
+        if path.exists():
+            raw = path.read_bytes().rstrip(b"\x00")
+            if raw:
+                entries = json.loads(raw)
+        event["timestamp"] = datetime.now(timezone.utc).isoformat()
+        entries.append(event)
+        path.write_text(json.dumps(entries, indent=2), encoding="utf-8")
+    except Exception as exc:
+        log.warning("Decision journal write failed: %s", exc)
 
 
 # ── Commands ───────────────────────────────────────────────────────────────
@@ -130,12 +157,27 @@ def cmd_status(payload):
 
 
 def cmd_regime(payload):
-    regime = _detect_regime()
+    r = _full_regime()
+    regime = r.get("regime", "neutral")
     color = {"bull": _GREEN, "neutral": _ORANGE, "bear": _RED}[regime]
+
+    def fmt(v, suffix=""):
+        return f"{v}{suffix}" if v is not None else "n/a"
+
+    fields = [
+        {"name": "VIX", "value": fmt(r.get("vix_current")), "inline": True},
+        {"name": "SPX vs 200MA", "value": fmt(r.get("spx_vs_200ma_pct"), "%"), "inline": True},
+        {"name": "SPX", "value": fmt(r.get("spx_price")), "inline": True},
+        {"name": "Yield curve (10Y−3M)", "value": fmt(r.get("yield_curve_spread"), "pp"), "inline": True},
+        {"name": "Credit spread mom.", "value": fmt(r.get("credit_spread_momentum")), "inline": True},
+        {"name": "Why", "value": r.get("notes", "—"), "inline": False},
+    ]
     _reply(payload, [_embed(
         f"🧭 Market Regime: {regime.upper()}",
-        "Based on SPY vs 50/200-day moving averages.",
-        color,
+        "Regime measures the **structural trend** (200-day MA, volatility, credit), "
+        "not today's move — a red day inside an uptrend is still BULL. "
+        "Data failures now fall back to NEUTRAL, never BULL.",
+        color, fields,
     )])
 
 
@@ -189,6 +231,8 @@ def cmd_stoploss_execute(payload):
         r = close_position(client, t)
         ok = r.get("status") not in ("failed",)
         results.append(f"{'✅' if ok else '❌'} {t}: {r.get('status')}" + (f" — {r.get('error')}" if r.get("error") else ""))
+        _journal({"decision": "stoploss_execute", "ticker": t,
+                  "order_status": r.get("status"), "regime": regime})
     _reply(payload, [_embed(
         f"🛑 Stop-Loss Executed — {len(breached)} position(s)",
         "\n".join(results) + "\n\n" + "\n".join(rows),
@@ -221,6 +265,7 @@ def cmd_pipeline_dry(payload):
 
 def cmd_pipeline_execute(payload):
     ok, out = _run_pipeline(execute=True)
+    _journal({"decision": "pipeline_execute", "success": ok})
     _reply(payload, [_embed(
         "🚀 Pipeline — EXECUTED" + ("" if ok else " (FAILED)"),
         f"```\n{out}\n```", _GREEN if ok else _RED,
@@ -247,16 +292,30 @@ def _finalize_alert(payload, verdict: str, extra_field: dict | None = None):
 
 def cmd_approve_sell(payload):
     ticker = payload.get("ticker", "").upper()
+    trigger = payload.get("trigger", "")
     if not ticker:
         _reply(payload, [_embed("❌ Error", "No ticker in approval payload.", _RED)])
         return
     client = get_client()
-    if ticker not in get_positions(client):
+    positions = get_positions(client)
+    if ticker not in positions:
         _finalize_alert(payload, f"⚠️ No open {ticker} position — nothing sold")
         dn.post_message([_embed(f"⚠️ {ticker}", "Position no longer exists — no order placed.", _ORANGE)])
         return
+    price_now = positions[ticker]["current_price"]
     r = close_position(client, ticker)
     ok = r.get("status") not in ("failed",)
+    _journal({
+        "decision": "approve_sell", "ticker": ticker, "trigger": trigger,
+        "price_at_decision": price_now, "order_status": r.get("status"),
+        "pnl_pct_at_decision": round(positions[ticker]["unrealized_plpc"] * 100, 2),
+    })
+    if trigger == "mr_exit":
+        try:
+            from strategies.mean_reversion import remove_from_sleeve
+            remove_from_sleeve(ticker)
+        except Exception as exc:
+            log.warning("Sleeve state update failed: %s", exc)
     _finalize_alert(
         payload,
         f"✅ Approved by you — sell submitted {datetime.now(timezone.utc).strftime('%H:%M UTC')}" if ok
@@ -265,14 +324,75 @@ def cmd_approve_sell(payload):
     )
     dn.post_message([_embed(
         f"{'✅' if ok else '❌'} SELL {'submitted' if ok else 'FAILED'} — {ticker}",
-        f"Trigger: {payload.get('trigger', '?').replace('_', ' ')}\nStatus: **{r.get('status')}**"
+        f"Trigger: {trigger.replace('_', ' ') or '?'}\nStatus: **{r.get('status')}**"
         + (f"\nError: {r.get('error')}" if r.get("error") else ""),
         _GREEN if ok else _RED,
     )])
 
 
+def cmd_approve_buy(payload):
+    """Sleeve BUY approved (mean-reversion proposals). Sized from sleeve budget."""
+    ticker = payload.get("ticker", "").upper()
+    if not ticker:
+        _reply(payload, [_embed("❌ Error", "No ticker in buy payload.", _RED)])
+        return
+    client = get_client()
+    if ticker in get_positions(client):
+        _finalize_alert(payload, f"⚠️ {ticker} already held — no additional buy")
+        return
+
+    from broker.alpaca_client import place_market_order
+    from broker import market_data
+    acct = get_account_summary(client)
+    sleeve_pct = getattr(config, "MR_SLEEVE_PCT", 0.10)
+    max_pos = getattr(config, "MR_MAX_POSITIONS", 5)
+    notional = acct["equity"] * sleeve_pct / max_pos
+    prices = market_data.get_latest_prices([ticker])
+    price = prices.get(ticker)
+    if not price:
+        _finalize_alert(payload, f"❌ Could not price {ticker} — no order placed")
+        return
+    qty = round(notional / price, 4)
+    r = place_market_order(client, ticker, qty, "buy")
+    ok = r.get("status") not in ("failed", None)
+    _journal({
+        "decision": "approve_buy", "ticker": ticker, "trigger": payload.get("trigger", "mr"),
+        "price_at_decision": price, "qty": qty, "order_status": r.get("status"),
+    })
+    if ok:
+        try:
+            from strategies.mean_reversion import add_to_sleeve
+            add_to_sleeve(ticker, price, qty)
+        except Exception as exc:
+            log.warning("Sleeve state update failed: %s", exc)
+    _finalize_alert(
+        payload,
+        f"✅ Approved — BUY {qty} {ticker} submitted" if ok else "❌ Approved but order FAILED",
+        {"name": "Order", "value": f"{r.get('status')} (id: {r.get('order_id', 'n/a')})", "inline": False},
+    )
+    dn.post_message([_embed(
+        f"{'✅' if ok else '❌'} BUY {'submitted' if ok else 'FAILED'} — {ticker}",
+        f"Mean-reversion sleeve · {qty} shares @ ~${price:.2f} (≈${notional:,.0f})\n"
+        f"Status: **{r.get('status')}**" + (f"\nError: {r.get('error')}" if r.get("error") else ""),
+        _GREEN if ok else _RED,
+    )])
+
+
 def cmd_reject(payload):
-    _finalize_alert(payload, "❌ Rejected by you — position kept")
+    ticker = payload.get("ticker", "").upper()
+    if ticker:
+        prices = {}
+        try:
+            from broker import market_data
+            prices = market_data.get_latest_prices([ticker])
+        except Exception:
+            pass
+        _journal({
+            "decision": "reject", "ticker": ticker,
+            "trigger": payload.get("trigger", ""),
+            "price_at_decision": prices.get(ticker),
+        })
+    # The worker already updated the message UI — journal is the real work here.
 
 
 # ── Entry point ────────────────────────────────────────────────────────────
@@ -286,6 +406,7 @@ COMMANDS = {
     "pipeline_dry":      cmd_pipeline_dry,
     "pipeline_execute":  cmd_pipeline_execute,
     "approve_sell":      cmd_approve_sell,
+    "approve_buy":       cmd_approve_buy,
     "reject":            cmd_reject,
 }
 
@@ -316,3 +437,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+# build: 2026-06-10 wave-2

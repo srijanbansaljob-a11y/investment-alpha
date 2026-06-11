@@ -47,18 +47,26 @@ async function verifySignature(request, bodyText, publicKey) {
 }
 
 // ── GitHub dispatch ────────────────────────────────────────────────────────
+// Returns null on success, or a diagnostic string on failure.
 async function dispatchToGitHub(env, payload) {
-  const r = await fetch(`https://api.github.com/repos/${env.GH_REPO}/dispatches`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.GH_TOKEN}`,
-      Accept: "application/vnd.github+json",
-      "Content-Type": "application/json",
-      "User-Agent": "investment-alpha-worker",
-    },
-    body: JSON.stringify({ event_type: "discord-command", client_payload: payload }),
-  });
-  return r.status === 204;
+  let r;
+  try {
+    r = await fetch(`https://api.github.com/repos/${env.GH_REPO}/dispatches`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${(env.GH_TOKEN || "").trim()}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "User-Agent": "investment-alpha-worker",
+      },
+      body: JSON.stringify({ event_type: "discord-command", client_payload: payload }),
+    });
+  } catch (e) {
+    return `fetch error: ${e.message}`;
+  }
+  if (r.status === 204) return null;
+  const body = (await r.text()).slice(0, 200);
+  return `GitHub HTTP ${r.status} for repo "${env.GH_REPO}": ${body}`;
 }
 
 const json = (obj) => new Response(JSON.stringify(obj), {
@@ -98,31 +106,62 @@ export default {
       const [tag, action, ticker, trigger] = (i.data.custom_id || "").split("|");
       if (tag !== "ia") return ephemeral("Unknown button.");
 
-      // Reject: handled entirely here — strip buttons, stamp the verdict
+      // Reject: instant UI update here + background dispatch so the
+      // decision journal records it (your rejects are learning data too)
       if (action === "reject") {
+        await dispatchToGitHub(env, {
+          command: "reject", ticker, trigger, message_id: i.message.id, ...common,
+        }); // best-effort — UI updates regardless
         const embeds = i.message.embeds || [];
-        if (embeds[0]) embeds[0].footer = { text: "❌ Rejected by you — position kept" };
+        if (embeds[0]) embeds[0].footer = { text: trigger === "mr"
+          ? "❌ Skipped by you — no buy"
+          : "❌ Rejected by you — position kept" };
         return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: [] } });
+      }
+
+      // Approve buy (strategy sleeve proposals): GitHub sizes + executes
+      if (action === "approve_buy") {
+        const err = await dispatchToGitHub(env, {
+          command: "approve_buy", ticker, trigger,
+          message_id: i.message.id, ...common,
+        });
+        const embeds = i.message.embeds || [];
+        if (embeds[0]) {
+          embeds[0].footer = { text: err
+            ? `❌ Approval NOT executed — ${err}`
+            : `⏳ Approved — sizing & submitting BUY ${ticker}…` };
+        }
+        return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: err ? i.message.components : [] } });
       }
 
       // Approve sell: acknowledge instantly, then GitHub executes via Alpaca
       if (action === "approve_sell") {
-        const embeds = i.message.embeds || [];
-        if (embeds[0]) embeds[0].footer = { text: `⏳ Approved — submitting SELL ${ticker}…` };
-        await dispatchToGitHub(env, {
+        const err = await dispatchToGitHub(env, {
           command: "approve_sell", ticker, trigger,
           message_id: i.message.id, ...common,
         });
-        return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: [] } });
+        const embeds = i.message.embeds || [];
+        if (embeds[0]) {
+          embeds[0].footer = { text: err
+            ? `❌ Approval NOT executed — ${err}`
+            : `⏳ Approved — submitting SELL ${ticker}…` };
+        }
+        // Keep the buttons if dispatch failed so you can retry
+        return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: err ? i.message.components : [] } });
       }
 
       // Confirm prompts for execute-class commands
       if (action === "confirm_pipeline_execute" || action === "confirm_stoploss_execute") {
         const command = action === "confirm_pipeline_execute" ? "pipeline_execute" : "stoploss_execute";
-        await dispatchToGitHub(env, { command, ...common });
+        const err = await dispatchToGitHub(env, { command, ...common });
         return json({
           type: R_UPDATE_MESSAGE,
-          data: { content: `🚀 Confirmed — \`${command}\` is running. Results will post here in ~2–5 min (pipeline runs can take longer).`, components: [] },
+          data: {
+            content: err
+              ? `❌ NOT executed — ${err}`
+              : `🚀 Confirmed — \`${command}\` is running. Results will post here in ~2–5 min (pipeline runs can take longer).`,
+            components: err ? i.message.components : [],
+          },
         });
       }
 
@@ -193,8 +232,8 @@ export default {
       const command = map[name];
       if (!command) return ephemeral("Unknown command.");
 
-      const ok = await dispatchToGitHub(env, { command, ...common });
-      if (!ok) return ephemeral("❌ Could not reach GitHub — check the worker's GH_TOKEN/GH_REPO secrets.");
+      const err = await dispatchToGitHub(env, { command, ...common });
+      if (err) return ephemeral(`❌ Could not reach GitHub — ${err}`);
       return json({ type: R_DEFERRED_MESSAGE });
     }
 
