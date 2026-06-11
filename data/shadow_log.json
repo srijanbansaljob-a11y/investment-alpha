@@ -1,0 +1,149 @@
+[
+  {
+    "date": "2026-06-11",
+    "regime": "neutral",
+    "evaluated": false,
+    "stocks": [
+      {
+        "ticker": "HST",
+        "rank": 1,
+        "composite": 0.615,
+        "price": 23.95,
+        "scores": {
+          "momentum": 0.6839,
+          "trend": 0.6326,
+          "quality": 0.5779,
+          "valuation": 0.8585,
+          "sentiment": 0.4469,
+          "volatility": 0.2066
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "rank": 2,
+        "composite": 0.6093,
+        "price": 15.77,
+        "scores": {
+          "momentum": 0.7861,
+          "trend": 0.6356,
+          "quality": 0.5055,
+          "valuation": 0.9494,
+          "sentiment": 0.4906,
+          "volatility": 0.5122
+        }
+      },
+      {
+        "ticker": "BIIB",
+        "rank": 3,
+        "composite": 0.5894,
+        "price": 194.24,
+        "scores": {
+          "momentum": 0.6996,
+          "trend": 0.6602,
+          "quality": 0.6498,
+          "valuation": 0.7542,
+          "sentiment": 0.5006,
+          "volatility": 0.5382
+        }
+      },
+      {
+        "ticker": "MATX",
+        "rank": 4,
+        "composite": 0.577,
+        "price": 193.43,
+        "scores": {
+          "momentum": 0.7308,
+          "trend": 0.7155,
+          "quality": 0.4649,
+          "valuation": 0.8738,
+          "sentiment": 0.3674,
+          "volatility": 0.5156
+        }
+      },
+      {
+        "ticker": "CHRD",
+        "rank": 5,
+        "composite": 0.5721,
+        "price": 138.25,
+        "scores": {
+          "momentum": 0.7766,
+          "trend": 0.6007,
+          "quality": 0.4786,
+          "valuation": 0.8385,
+          "sentiment": 0.5943,
+          "volatility": 0.7257
+        }
+      },
+      {
+        "ticker": "MRK",
+        "rank": 6,
+        "composite": 0.5718,
+        "price": 119.09,
+        "scores": {
+          "momentum": 0.6318,
+          "trend": 0.7051,
+          "quality": 0.5984,
+          "valuation": 0.6697,
+          "sentiment": 0.4954,
+          "volatility": 0.3316
+        }
+      },
+      {
+        "ticker": "EIX",
+        "rank": 7,
+        "composite": 0.5712,
+        "price": 71.5,
+        "scores": {
+          "momentum": 0.6675,
+          "trend": 0.6977,
+          "quality": 0.4531,
+          "valuation": 0.8562,
+          "sentiment": 0.3574,
+          "volatility": 0.2014
+        }
+      },
+      {
+        "ticker": "EOG",
+        "rank": 8,
+        "composite": 0.5662,
+        "price": 140.28,
+        "scores": {
+          "momentum": 0.6508,
+          "trend": 0.7012,
+          "quality": 0.5988,
+          "valuation": 0.7577,
+          "sentiment": 0.479,
+          "volatility": 0.434
+        }
+      },
+      {
+        "ticker": "VLO",
+        "rank": 9,
+        "composite": 0.5595,
+        "price": 257.99,
+        "scores": {
+          "momentum": 0.7576,
+          "trend": 0.763,
+          "quality": 0.5854,
+          "valuation": 0.494,
+          "sentiment": 0.4101,
+          "volatility": 0.6545
+        }
+      },
+      {
+        "ticker": "ALL",
+        "rank": 10,
+        "composite": 0.5577,
+        "price": 223.34,
+        "scores": {
+          "momentum": 0.45,
+          "trend": 0.6604,
+          "quality": 0.6287,
+          "valuation": 0.8282,
+          "sentiment": 0.4438,
+          "volatility": 0.2049
+        }
+      }
+    ]
+  }
+]

@@ -2803,5 +2803,160 @@
       "start_date": "2026-05-01",
       "end_date": "2026-07-30"
     }
+  },
+  {
+    "timestamp": "2026-06-11T17:17:22.566732+00:00",
+    "run_date": "2026-05-01",
+    "regime": "unknown",
+    "total_capital": 1000.0,
+    "portfolio_value": 1011.67,
+    "realised_pnl": 0.0,
+    "total_portfolio_value": 1011.67,
+    "total_return_pct": 1.1673,
+    "benchmark_return_pct": 0.7438,
+    "alpha_pct": 0.4235,
+    "sharpe_ratio": 0.7233,
+    "max_drawdown_pct": -1.337,
+    "win_rate_pct": 75.0,
+    "avg_gain_pct": 1.59,
+    "avg_loss_pct": -0.28,
+    "positions": [
+      {
+        "ticker": "HST",
+        "weight": 0.158488,
+        "entry_price": 23.95,
+        "current_price": 24.205,
+        "cost_basis": 158.49,
+        "current_value": 160.18,
+        "unrealised_pnl": 1.69,
+        "unrealised_pct": 1.06,
+        "score": 0.615,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "weight": 0.113507,
+        "entry_price": 15.77,
+        "current_price": 15.92,
+        "cost_basis": 113.51,
+        "current_value": 114.59,
+        "unrealised_pnl": 1.08,
+        "unrealised_pct": 0.95,
+        "score": 0.6093,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "BIIB",
+        "weight": 0.109626,
+        "entry_price": 194.24,
+        "current_price": 198.77,
+        "cost_basis": 109.63,
+        "current_value": 112.18,
+        "unrealised_pnl": 2.56,
+        "unrealised_pct": 2.33,
+        "score": 0.5894,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "MATX",
+        "weight": 0.113186,
+        "entry_price": 193.43,
+        "current_price": 197.09,
+        "cost_basis": 113.19,
+        "current_value": 115.33,
+        "unrealised_pnl": 2.14,
+        "unrealised_pct": 1.89,
+        "score": 0.577,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "CHRD",
+        "weight": 0.083978,
+        "entry_price": 138.25,
+        "current_price": 138.11,
+        "cost_basis": 83.98,
+        "current_value": 83.89,
+        "unrealised_pnl": -0.09,
+        "unrealised_pct": -0.1,
+        "score": 0.5721,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "MRK",
+        "weight": 0.13754,
+        "entry_price": 119.09,
+        "current_price": 121.38,
+        "cost_basis": 137.54,
+        "current_value": 140.18,
+        "unrealised_pnl": 2.64,
+        "unrealised_pct": 1.92,
+        "score": 0.5718,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "EIX",
+        "weight": 0.159079,
+        "entry_price": 71.5,
+        "current_price": 72.4959,
+        "cost_basis": 159.08,
+        "current_value": 161.29,
+        "unrealised_pnl": 2.22,
+        "unrealised_pct": 1.39,
+        "score": 0.5712,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "EOG",
+        "weight": 0.124597,
+        "entry_price": 140.28,
+        "current_price": 139.64,
+        "cost_basis": 124.6,
+        "current_value": 124.03,
+        "unrealised_pnl": -0.57,
+        "unrealised_pct": -0.46,
+        "score": 0.5662,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      }
+    ],
+    "closed_positions": [],
+    "paper_trading": {
+      "in_validation": true,
+      "days_elapsed": 41,
+      "days_remaining": 49,
+      "start_date": "2026-05-01",
+      "end_date": "2026-07-30"
+    }
   }
 ]
