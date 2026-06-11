@@ -272,6 +272,217 @@ def cmd_pipeline_execute(payload):
     )])
 
 
+def cmd_strategy(payload):
+    """Self-describing strategy card — generated LIVE from config.py and the
+    learned-weights files, so it always reflects the system as it runs today."""
+    # Active factor weights (learned beat defaults)
+    weights = None
+    source = "config defaults"
+    lw = Path(getattr(config, "LEARNED_WEIGHTS_FILE", "data/learned_weights.json"))
+    if not lw.is_absolute():
+        lw = config.BASE_DIR / lw
+    if lw.exists():
+        try:
+            weights = json.loads(lw.read_bytes().rstrip(b"\x00"))
+            source = "learned (adaptive)"
+        except Exception:
+            pass
+    if weights is None:
+        weights = getattr(config, "FACTOR_WEIGHTS_WITH_SENTIMENT", config.FACTOR_WEIGHTS)
+    w_lines = " · ".join(f"{k} {v*100:.0f}%" for k, v in sorted(weights.items(), key=lambda x: -x[1]))
+
+    # Learning state
+    v2 = config.DATA_DIR / "learned_weights_v2.json"
+    learn_line = "Weekly per-regime learning: not yet started (needs first Saturday run)"
+    if v2.exists():
+        try:
+            store = json.loads(v2.read_bytes().rstrip(b"\x00"))
+            obs = {r: n["n_obs"] for r, n in store.get("regimes", {}).items()}
+            learn_line = ("Weekly per-regime learning active — observations: "
+                          + ", ".join(f"{r} {n}" for r, n in obs.items()))
+        except Exception:
+            pass
+
+    top_n = getattr(config, "REGIME_TOP_N", {})
+    atr_m = getattr(config, "ATR_STOP_MULTIPLIER", {})
+    desc = (
+        f"**1️⃣ Core: {len(weights)}-factor monthly rotation** "
+        f"(universe: {len(getattr(config, 'ALL_TICKERS', []))} US stocks)\n"
+        f"Each stock is scored on: **{w_lines}**\n"
+        f"_Weights source: {source}. Volatility is a penalty; sentiment blends analyst revisions"
+        + (" 70% + congressional trades 30%" if getattr(config, "CONGRESSIONAL_ENABLED", False) else "")
+        + "._\n"
+        f"**Filters:** drop if >{abs(getattr(config, 'MA200_HARD_EXCLUDE', -0.03))*100:.0f}% below 200-day MA "
+        f"(soft penalty within {getattr(config, 'MA200_SOFT_ZONE', 0.03)*100:.0f}%), "
+        f"sector ≤{getattr(config, 'SECTOR_MAX_WEIGHT', 0.30)*100:.0f}% of portfolio, "
+        f"no buys within {getattr(config, 'EARNINGS_BLACKOUT_DAYS', 5)}d of earnings.\n"
+        f"**Picks:** top {top_n.get('bull','10')} (bull) / {top_n.get('neutral','8')} (neutral) / "
+        f"{top_n.get('bear','5')} (bear) by composite score, sized inverse-volatility.\n"
+        f"**Stops:** ATR({getattr(config, 'ATR_PERIOD', 14)}) × "
+        f"{atr_m.get('bull','2.5')}/{atr_m.get('neutral','2.0')}/{atr_m.get('bear','1.5')} "
+        f"(bull/neutral/bear) — alerts with ✅/❌ buttons, never auto-sold.\n\n"
+    )
+    if getattr(config, "MR_ENABLED", False):
+        desc += (
+            f"**2️⃣ Mean-reversion sleeve** ({getattr(config, 'MR_SLEEVE_PCT', 0.10)*100:.0f}% of equity, "
+            f"max {getattr(config, 'MR_MAX_POSITIONS', 5)} slots)\n"
+            f"Buys RSI(2)<{getattr(config, 'MR_RSI_ENTRY', 10)} dips in stocks above their 200-day MA; "
+            f"exits on close > 5-day MA or {getattr(config, 'MR_MAX_HOLD_DAYS', 10)}-day time stop. "
+            f"Every entry/exit is a button proposal.\n\n"
+        )
+    if getattr(config, "DM_ENABLED", False):
+        desc += ("**3️⃣ Dual-momentum compass** (monthly, advisory)\n"
+                 "SPY vs VEU vs AGG vs T-bills, 12-month returns — warns when equities lose "
+                 "absolute momentum.\n\n")
+    desc += (
+        f"**🧠 How it learns:** shadow-logs the top-30 every run (not just buys); {learn_line}; "
+        f"stop exits get a 30-day post-mortem (too tight → ATR suggestion); "
+        f"your ✅/❌ decisions are scored vs the model every Saturday.\n"
+        f"**Regime now:** falls back to NEUTRAL on data failure (never BULL)."
+    )
+    _reply(payload, [_embed("📜 Current Strategy — live from config", desc, _BLUE,
+                            footer="Auto-generated from config.py + learned weights — always current")])
+
+
+def _render_stock_chart(ticker: str) -> tuple[bytes, str] | None:
+    """6-month price chart with SMA50/200, entry + stop if held. Returns (png, caption)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from broker import market_data
+
+    df = market_data.get_daily_bars(ticker, days=250)
+    if df is None or len(df) < 30:
+        return None
+    closes = df["Close"]
+    sma50 = closes.rolling(50).mean()
+    sma200 = closes.rolling(200).mean()
+
+    entry = stop = None
+    try:
+        client = get_client()
+        pos = get_positions(client).get(ticker)
+        if pos:
+            entry = pos["avg_entry_price"]
+            stop, _ = _stop_price(ticker, entry, _detect_regime())
+    except Exception:
+        pass
+
+    n = min(len(closes), 126)  # ~6 months shown
+    x = range(n)
+    fig, ax = plt.subplots(figsize=(10, 5), dpi=110)
+    ax.plot(x, closes.iloc[-n:].values, color="#3498DB", lw=1.8, label="Close")
+    if sma50.notna().any():
+        ax.plot(x, sma50.iloc[-n:].values, color="#E67E22", lw=1.2, label="SMA50")
+    if sma200.notna().any():
+        ax.plot(x, sma200.iloc[-n:].values, color="#95A5A6", lw=1.2, label="SMA200")
+    if entry:
+        ax.axhline(entry, color="#2ECC71", ls="--", lw=1.2, label=f"Entry ${entry:.2f}")
+    if stop:
+        ax.axhline(stop, color="#E74C3C", ls="--", lw=1.2, label=f"Stop ${stop:.2f}")
+    last = float(closes.iloc[-1])
+    ax.set_title(f"{ticker} — ${last:.2f}", fontsize=13, weight="bold")
+    ax.legend(loc="best", fontsize=8)
+    ax.grid(alpha=0.25)
+    ax.set_xticks([])
+    fig.tight_layout()
+    import io
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    plt.close(fig)
+    cap = f"${last:.2f}"
+    if entry:
+        cap += f" · {((last-entry)/entry*100):+.1f}% from entry"
+    return buf.getvalue(), cap
+
+
+def _render_portfolio_chart() -> tuple[bytes, str] | None:
+    """Equity curve vs SPY (normalised) + per-position P&L bars."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    client = get_client()
+    equity = None
+    try:
+        from alpaca.trading.requests import GetPortfolioHistoryRequest
+        hist = client.get_portfolio_history(
+            GetPortfolioHistoryRequest(period="3M", timeframe="1D"))
+        eq = [e for e in (hist.equity or []) if e]
+        if len(eq) >= 5:
+            equity = eq
+    except Exception as exc:
+        log.warning("Portfolio history failed: %s", exc)
+
+    positions = get_positions(client)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 7), dpi=110,
+                                   gridspec_kw={"height_ratios": [2, 1]})
+    caption = ""
+    if equity:
+        base = equity[0]
+        ax1.plot(range(len(equity)), [e / base * 100 for e in equity],
+                 color="#2ECC71", lw=2, label="Portfolio")
+        try:
+            import yfinance as yf
+            spy = yf.download("SPY", period="3mo", auto_adjust=True,
+                              progress=False)["Close"].squeeze().dropna()
+            ax1.plot([i * (len(equity) - 1) / max(len(spy) - 1, 1) for i in range(len(spy))],
+                     (spy / spy.iloc[0] * 100).values, color="#95A5A6", lw=1.3, label="SPY")
+        except Exception:
+            pass
+        total_ret = (equity[-1] / base - 1) * 100
+        caption = f"3-month equity: {total_ret:+.1f}% (${equity[-1]:,.0f})"
+        ax1.set_title(f"Portfolio vs SPY — 3 months (indexed to 100) · {total_ret:+.1f}%",
+                      fontsize=12, weight="bold")
+        ax1.legend(fontsize=9)
+        ax1.grid(alpha=0.25)
+        ax1.set_xticks([])
+    else:
+        ax1.text(0.5, 0.5, "Equity history unavailable", ha="center", va="center")
+        ax1.set_xticks([]); ax1.set_yticks([])
+
+    if positions:
+        items = sorted(positions.items(), key=lambda kv: kv[1]["unrealized_plpc"])
+        names = [t for t, _ in items]
+        pls = [p["unrealized_plpc"] * 100 for _, p in items]
+        colors = ["#E74C3C" if v < 0 else "#2ECC71" for v in pls]
+        ax2.barh(names, pls, color=colors)
+        ax2.set_title("Open positions — unrealised P&L %", fontsize=11)
+        ax2.grid(alpha=0.25, axis="x")
+    else:
+        ax2.text(0.5, 0.5, "No open positions", ha="center", va="center")
+        ax2.set_xticks([]); ax2.set_yticks([])
+    fig.tight_layout()
+    import io
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    plt.close(fig)
+    return buf.getvalue(), caption
+
+
+def cmd_chart(payload):
+    target = (payload.get("ticker") or "portfolio").upper().strip()
+    if target in ("PORTFOLIO", "ALL", "PF"):
+        result = _render_portfolio_chart()
+        title = "📈 Portfolio Chart"
+    else:
+        result = _render_stock_chart(target)
+        title = f"📈 {target} Chart"
+    if result is None:
+        _reply(payload, [_embed("❌ Chart failed",
+                                f"No price data found for `{target}`. Check the ticker symbol.", _RED)])
+        return
+    png, caption = result
+    embed = _embed(title, caption, _BLUE)
+    embed["image"] = {"url": "attachment://chart.png"}
+    posted = dn.post_image([embed], png)
+    # Resolve the deferred slash response
+    if posted:
+        _reply(payload, [_embed(title, "Chart posted below ⬇️", _BLUE)])
+    else:
+        _reply(payload, [_embed("❌ Chart upload failed", "Bot couldn't attach the image — check DISCORD_BOT_TOKEN.", _RED)])
+
+
 # ── Button decisions ───────────────────────────────────────────────────────
 
 def _finalize_alert(payload, verdict: str, extra_field: dict | None = None):
@@ -400,6 +611,8 @@ def cmd_reject(payload):
 COMMANDS = {
     "status":            cmd_status,
     "regime":            cmd_regime,
+    "strategy":          cmd_strategy,
+    "chart":             cmd_chart,
     "monitor_check":     cmd_monitor_check,
     "stoploss_check":    cmd_stoploss_check,
     "stoploss_execute":  cmd_stoploss_execute,

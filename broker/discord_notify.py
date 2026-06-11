@@ -162,6 +162,27 @@ def recent_alert_exists(ticker: str, trigger: str, limit: int = 50) -> bool:
         return False
 
 
+def post_image(embeds: list, png_bytes: bytes, filename: str = "chart.png") -> dict | None:
+    """POST a bot message with an attached PNG. The first embed should
+    reference it via {"image": {"url": "attachment://<filename>"}}."""
+    if not bot_configured():
+        log.warning("Bot not configured — cannot post image")
+        return None
+    try:
+        r = requests.post(
+            f"{API}/channels/{CHANNEL_ID}/messages",
+            headers={"Authorization": f"Bot {BOT_TOKEN}"},
+            data={"payload_json": json.dumps({"embeds": embeds})},
+            files={"files[0]": (filename, png_bytes, "image/png")},
+            timeout=20,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as exc:
+        log.error("Discord image post failed: %s", exc)
+        return None
+
+
 # ── Interaction follow-ups (deferred slash commands) ───────────────────────
 
 def edit_interaction_response(application_id: str, interaction_token: str,

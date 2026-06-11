@@ -29,6 +29,9 @@ If the same breach persists, you'll get at most **one alert per ticker per day**
 | Command | What it does | Orders? | Wait time |
 |---|---|---|---|
 | `/status` | All positions: qty, entry, current, P&L, stop distance, equity, cash, regime | No | ~1–2 min |
+| `/strategy` | How the model picks stocks — factors, weights, filters, stops, sleeves, learning state. Generated live from config, so it always reflects the latest changes | No | ~1–2 min |
+| `/chart symbol:AAPL` | 6-month price chart with SMA50/200, your entry & stop lines | No | ~2 min |
+| `/chart symbol:portfolio` | Equity curve vs SPY (3 months) + per-position P&L bars | No | ~2 min |
 | `/regime` | Market regime: BULL / NEUTRAL / BEAR (SPY vs 50/200-day SMA) | No | ~1–2 min |
 | `/monitor` | Immediate position check — alert cards post if anything triggers | No | ~2 min |
 | `/stoploss mode:check` | Each position vs its ATR stop, breach flags | No | ~2 min |

@@ -186,6 +186,8 @@ export default {
             content: [
               "**Investment Alpha — commands**",
               "`/status` — positions, P&L, stops, regime (~1 min)",
+              "`/strategy` — how the model picks stocks, live from config (~1 min)",
+              "`/chart symbol:AAPL` or `symbol:portfolio` — price/equity charts (~2 min)",
               "`/regime` — current market regime (~1 min)",
               "`/monitor` — run a position check right now (~2 min)",
               "`/stoploss mode:check` — stop levels, no orders (~2 min)",
@@ -225,6 +227,8 @@ export default {
       const map = {
         status: "status",
         regime: "regime",
+        strategy: "strategy",
+        chart: "chart",
         monitor: "monitor_check",
         stoploss: "stoploss_check",
         pipeline: "pipeline_dry",
@@ -232,7 +236,8 @@ export default {
       const command = map[name];
       if (!command) return ephemeral("Unknown command.");
 
-      const err = await dispatchToGitHub(env, { command, ...common });
+      const extra = name === "chart" ? { ticker: String(opts.symbol || "portfolio") } : {};
+      const err = await dispatchToGitHub(env, { command, ...extra, ...common });
       if (err) return ephemeral(`❌ Could not reach GitHub — ${err}`);
       return json({ type: R_DEFERRED_MESSAGE });
     }

@@ -68,6 +68,18 @@ COMMANDS = [
         }],
     },
     {
+        "name": "strategy",
+        "description": "Describe the current strategies and how stocks are picked (live from config)",
+    },
+    {
+        "name": "chart",
+        "description": "Price chart for a stock or the whole portfolio",
+        "options": [{
+            "name": "symbol", "type": 3, "required": True,
+            "description": "Ticker (e.g. AAPL) or 'portfolio' for equity curve + P&L",
+        }],
+    },
+    {
         "name": "help",
         "description": "Show all Investment Alpha commands and what they do",
     },

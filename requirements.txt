@@ -20,6 +20,10 @@ requests>=2.31.0         # SEC EDGAR insider, Capitol Trades, Discord webhook
 # ── Sentiment / fundamentals ───────────────────────────────────────────────
 finnhub-python>=2.4.19   # analyst sentiment (Phase 2)
 
+# ── Learning & charts ──────────────────────────────────────────────────────
+scipy>=1.11.0            # Spearman IC (feedback.py, learning.py)
+matplotlib>=3.8.0        # /chart command renders (remote_commands.py)
+
 # ── API server (optional — only needed if running api/server.py) ───────────
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
