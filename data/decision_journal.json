@@ -3,5 +3,14 @@
     "decision": "pipeline_execute",
     "success": true,
     "timestamp": "2026-06-11T17:17:23.502179+00:00"
+  },
+  {
+    "decision": "approve_buy",
+    "ticker": "LLY",
+    "trigger": "mr",
+    "price_at_decision": 1098.76,
+    "qty": 1.8939,
+    "order_status": "OrderStatus.ACCEPTED",
+    "timestamp": "2026-06-20T09:04:04.728704+00:00"
   }
 ]
