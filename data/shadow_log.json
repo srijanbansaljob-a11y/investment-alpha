@@ -145,5 +145,152 @@
         }
       }
     ]
+  },
+  {
+    "date": "2026-06-20",
+    "regime": "bull",
+    "evaluated": false,
+    "stocks": [
+      {
+        "ticker": "MATX",
+        "rank": 1,
+        "composite": 0.6129,
+        "price": 191.24,
+        "scores": {
+          "momentum": 0.761,
+          "trend": 0.7257,
+          "quality": 0.4682,
+          "valuation": 0.8921,
+          "sentiment": 0.5925,
+          "volatility": 0.5183
+        }
+      },
+      {
+        "ticker": "HST",
+        "rank": 2,
+        "composite": 0.6047,
+        "price": 25.01,
+        "scores": {
+          "momentum": 0.6763,
+          "trend": 0.5961,
+          "quality": 0.5742,
+          "valuation": 0.8322,
+          "sentiment": 0.4388,
+          "volatility": 0.1652
+        }
+      },
+      {
+        "ticker": "MTCH",
+        "rank": 3,
+        "composite": 0.5847,
+        "price": 35.45,
+        "scores": {
+          "momentum": 0.6435,
+          "trend": 0.5959,
+          "quality": 0.7187,
+          "valuation": 0.8592,
+          "sentiment": 0.4642,
+          "volatility": 0.4678
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "rank": 4,
+        "composite": 0.5787,
+        "price": 15.37,
+        "scores": {
+          "momentum": 0.7903,
+          "trend": 0.4807,
+          "quality": 0.5075,
+          "valuation": 0.9527,
+          "sentiment": 0.4932,
+          "volatility": 0.5304
+        }
+      },
+      {
+        "ticker": "ALL",
+        "rank": 5,
+        "composite": 0.5699,
+        "price": 221.17,
+        "scores": {
+          "momentum": 0.4723,
+          "trend": 0.6913,
+          "quality": 0.6275,
+          "valuation": 0.8193,
+          "sentiment": 0.4557,
+          "volatility": 0.2052
+        }
+      },
+      {
+        "ticker": "KIM",
+        "rank": 6,
+        "composite": 0.5678,
+        "price": 24.38,
+        "scores": {
+          "momentum": 0.584,
+          "trend": 0.6835,
+          "quality": 0.5798,
+          "valuation": 0.693,
+          "sentiment": 0.4267,
+          "volatility": 0.0417
+        }
+      },
+      {
+        "ticker": "FRT",
+        "rank": 7,
+        "composite": 0.5663,
+        "price": 120.39,
+        "scores": {
+          "momentum": 0.6289,
+          "trend": 0.6598,
+          "quality": 0.5397,
+          "valuation": 0.4788,
+          "sentiment": 0.4636,
+          "volatility": 0.0139
+        }
+      },
+      {
+        "ticker": "BIIB",
+        "rank": 8,
+        "composite": 0.5662,
+        "price": 196.58,
+        "scores": {
+          "momentum": 0.593,
+          "trend": 0.6872,
+          "quality": 0.6512,
+          "valuation": 0.7708,
+          "sentiment": 0.5038,
+          "volatility": 0.5548
+        }
+      },
+      {
+        "ticker": "NUE",
+        "rank": 9,
+        "composite": 0.5654,
+        "price": 243.83,
+        "scores": {
+          "momentum": 0.8139,
+          "trend": 0.6337,
+          "quality": 0.4867,
+          "valuation": 0.5732,
+          "sentiment": 0.4959,
+          "volatility": 0.4417
+        }
+      },
+      {
+        "ticker": "EXPE",
+        "rank": 10,
+        "composite": 0.5641,
+        "price": 240.9,
+        "scores": {
+          "momentum": 0.6369,
+          "trend": 0.618,
+          "quality": 0.6728,
+          "valuation": 0.7976,
+          "sentiment": 0.5154,
+          "volatility": 0.6852
+        }
+      }
+    ]
   }
 ]

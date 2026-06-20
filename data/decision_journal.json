@@ -12,5 +12,10 @@
     "qty": 1.8939,
     "order_status": "OrderStatus.ACCEPTED",
     "timestamp": "2026-06-20T09:04:04.728704+00:00"
+  },
+  {
+    "decision": "pipeline_execute",
+    "success": true,
+    "timestamp": "2026-06-20T09:22:15.440483+00:00"
   }
 ]
