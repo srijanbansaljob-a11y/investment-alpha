@@ -26,5 +26,14 @@
     "qty": 17.8901,
     "order_status": "OrderStatus.PENDING_NEW",
     "timestamp": "2026-06-23T10:59:42.434685+00:00"
+  },
+  {
+    "decision": "approve_buy",
+    "ticker": "COP",
+    "trigger": "mr",
+    "price_at_decision": 109.69,
+    "qty": 19.1079,
+    "order_status": "OrderStatus.PENDING_NEW",
+    "timestamp": "2026-06-23T11:10:25.353707+00:00"
   }
 ]

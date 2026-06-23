@@ -8,5 +8,10 @@
     "entry_price": 117.15,
     "qty": 17.8901,
     "entry_date": "2026-06-23"
+  },
+  "COP": {
+    "entry_price": 109.69,
+    "qty": 19.1079,
+    "entry_date": "2026-06-23"
   }
 }
