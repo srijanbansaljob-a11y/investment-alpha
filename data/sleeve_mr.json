@@ -3,5 +3,10 @@
     "entry_price": 1098.76,
     "qty": 1.8939,
     "entry_date": "2026-06-20"
+  },
+  "WMT": {
+    "entry_price": 117.15,
+    "qty": 17.8901,
+    "entry_date": "2026-06-23"
   }
 }
