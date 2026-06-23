@@ -1,0 +1,164 @@
+// ============================================================================
+//  Investment Alpha — Momentum Strategy (Pine Script v5)
+//  
+//  WHAT THIS DOES:
+//  Fires webhook alerts to your Cloudflare Worker which reads regime from KV,
+//  checks stock bucket, and places a bracket order on Alpaca.
+//
+//  ENTRY CONDITIONS (all must be true):
+//    1. Price > 20-day EMA (short trend intact)
+//    2. Price > 50-day SMA (medium trend intact)
+//    3. RSI(14) between 45-70 — not overbought, not in freefall
+//    4. ADX(14) > 22 — trend has strength (not ranging/choppy)
+//    5. Volume spike: current bar > 1.3× 20-day average volume
+//    6. Price within 2% of 10-day high (near breakout point)
+//
+//  EXIT CONDITIONS (first to trigger wins):
+//    1. Price crosses below 20-day EMA (trend breakdown)
+//    2. RSI(14) drops below 40 (momentum evaporating)
+//    3. Time stop: 15 bars held without +8% gain
+//
+//  WEBHOOK MESSAGE FORMAT (paste in TradingView alert → Message):
+//  {
+//    "secret":   "YOUR_TV_SECRET_HERE",
+//    "ticker":   "{{ticker}}",
+//    "action":   "{{strategy.order.action}}",
+//    "strategy": "momentum",
+//    "price":    {{close}},
+//    "comment":  "{{strategy.order.comment}}"
+//  }
+//
+//  HOW TO SET UP:
+//  1. Open TradingView → open any stock chart
+//  2. Open Pine Script editor → paste this script → Add to chart
+//  3. Right-click any alert triangle → Edit alert
+//     OR: Click the clock icon → Create alert → Condition: this strategy
+//  4. In "Message" field paste the JSON above (with your TV_SECRET filled in)
+//  5. In "Webhook URL" field: https://investment-alpha-bot.<subdomain>.workers.dev/webhook
+//  6. Fire away — your Worker gates execution based on today's regime
+// ============================================================================
+
+//@version=5
+strategy(
+    title         = "Investment Alpha — Momentum",
+    shorttitle    = "IA Momentum",
+    overlay       = true,
+    pyramiding    = 0,
+    initial_capital = 10000,
+    default_qty_type  = strategy.percent_of_equity,
+    default_qty_value = 5,          // 5% per trade — matches Worker's POSITION_SIZE_PCT
+    commission_type   = strategy.commission.percent,
+    commission_value  = 0.005,      // 0.5 bps (Alpaca paper = 0)
+    slippage          = 1
+)
+
+// ── Inputs ──────────────────────────────────────────────────────────────────
+ema_short   = input.int(20,  "EMA (trend filter)",    minval=5)
+sma_medium  = input.int(50,  "SMA (trend filter)",    minval=20)
+rsi_period  = input.int(14,  "RSI period",            minval=5)
+rsi_hi      = input.int(70,  "RSI overbought ceiling",minval=60)
+rsi_lo_entry= input.int(45,  "RSI floor (entry)",     minval=30)
+rsi_lo_exit = input.int(40,  "RSI exit trigger",      minval=25)
+adx_period  = input.int(14,  "ADX period",            minval=7)
+adx_min     = input.float(22,"ADX min (trend strength)", minval=15, step=1)
+vol_mult    = input.float(1.3,"Volume spike multiplier", minval=1.0, step=0.1)
+near_hi_pct = input.float(2.0,"Max % below 10d high",    minval=0.5, step=0.5)
+time_stop   = input.int(15,  "Time stop (bars)",       minval=5)
+profit_stop = input.float(8.0,"Time-stop profit skip (%)", minval=0.0)
+
+// ── Indicators ───────────────────────────────────────────────────────────────
+ema20  = ta.ema(close, ema_short)
+sma50  = ta.sma(close, sma_medium)
+rsi14  = ta.rsi(close, rsi_period)
+vol20  = ta.sma(volume, 20)
+hi10   = ta.highest(high, 10)
+
+// ADX (Wilder's method, matches daily_sentiment_runner.py implementation)
+[diplus, diminus, adx14] = ta.dmi(adx_period, adx_period)
+
+// ── Entry conditions ─────────────────────────────────────────────────────────
+trend_ok    = close > ema20 and close > sma50
+rsi_ok      = rsi14 >= rsi_lo_entry and rsi14 <= rsi_hi
+adx_ok      = adx14 > adx_min
+vol_ok      = volume > vol20 * vol_mult
+near_high   = close >= hi10 * (1 - near_hi_pct / 100)
+
+// Bullish DI alignment (optional additional filter)
+di_ok       = diplus > diminus
+
+long_entry  = trend_ok and rsi_ok and adx_ok and vol_ok and near_high and di_ok
+
+// ── Exit conditions ──────────────────────────────────────────────────────────
+trend_break = close < ema20
+rsi_exit    = rsi14 < rsi_lo_exit
+
+// Time stop: exit after N bars if position hasn't hit profit threshold
+bars_held   = strategy.opentrades > 0 ? bar_index - strategy.opentrades.entry_bar_index(0) : 0
+entry_val   = strategy.opentrades.entry_price(0)
+unrealized  = entry_val > 0 ? (close - entry_val) / entry_val * 100 : 0
+time_exit   = bars_held >= time_stop and unrealized < profit_stop
+
+// ── Strategy execution ────────────────────────────────────────────────────────
+if long_entry and strategy.position_size == 0
+    reason = "EMA20✓ SMA50✓ RSI" + str.tostring(math.round(rsi14)) + " ADX" + str.tostring(math.round(adx14)) + " vol×" + str.tostring(math.round(volume / vol20 * 10) / 10)
+    strategy.entry("Long", strategy.long, comment=reason)
+    // Alert fires here → webhook → Worker → Alpaca
+    alert(
+        '{"secret":"YOUR_TV_SECRET_HERE","ticker":"' + syminfo.ticker + '","action":"buy","strategy":"momentum","price":' + str.tostring(close) + ',"comment":"' + reason + '"}',
+        alert.freq_once_per_bar
+    )
+
+if strategy.position_size > 0
+    exit_reason = trend_break ? "EMA20 break" : rsi_exit ? "RSI<40" : time_exit ? "time stop" : ""
+    if trend_break or rsi_exit or time_exit
+        strategy.close("Long", comment=exit_reason)
+        alert(
+            '{"secret":"YOUR_TV_SECRET_HERE","ticker":"' + syminfo.ticker + '","action":"sell","strategy":"momentum","price":' + str.tostring(close) + ',"comment":"' + exit_reason + '"}',
+            alert.freq_once_per_bar
+        )
+
+// ── Visuals ───────────────────────────────────────────────────────────────────
+plot(ema20, "EMA 20", color=color.new(color.orange, 0), linewidth=1)
+plot(sma50, "SMA 50", color=color.new(color.blue, 0),   linewidth=1)
+
+// Entry signal markers
+plotshape(long_entry and strategy.position_size == 0,
+    title="Entry", style=shape.triangleup, location=location.belowbar,
+    color=color.new(color.green, 0), size=size.small)
+
+// Exit signal markers
+exit_signal = strategy.position_size > 0 and (trend_break or rsi_exit or time_exit)
+plotshape(exit_signal,
+    title="Exit", style=shape.triangledown, location=location.abovebar,
+    color=color.new(color.red, 0), size=size.small)
+
+// ADX background highlight: dim when market is ranging (ADX < threshold)
+bgcolor(adx14 < adx_min ? color.new(color.gray, 92) : na, title="Ranging market")
+
+// ── Info table ────────────────────────────────────────────────────────────────
+var table info = table.new(position.top_right, 2, 6, bgcolor=color.new(color.black, 80), border_width=1)
+
+if barstate.islast
+    table.cell(info, 0, 0, "EMA20",     text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 0, str.tostring(math.round(ema20, 2)),
+               text_color=close > ema20 ? color.green : color.red, text_size=size.small)
+
+    table.cell(info, 0, 1, "SMA50",     text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 1, str.tostring(math.round(sma50, 2)),
+               text_color=close > sma50 ? color.green : color.red, text_size=size.small)
+
+    table.cell(info, 0, 2, "RSI14",     text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 2, str.tostring(math.round(rsi14, 1)),
+               text_color=rsi_ok ? color.green : color.red, text_size=size.small)
+
+    table.cell(info, 0, 3, "ADX14",     text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 3, str.tostring(math.round(adx14, 1)),
+               text_color=adx_ok ? color.green : color.orange, text_size=size.small)
+
+    table.cell(info, 0, 4, "Vol×",      text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 4, str.tostring(math.round(volume / vol20 * 10) / 10) + "×",
+               text_color=vol_ok ? color.green : color.gray, text_size=size.small)
+
+    table.cell(info, 0, 5, "Signal",    text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 5, long_entry ? "ENTRY ✓" : strategy.position_size > 0 ? "HELD" : "—",
+               text_color=long_entry ? color.green : color.gray, text_size=size.small)

@@ -1,0 +1,87 @@
+name: Daily Screener
+
+# Runs at 8 AM ET (before market open) every weekday.
+# 1. Runs daily_sentiment_runner.py — scores every stock, computes 6-component regime
+# 2. Pushes regime_signal + stock_buckets + screener_summary to Cloudflare KV
+#    so the TradingView webhook handler can gate orders in real time
+# 3. Posts top picks embed to Discord
+
+on:
+  schedule:
+    - cron: "0 12 * * 1-5"   # 8 AM EDT (summer)
+    - cron: "0 13 * * 1-5"   # 8 AM EST (winter)
+  workflow_dispatch:
+
+jobs:
+  screener:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Guard — only run at 8 AM New York
+        id: tz
+        run: |
+          HOUR=$(TZ=America/New_York date +%H)
+          echo "NY hour: $HOUR"
+          if [ "$HOUR" = "08" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "go=true" >> $GITHUB_OUTPUT
+          else
+            echo "go=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout
+        if: steps.tz.outputs.go == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        if: steps.tz.outputs.go == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        if: steps.tz.outputs.go == 'true'
+        run: |
+          pip install requests python-dotenv
+          # The screener only needs requests — no alpaca-py, no yfinance needed separately
+          # (daily_sentiment_runner uses Yahoo Finance v8 API via requests)
+
+      - name: Run daily screener
+        if: steps.tz.outputs.go == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_BOT_TOKEN:   ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:  ${{ secrets.DISCORD_CHANNEL_ID }}
+          FINNHUB_API_KEY:     ${{ secrets.FINNHUB_API_KEY }}
+        run: |
+          mkdir -p screener/outputs
+          python screener/daily_sentiment_runner.py \
+            --save-json screener/outputs/daily_sentiment_data.json \
+            2>&1 | tail -100
+
+      - name: Push regime to Cloudflare KV
+        if: steps.tz.outputs.go == 'true'
+        env:
+          CF_ACCOUNT_ID:   ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE: ${{ secrets.CF_KV_NAMESPACE }}
+          CF_API_TOKEN:    ${{ secrets.CF_API_TOKEN }}
+        run: |
+          python screener/regime_to_kv.py \
+            --regime-file screener/outputs/daily_sentiment_data.json
+
+      - name: Commit screener outputs
+        if: steps.tz.outputs.go == 'true'
+        run: |
+          git config user.name "investment-alpha-bot"
+          git config user.email "actions@github.com"
+          git add screener/outputs/ || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: daily screener output $(date -u +%Y-%m-%d) [skip ci]"
+            git pull --rebase origin main || true
+            git push
+          else
+            echo "No screener output changes to commit"
+          fi

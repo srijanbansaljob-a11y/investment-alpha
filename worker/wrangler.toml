@@ -2,10 +2,29 @@ name = "investment-alpha-bot"
 main = "index.js"
 compatibility_date = "2026-01-01"
 
-# Secrets are NOT stored here. After `npx wrangler login`, set them with:
+# ── KV namespace binding ───────────────────────────────────────────────────
+# Create this namespace first:
+#   npx wrangler kv:namespace create "investment-alpha-kv"
+# Then paste the returned id below.
+[[kv_namespaces]]
+binding = "KV"
+id = "PASTE_KV_NAMESPACE_ID_HERE"
+
+# ── Worker secrets (never stored here — set via CLI) ───────────────────────
+# After `npx wrangler login`, run these commands once:
+#
 #   npx wrangler secret put DISCORD_PUBLIC_KEY
 #   npx wrangler secret put OWNER_ID
 #   npx wrangler secret put GH_TOKEN
-#   npx wrangler secret put GH_REPO        (value: srijanbansaljob-a11y/investment-alpha)
-# Deploy with:
+#   npx wrangler secret put GH_REPO           # e.g. srijanbansal/investment-alpha
+#   npx wrangler secret put DISCORD_WEBHOOK_URL
+#   npx wrangler secret put TV_SECRET         # any strong random string, e.g. openssl rand -hex 32
+#   npx wrangler secret put ALPACA_KEY
+#   npx wrangler secret put ALPACA_SECRET
+#   npx wrangler secret put ALPACA_BASE_URL   # https://paper-api.alpaca.markets
+#
+# Deploy:
 #   npx wrangler deploy
+#
+# Your webhook URL (put in TradingView alerts):
+#   https://investment-alpha-bot.<your-subdomain>.workers.dev/webhook
