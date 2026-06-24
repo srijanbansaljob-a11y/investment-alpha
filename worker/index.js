@@ -540,6 +540,14 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
         const label = (r.label || "UNKNOWN").toUpperCase();
         const score = r.total ?? r.score ?? 0;
         const color = label === "BULL" ? C_GREEN : label === "BEAR" ? C_RED : C_ORANGE;
+        const d = r.details || {};
+        const noteParts = [];
+        if (d.spy_pct_from_200ma != null) noteParts.push(`SPY ${d.spy_pct_from_200ma > 0 ? "+" : ""}${Number(d.spy_pct_from_200ma).toFixed(1)}% vs 200MA`);
+        if (d.adx != null)                noteParts.push(`ADX ${Number(d.adx).toFixed(0)} (${d.spy_trend || "flat"})`);
+        if (d.breadth_pct != null)        noteParts.push(`Breadth ${d.breadth_pct}%`);
+        if (d.fg != null)                 noteParts.push(`F&G ${d.fg}`);
+        if (d.vix_struct)                 noteParts.push(`VIX ${d.vix_struct}`);
+        const autoNotes = noteParts.length ? noteParts.join(" · ") : "—";
         return json({ type: R_CHANNEL_MESSAGE, data: {
           flags: EPHEMERAL,
           embeds: [{
@@ -549,10 +557,10 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
             fields: [
               { name: "Score",       value: `${score}/100`,                                    inline: true },
               { name: "Permitted",   value: (r.permitted_strategies || []).join(", ") || "—",  inline: true },
-              { name: "VIX",         value: r.vix != null ? String(r.vix) : "n/a",             inline: true },
-              { name: "Notes",       value: r.notes || "—",                                    inline: false },
+              { name: "VIX",         value: (r.vix ?? r.vix_value) != null ? String(r.vix ?? r.vix_value) : "n/a", inline: true },
+              { name: "Notes",       value: autoNotes,                                         inline: false },
             ],
-            footer: { text: `Updated 3× daily (8 AM, 11 AM, 3:30 PM ET) · as of ${r.date || "today"}` },
+            footer: { text: `Updated 3× daily (8 AM, 11 AM, 3:30 PM ET) · as of ${r.date || new Date().toISOString().slice(0,10)}` },
           }],
         }});
       } catch (e) {
@@ -617,29 +625,19 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
 }
 
 
-// ══════════════════════════════════════════════════════════════════════════
-//  MAIN FETCH HANDLER
-// ══════════════════════════════════════════════════════════════════════════
-
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Health check
     if (request.method === "GET") {
-      return new Response("Investment Alpha worker OK — POST /webhook for TradingView, POST / for Discord");
+      return new Response("Investment Alpha worker OK");
     }
-
     if (request.method !== "POST") {
       return new Response("Method not allowed", { status: 405 });
     }
-
-    // ── TradingView webhook ──────────────────────────────────────────────
     if (url.pathname === "/webhook") {
       return handleTradingViewWebhook(request, env);
     }
-
-    // ── Discord interactions ─────────────────────────────────────────────
     const bodyText = await request.text();
     if (!(await verifyDiscordSignature(request, bodyText, env.DISCORD_PUBLIC_KEY))) {
       return new Response("invalid request signature", { status: 401 });
