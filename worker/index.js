@@ -107,6 +107,79 @@ async function postDiscordWebhook(webhookUrl, embeds) {
   }
 }
 
+// ── Alpaca trade helpers ────────────────────────────────────────────────────
+
+async function getAlpacaPrice(env, symbol) {
+  const headers = {
+    "APCA-API-KEY-ID":     (env.ALPACA_KEY    || "").trim(),
+    "APCA-API-SECRET-KEY": (env.ALPACA_SECRET || "").trim(),
+  };
+  try {
+    const r = await fetch(
+      `https://data.alpaca.markets/v2/stocks/snapshots?symbols=${symbol}&feed=iex`,
+      { headers }
+    );
+    if (!r.ok) return null;
+    const data = await r.json();
+    const snap = data[symbol];
+    return snap?.latestTrade?.p || snap?.latestQuote?.ap || null;
+  } catch { return null; }
+}
+
+async function placeBracketOrder(env, symbol) {
+  const alpacaBase   = (env.ALPACA_BASE_URL || "https://paper-api.alpaca.markets").trim();
+  const alpacaKey    = (env.ALPACA_KEY    || "").trim();
+  const alpacaSecret = (env.ALPACA_SECRET || "").trim();
+  if (!alpacaKey || !alpacaSecret) return { error: "Alpaca credentials not set in Worker secrets." };
+
+  const headers = {
+    "APCA-API-KEY-ID":     alpacaKey,
+    "APCA-API-SECRET-KEY": alpacaSecret,
+    "Content-Type":        "application/json",
+  };
+
+  // Get live price
+  const price = await getAlpacaPrice(env, symbol);
+  if (!price) return { error: `Could not fetch price for ${symbol} — market may be closed.` };
+
+  // Size from buying power + regime
+  let qty = 1, sizePct = POSITION_SIZE_BY_REGIME.neutral;
+  try {
+    const raw = await env.KV.get("regime_signal");
+    if (raw) {
+      const r   = JSON.parse(raw);
+      const sc  = r.total ?? r.score ?? 0;
+      const key = sc >= 60 ? "bull" : sc >= 30 ? "neutral" : "bear";
+      sizePct   = POSITION_SIZE_BY_REGIME[key];
+    }
+    const acctR = await fetch(`${alpacaBase}/v2/account`, { headers });
+    const acct  = await acctR.json();
+    const bp    = parseFloat(acct.buying_power || acct.cash || 0);
+    qty = Math.max(1, Math.floor((bp * sizePct) / price));
+  } catch (e) { console.warn("Sizing error:", e.message); }
+
+  const stopPrice = parseFloat((price * (1 - STOP_LOSS_PCT)).toFixed(2));
+  const takePrice = parseFloat((price * (1 + TAKE_PROFIT_PCT)).toFixed(2));
+
+  try {
+    const r = await fetch(`${alpacaBase}/v2/orders`, {
+      method: "POST", headers,
+      body: JSON.stringify({
+        symbol, qty: String(qty), side: "buy",
+        type: "market", time_in_force: "day",
+        order_class: "bracket",
+        stop_loss:   { stop_price:  String(stopPrice) },
+        take_profit: { limit_price: String(takePrice) },
+      }),
+    });
+    const result = await r.json();
+    if (!r.ok) return { error: result?.message || `HTTP ${r.status}`, price, qty, stopPrice, takePrice, sizePct };
+    return { order: result, price, qty, stopPrice, takePrice, sizePct };
+  } catch (e) {
+    return { error: e.message, price, qty, stopPrice, takePrice, sizePct };
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 //  TRADINGVIEW WEBHOOK HANDLER
 // ══════════════════════════════════════════════════════════════════════════
@@ -459,6 +532,44 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       });
     }
 
+    if (action === "confirm_buy_execute") {
+      const result = await placeBracketOrder(env, ticker);
+      const ok = !!result.order;
+      const embeds = i.message.embeds || [];
+      if (embeds[0]) {
+        embeds[0].color = ok ? C_GREEN : C_RED;
+        embeds[0].title = ok
+          ? `✅ BUY ${ticker} — Order Placed`
+          : `❌ BUY ${ticker} — Order Failed`;
+        embeds[0].footer = { text: ok
+          ? `Order ID: ${result.order?.id || "—"} · Bracket: stop $${result.stopPrice} / target $${result.takePrice} · Paper trading`
+          : `Error: ${result.error}` };
+      }
+      return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: [] } });
+    }
+
+    if (action === "confirm_sell_execute") {
+      const alpacaBase = (env.ALPACA_BASE_URL || "https://paper-api.alpaca.markets").trim();
+      const headers = {
+        "APCA-API-KEY-ID":     (env.ALPACA_KEY    || "").trim(),
+        "APCA-API-SECRET-KEY": (env.ALPACA_SECRET || "").trim(),
+      };
+      let ok = false, errMsg = "";
+      try {
+        const r = await fetch(`${alpacaBase}/v2/positions/${ticker}`, { method: "DELETE", headers });
+        ok = r.status === 200 || r.status === 204;
+        if (!ok) { const b = await r.json(); errMsg = b?.message || `HTTP ${r.status}`; }
+      } catch (e) { errMsg = e.message; }
+
+      const embeds = i.message.embeds || [];
+      if (embeds[0]) {
+        embeds[0].color = ok ? C_GREEN : C_RED;
+        embeds[0].title = ok ? `✅ SELL ${ticker} — Position Closed` : `❌ SELL ${ticker} — Failed`;
+        embeds[0].footer = { text: ok ? "Market order submitted · Paper trading" : `Error: ${errMsg}` };
+      }
+      return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: [] } });
+    }
+
     if (action === "cancel") {
       return json({ type: R_UPDATE_MESSAGE, data: { content: "🚫 Cancelled.", components: [] } });
     }
@@ -583,6 +694,97 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       } catch (e) {
         return ephemeral(`Error reading regime: ${e.message}`);
       }
+    }
+
+    // /buy — preview order then confirm
+    if (name === "buy") {
+      const symbol = (opts.symbol || "").toUpperCase();
+      if (!symbol) return ephemeral("Provide a ticker: `/buy symbol:AAPL`");
+
+      // Regime + bucket gates
+      let regimeLabel = "UNKNOWN", regimeScore = 0, permitted = [];
+      try {
+        const raw = await env.KV.get("regime_signal");
+        if (raw) { const r = JSON.parse(raw); regimeLabel = r.label || "UNKNOWN"; regimeScore = r.total ?? r.score ?? 0; permitted = r.permitted_strategies || []; }
+      } catch {}
+
+      let bucket = "unknown", regimeOk = true, nearEarnings = false;
+      try {
+        const raw = await env.KV.get("stock_buckets");
+        if (raw) { const b = JSON.parse(raw); const info = b[symbol]; if (info) { bucket = info.bucket || "unknown"; regimeOk = info.regime_ok !== false; nearEarnings = info.near_earnings === true; } }
+      } catch {}
+
+      if (nearEarnings) return ephemeral(`⚠️ **${symbol}** is in earnings blackout (within 14 days). Wait until after earnings to avoid gap risk.`);
+      if (!regimeOk)    return ephemeral(`🚫 **${symbol}** bucket \`${bucket}\` is not permitted in **${regimeLabel}** market.\nPermitted: ${permitted.join(", ") || "none"}`);
+
+      // Live price + sizing preview
+      const price = await getAlpacaPrice(env, symbol);
+      if (!price) return ephemeral(`❌ Could not fetch price for **${symbol}**. Market may be closed or ticker invalid.`);
+
+      const regimeKey = regimeScore >= 60 ? "bull" : regimeScore >= 30 ? "neutral" : "bear";
+      const sizePct   = POSITION_SIZE_BY_REGIME[regimeKey];
+      let qty = 1;
+      try {
+        const alpacaBase = (env.ALPACA_BASE_URL || "https://paper-api.alpaca.markets").trim();
+        const ah = { "APCA-API-KEY-ID": (env.ALPACA_KEY||"").trim(), "APCA-API-SECRET-KEY": (env.ALPACA_SECRET||"").trim() };
+        const acct = await (await fetch(`${alpacaBase}/v2/account`, { headers: ah })).json();
+        qty = Math.max(1, Math.floor((parseFloat(acct.buying_power || acct.cash || 0) * sizePct) / price));
+      } catch {}
+
+      const stopPrice = parseFloat((price * (1 - STOP_LOSS_PCT)).toFixed(2));
+      const takePrice = parseFloat((price * (1 + TAKE_PROFIT_PCT)).toFixed(2));
+
+      return json({ type: R_CHANNEL_MESSAGE, data: { flags: EPHEMERAL, embeds: [{
+        title: `🛒 Confirm BUY ${symbol}?`,
+        color: C_BLUE,
+        fields: [
+          { name: "Current price",  value: `$${price.toFixed(2)}`,                                      inline: true },
+          { name: "Shares",         value: String(qty),                                                  inline: true },
+          { name: "Total cost",     value: `~$${(price * qty).toFixed(0)}`,                             inline: true },
+          { name: "Stop loss",      value: `$${stopPrice} (−${(STOP_LOSS_PCT*100).toFixed(0)}%)`,       inline: true },
+          { name: "Take profit",    value: `$${takePrice} (+${(TAKE_PROFIT_PCT*100).toFixed(0)}%)`,     inline: true },
+          { name: "Position size",  value: `${(sizePct*100).toFixed(0)}% of buying power`,              inline: true },
+          { name: "Regime",         value: `${regimeLabel} (${regimeScore}/100)`,                       inline: true },
+          { name: "Bucket",         value: bucket,                                                       inline: true },
+        ],
+        footer: { text: "Bracket order: stop-loss + take-profit auto-managed by Alpaca · Paper trading" },
+      }], components: [{ type: 1, components: [
+        { type: 2, style: 3, label: `✅ Buy ${qty} shares of ${symbol}`, custom_id: `ia|confirm_buy_execute|${symbol}|buy` },
+        { type: 2, style: 2, label: "❌ Cancel", custom_id: `ia|cancel||buy` },
+      ]}]}});
+    }
+
+    // /sell — preview position then confirm close
+    if (name === "sell") {
+      const symbol = (opts.symbol || "").toUpperCase();
+      if (!symbol) return ephemeral("Provide a ticker: `/sell symbol:AAPL`");
+
+      const alpacaBase = (env.ALPACA_BASE_URL || "https://paper-api.alpaca.markets").trim();
+      const ah = { "APCA-API-KEY-ID": (env.ALPACA_KEY||"").trim(), "APCA-API-SECRET-KEY": (env.ALPACA_SECRET||"").trim() };
+
+      let position = null;
+      try { const r = await fetch(`${alpacaBase}/v2/positions/${symbol}`, { headers: ah }); if (r.ok) position = await r.json(); } catch {}
+      if (!position) return ephemeral(`❌ No open position found for **${symbol}**.`);
+
+      const qty    = position.qty;
+      const price  = parseFloat(position.current_price || 0);
+      const pnl    = parseFloat(position.unrealized_pl || 0);
+      const pnlPct = parseFloat(position.unrealized_plpc || 0) * 100;
+      const pnlStr = `$${pnl.toFixed(2)} (${pnl >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%)`;
+
+      return json({ type: R_CHANNEL_MESSAGE, data: { flags: EPHEMERAL, embeds: [{
+        title: `⚠️ Confirm SELL ${symbol}?`,
+        color: C_ORANGE,
+        fields: [
+          { name: "Shares",       value: String(qty),              inline: true },
+          { name: "Current price",value: `$${price.toFixed(2)}`,  inline: true },
+          { name: "Unrealised P&L",value: pnlStr,                 inline: true },
+        ],
+        footer: { text: "Market order — closes entire position · Paper trading" },
+      }], components: [{ type: 1, components: [
+        { type: 2, style: 4, label: `🔴 Sell all ${qty} shares`, custom_id: `ia|confirm_sell_execute|${symbol}|sell` },
+        { type: 2, style: 2, label: "❌ Cancel", custom_id: `ia|cancel||sell` },
+      ]}]}});
     }
 
     // All other commands → GitHub Actions

@@ -87,6 +87,22 @@ COMMANDS = [
         "name": "help",
         "description": "Show all Investment Alpha commands and what they do",
     },
+    {
+        "name": "buy",
+        "description": "Buy a stock — previews order (size, stop, target) and asks to confirm before executing",
+        "options": [{
+            "name": "symbol", "type": 3, "required": True,
+            "description": "Ticker to buy (e.g. AAPL, C, REGN)",
+        }],
+    },
+    {
+        "name": "sell",
+        "description": "Sell (close) an existing position — shows current P&L and asks to confirm",
+        "options": [{
+            "name": "symbol", "type": 3, "required": True,
+            "description": "Ticker to sell (e.g. AAPL, C, REGN)",
+        }],
+    },
 ]
 
 resp = requests.put(
