@@ -526,10 +526,43 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       }
     }
 
+    // /regime — served directly from KV (updated 3x daily by screener)
+    if (name === "regime") {
+      try {
+        const raw = await env.KV.get("regime_signal");
+        if (!raw) {
+          return json({ type: R_CHANNEL_MESSAGE, data: {
+            flags: EPHEMERAL,
+            content: "No regime data yet — runs at 8 AM ET on weekdays.",
+          }});
+        }
+        const r = JSON.parse(raw);
+        const label = (r.label || "UNKNOWN").toUpperCase();
+        const score = r.total ?? r.score ?? 0;
+        const color = label === "BULL" ? C_GREEN : label === "BEAR" ? C_RED : C_ORANGE;
+        return json({ type: R_CHANNEL_MESSAGE, data: {
+          flags: EPHEMERAL,
+          embeds: [{
+            title: `🧭 Market Regime: ${label}`,
+            description: "Regime measures the **structural trend** (200-day MA, volatility, credit) — not today's move. A red day inside an uptrend is still BULL.",
+            color,
+            fields: [
+              { name: "Score",       value: `${score}/100`,                                    inline: true },
+              { name: "Permitted",   value: (r.permitted_strategies || []).join(", ") || "—",  inline: true },
+              { name: "VIX",         value: r.vix != null ? String(r.vix) : "n/a",             inline: true },
+              { name: "Notes",       value: r.notes || "—",                                    inline: false },
+            ],
+            footer: { text: `Updated 3× daily (8 AM, 11 AM, 3:30 PM ET) · as of ${r.date || "today"}` },
+          }],
+        }});
+      } catch (e) {
+        return ephemeral(`Error reading regime: ${e.message}`);
+      }
+    }
+
     // All other commands → GitHub Actions
     const commandMap = {
       "status":    "status",
-      "regime":    "regime",
       "monitor":   "monitor_check",
       "strategy":  "strategy",
       "chart":     "chart",
@@ -563,7 +596,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
     }
 
     // Defer response (pipeline takes minutes)
-    const needsDefer = ["status", "regime", "monitor_check", "strategy", "chart",
+    const needsDefer = ["status", "monitor_check", "strategy", "chart",
                         "stoploss_check", "stoploss_execute", "pipeline_dry"].includes(command);
 
     if (needsDefer) {
