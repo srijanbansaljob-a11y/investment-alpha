@@ -264,10 +264,46 @@ def compute_adx(ohlc_rows: list, period: int = 14) -> dict:
 
 # ─── SPY TECHNICAL INDICATORS ─────────────────────────────────────────────────
 
+def _get_alpaca_ohlcv(symbol: str, days: int = 260) -> list:
+    """
+    Fetch daily OHLCV bars from Alpaca for a single symbol.
+    Returns list of (timestamp, high, low, close) tuples — same format
+    as get_historical_ohlcv() so compute_adx() can consume it directly.
+    """
+    if not ALPACA_AVAILABLE:
+        return []
+    from datetime import timedelta
+    start_date = (date.today() - timedelta(days=days + 30)).isoformat()
+    try:
+        r = SESSION.get(
+            f"{ALPACA_DATA}/v2/stocks/bars",
+            headers=_alpaca_headers(),
+            params={
+                "symbols":    symbol,
+                "timeframe":  "1Day",
+                "start":      start_date,
+                "limit":      days + 30,
+                "feed":       "iex",
+                "adjustment": "split",
+            },
+            timeout=15,
+        )
+        if not r.ok:
+            return []
+        bars = r.json().get("bars", {}).get(symbol, [])
+        return [(b["t"], b["h"], b["l"], b["c"]) for b in bars if b.get("c")]
+    except Exception as e:
+        print(f"  ⚠  Alpaca OHLCV for {symbol} failed: {e}")
+        return []
+
+
 def get_spy_technical_indicators() -> dict:
-    """ADX-14 + SPY position relative to 200-day SMA."""
+    """ADX-14 + SPY position relative to 200-day SMA. Uses Alpaca, falls back to Yahoo."""
     print("  → Computing SPY technicals (ADX-14, 200MA)...")
-    rows = get_historical_ohlcv("SPY", days=260)
+    rows = _get_alpaca_ohlcv("SPY", days=260)
+    if len(rows) < 200:
+        print("  ⚠  Alpaca SPY history insufficient — trying Yahoo...")
+        rows = get_historical_ohlcv("SPY", days=260)
     if len(rows) < 200:
         print("  ⚠  Insufficient SPY history — skipping")
         return {}
@@ -330,25 +366,67 @@ def get_sector_breadth() -> dict:
     % of 11 sector ETFs trading above their 200-day MA.
     Proxy for market-wide participation.
     >70% = broad bull  |  50–70% = selective  |  <50% = narrowing / weak
+    Uses Alpaca bars (single batch call) with Yahoo Finance as fallback.
     """
     print("  → Computing sector breadth (11 ETFs vs 200MA)...")
-    above_200 = 0
-    detail    = {}
+    etf_symbols = list(SECTOR_ETFS.values())
+    above_200   = 0
+    detail      = {}
 
-    for etf in SECTOR_ETFS.values():
-        closes = get_historical_closes(etf, days=210)
-        if len(closes) < 200:
-            continue
-        ma200   = sum(closes[-200:]) / 200
-        current = closes[-1]
-        is_above = current > ma200
-        if is_above:
-            above_200 += 1
-        detail[etf] = {
-            "above_200ma":  is_above,
-            "pct_from_200": round((current - ma200) / ma200 * 100, 1),
-        }
-        time.sleep(0.12)
+    # ── Try Alpaca first (single batch call, no rate-limit risk) ──────────
+    if ALPACA_AVAILABLE:
+        from datetime import timedelta
+        start_date = (date.today() - timedelta(days=260)).isoformat()
+        try:
+            r = SESSION.get(
+                f"{ALPACA_DATA}/v2/stocks/bars",
+                headers=_alpaca_headers(),
+                params={
+                    "symbols":    ",".join(etf_symbols),
+                    "timeframe":  "1Day",
+                    "start":      start_date,
+                    "limit":      260,
+                    "feed":       "iex",
+                    "adjustment": "split",
+                },
+                timeout=20,
+            )
+            if r.ok:
+                bars_data = r.json().get("bars", {})
+                for etf in etf_symbols:
+                    bars = bars_data.get(etf, [])
+                    closes = [b["c"] for b in bars if b.get("c")]
+                    if len(closes) < 200:
+                        continue
+                    ma200    = sum(closes[-200:]) / 200
+                    current  = closes[-1]
+                    is_above = current > ma200
+                    if is_above:
+                        above_200 += 1
+                    detail[etf] = {
+                        "above_200ma":  is_above,
+                        "pct_from_200": round((current - ma200) / ma200 * 100, 1),
+                    }
+        except Exception as e:
+            print(f"  ⚠  Alpaca breadth fetch failed: {e}")
+
+    # ── Fall back to Yahoo per-ETF if Alpaca returned nothing ─────────────
+    if not detail:
+        print("  → Falling back to Yahoo Finance for breadth...")
+        for etf in etf_symbols:
+            closes = get_historical_closes(etf, days=210)
+            if len(closes) < 200:
+                continue
+            ma200    = sum(closes[-200:]) / 200
+            current  = closes[-1]
+            is_above = current > ma200
+            if is_above:
+                above_200 += 1
+            detail[etf] = {
+                "above_200ma":  is_above,
+                "pct_from_200": round((current - ma200) / ma200 * 100, 1),
+            }
+            time.sleep(0.12)
 
     checked = len(detail)
     if checked == 0:
@@ -1308,131 +1386,4 @@ def run_daily_analysis(tickers: list = None, quick: bool = False) -> dict:
         print("\n🌐 STEP 5 — Sector Breadth")
         breadth = get_sector_breadth()
         if breadth:
-            print(f"  {breadth['above_count']}/{breadth['total_checked']} "
-                  f"ETFs above 200MA — {breadth['label']}")
-    else:
-        print("\n⚡ Quick mode — technicals skipped")
-
-    macro = compute_macro_score(market, fear_greed, spy_tech, vix_term, breadth)
-    print(f"\n🎯 REGIME: {macro['label']}  ({macro['total']}/100)")
-    print(f"   Active strategies: {', '.join(macro['permitted_strategies'])}")
-
-    step = 4 if quick else 6
-    print(f"\n🔄 STEP {step} — Sector Rotation")
-    sectors = get_sector_rotation()
-
-    step = 5 if quick else 7
-    print(f"\n🎯 STEP {step} — Scoring {len(tickers)} Stocks")
-    quotes        = get_stock_quotes(tickers)
-    scored_stocks = []
-
-    for ticker in tickers:
-        quote = quotes.get(ticker, {})
-        if "error" in quote:
-            continue
-        news        = get_yahoo_news(ticker) if not quick else []
-        stock_score = score_stock(ticker, quote, news, macro)
-        scored_stocks.append(stock_score)
-        if not quick:
-            time.sleep(0.1)
-
-    scored_stocks.sort(key=lambda x: x["total_score"], reverse=True)
-
-    logged = log_signals(scored_stocks, macro)
-    print(f"\n📝 {logged} new BUY+ signals logged → trade_log.csv")
-
-    results = {
-        "date": today_str, "generated_at": datetime.now().strftime("%H:%M:%S ET"),
-        "market": market, "fear_greed": fear_greed, "macro_score": macro,
-        "spy_technicals": spy_tech, "vix_term": vix_term, "breadth": breadth,
-        "sectors": sectors, "stocks": scored_stocks, "score_weights": SCORE_WEIGHTS,
-        "sources_used": [
-            "CNN Fear & Greed Index", "Yahoo Finance JSON + v8 OHLCV API",
-            "CBOE VIX + VIX3M", "Sector ETF breadth (11 ETFs vs 200MA)",
-            "SPY ADX-14 + 200MA position",
-        ],
-    }
-    with open(JSON_OUTPUT, "w") as f:
-        json.dump(results, f, indent=2, default=str)
-    print(f"✅ JSON saved → {JSON_OUTPUT}")
-    print_summary(results)
-    return results
-
-
-# ─── SUMMARY ─────────────────────────────────────────────────────────────────
-
-def print_summary(results: dict):
-    print(f"\n{'='*62}")
-    print(f"  📅 {results['date']}  |  {results['generated_at']}")
-    print(f"{'='*62}")
-
-    m      = results["macro_score"]
-    fg     = results["fear_greed"]
-    market = results["market"]
-    spy    = results.get("spy_technicals", {})
-    vt     = results.get("vix_term", {})
-    br     = results.get("breadth", {})
-
-    print(f"\n🌍 REGIME: {m['label']}  ({m['total']}/100)")
-    parts = [f"{k}={v}" for k, v in m.get("components", {}).items()]
-    print(f"   {' | '.join(parts)}")
-    vix = market.get("VIX", {}).get("price", "N/A")
-    sp  = market.get("SP500", {}).get("change_pct", "N/A")
-    print(f"   VIX: {vix}", end="")
-    if vt:
-        print(f" → VIX3M: {vt.get('vix3m')} ({vt.get('structure','')})", end="")
-    print(f" | F&G: {fg.get('score')} ({fg.get('label')})")
-    if spy.get("adx"):
-        print(f"   ADX-14: {spy['adx']} ({spy.get('spy_trend')}) | "
-              f"SPY vs 200MA: {spy.get('pct_from_200ma', 0):+.1f}%")
-    if br:
-        print(f"   Breadth: {br.get('above_count')}/{br.get('total_checked')} "
-              f"above 200MA ({br.get('label')})")
-    if isinstance(sp, float):
-        print(f"   S&P 500: {sp:+.2f}%")
-    print(f"   Permitted: {', '.join(m.get('permitted_strategies', []))}")
-
-    sectors  = results.get("sectors", [])
-    if sectors:
-        print(f"\n🔄 SECTORS")
-        for s in sectors[:3]:
-            print(f"   ▲ {s.get('sector',''):<14} {s.get('etf',''):<5} {s.get('change_pct',0):+.2f}%")
-        for s in sectors[-2:]:
-            print(f"   ▼ {s.get('sector',''):<14} {s.get('etf',''):<5} {s.get('change_pct',0):+.2f}%")
-
-    stocks    = results.get("stocks", [])
-    permitted = m.get("permitted_strategies", [])
-    strong    = [s for s in stocks if "STRONG BUY" in s.get("conviction", "")]
-    buy       = [s for s in stocks if s.get("conviction", "") == "✅ BUY"]
-
-    print(f"\n🎯 TOP PICKS  ({len(strong)} Strong Buy / {len(buy)} Buy)")
-    print(f"  {'#':<3} {'Ticker':<7} {'Name':<22} {'Score':<6} {'Conv.':<14} "
-          f"{'Chg%':<7} {'Upside':<8} {'Bucket':<15} OK?")
-    print(f"  {'-'*90}")
-    for i, s in enumerate(stocks[:15], 1):
-        upside    = f"+{s['upside_pct']:.1f}%" if s.get('upside_pct', 0) > 0 else f"{s.get('upside_pct',0):.1f}%"
-        bucket    = s.get("strategy_bucket", "watch")
-        regime_ok = "✅" if bucket in permitted else "🚫"
-        near_earn = " ⚠EARN" if s.get("near_earnings") else ""
-        print(f"  {i:<3} {s['ticker']:<7} {s.get('name','')[:21]:<22} "
-              f"{s['total_score']:<6} {s['conviction']:<14} "
-              f"{s.get('change_pct',0):+.2f}%  {upside:<8} {bucket:<15} {regime_ok}{near_earn}")
-        for sig in s.get("signals", [])[:2]:
-            print(f"      └─ {sig}")
-
-    print(f"\n{'='*62}")
-    print(f"  ⚠  Not financial advice. Run 8–9 AM ET before market open.")
-    print(f"{'='*62}\n")
-
-
-# ─── CLI ─────────────────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Daily Market Sentiment Engine v2.0")
-    parser.add_argument("--quick",  action="store_true",
-                        help="Skip SPY technicals, VIX term structure, breadth")
-    parser.add_argument("--stocks", nargs="+", metavar="TICKER",
-                        help="Score specific tickers only")
-    args    = parser.parse_args()
-    tickers = args.stocks if args.stocks else None
-    run_daily_analysis(tickers=tickers, quick=args.quick)
+    
