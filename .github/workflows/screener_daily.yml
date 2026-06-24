@@ -66,10 +66,7 @@ jobs:
           FINNHUB_API_KEY:     ${{ secrets.FINNHUB_API_KEY }}
         run: |
           set -o pipefail
-          mkdir -p screener/outputs
-          python screener/daily_sentiment_runner.py \
-            --save-json screener/outputs/daily_sentiment_data.json \
-            2>&1
+          python screener/daily_sentiment_runner.py 2>&1
           echo "Exit code: $?"
 
       - name: Push regime to Cloudflare KV
@@ -80,7 +77,7 @@ jobs:
           CF_API_TOKEN:    ${{ secrets.CF_API_TOKEN }}
         run: |
           python screener/regime_to_kv.py \
-            --regime-file screener/outputs/daily_sentiment_data.json
+            --regime-file screener/daily_sentiment_data.json
 
       - name: Commit screener outputs (8AM only)
         if: steps.tz.outputs.go == 'true'
@@ -92,7 +89,7 @@ jobs:
           fi
           git config user.name "investment-alpha-bot"
           git config user.email "actions@github.com"
-          git add screener/outputs/ || true
+          git add screener/daily_sentiment_data.json screener/sentiment_history.csv screener/trade_log.csv || true
           if ! git diff --cached --quiet; then
             git commit -m "chore: daily screener output $(date -u +%Y-%m-%d) [skip ci]"
             git pull --rebase origin main || true
