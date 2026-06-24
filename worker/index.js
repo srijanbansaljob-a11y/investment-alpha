@@ -108,11 +108,23 @@ async function postDiscordWebhook(webhookUrl, embeds) {
 }
 
 // ── Alpaca trade helpers ────────────────────────────────────────────────────
+// Two Alpaca accounts:
+//   ALPACA_KEY / ALPACA_SECRET         → pipeline account (TradingView webhook, portfolio)
+//   ALPACA_KEY_SCREENER / ALPACA_SECRET_SCREENER → screener account (/buy, /sell Discord commands)
+
+function screenerHeaders(env) {
+  return {
+    "APCA-API-KEY-ID":     (env.ALPACA_KEY_SCREENER || env.ALPACA_KEY    || "").trim(),
+    "APCA-API-SECRET-KEY": (env.ALPACA_SECRET_SCREENER || env.ALPACA_SECRET || "").trim(),
+    "Content-Type":        "application/json",
+  };
+}
 
 async function getAlpacaPrice(env, symbol) {
+  // Use screener account credentials for price (both accounts see same market data)
   const headers = {
-    "APCA-API-KEY-ID":     (env.ALPACA_KEY    || "").trim(),
-    "APCA-API-SECRET-KEY": (env.ALPACA_SECRET || "").trim(),
+    "APCA-API-KEY-ID":     (env.ALPACA_KEY_SCREENER || env.ALPACA_KEY    || "").trim(),
+    "APCA-API-SECRET-KEY": (env.ALPACA_SECRET_SCREENER || env.ALPACA_SECRET || "").trim(),
   };
   try {
     const r = await fetch(
@@ -127,16 +139,13 @@ async function getAlpacaPrice(env, symbol) {
 }
 
 async function placeBracketOrder(env, symbol) {
-  const alpacaBase   = (env.ALPACA_BASE_URL || "https://paper-api.alpaca.markets").trim();
-  const alpacaKey    = (env.ALPACA_KEY    || "").trim();
-  const alpacaSecret = (env.ALPACA_SECRET || "").trim();
-  if (!alpacaKey || !alpacaSecret) return { error: "Alpaca credentials not set in Worker secrets." };
+  // Always uses SCREENER account — keeps screener trades separate from pipeline
+  const alpacaBase   = "https://paper-api.alpaca.markets";
+  const alpacaKey    = (env.ALPACA_KEY_SCREENER    || env.ALPACA_KEY    || "").trim();
+  const alpacaSecret = (env.ALPACA_SECRET_SCREENER || env.ALPACA_SECRET || "").trim();
+  if (!alpacaKey || !alpacaSecret) return { error: "Alpaca screener credentials not set. Run: wrangler secret put ALPACA_KEY_SCREENER" };
 
-  const headers = {
-    "APCA-API-KEY-ID":     alpacaKey,
-    "APCA-API-SECRET-KEY": alpacaSecret,
-    "Content-Type":        "application/json",
-  };
+  const headers = screenerHeaders(env);
 
   // Get live price
   const price = await getAlpacaPrice(env, symbol);
@@ -549,11 +558,8 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
     }
 
     if (action === "confirm_sell_execute") {
-      const alpacaBase = (env.ALPACA_BASE_URL || "https://paper-api.alpaca.markets").trim();
-      const headers = {
-        "APCA-API-KEY-ID":     (env.ALPACA_KEY    || "").trim(),
-        "APCA-API-SECRET-KEY": (env.ALPACA_SECRET || "").trim(),
-      };
+      const alpacaBase = "https://paper-api.alpaca.markets";
+      const headers = screenerHeaders(env);  // screener account
       let ok = false, errMsg = "";
       try {
         const r = await fetch(`${alpacaBase}/v2/positions/${ticker}`, { method: "DELETE", headers });
@@ -726,7 +732,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       let qty = 1;
       try {
         const alpacaBase = (env.ALPACA_BASE_URL || "https://paper-api.alpaca.markets").trim();
-        const ah = { "APCA-API-KEY-ID": (env.ALPACA_KEY||"").trim(), "APCA-API-SECRET-KEY": (env.ALPACA_SECRET||"").trim() };
+        const ah = screenerHeaders(env);
         const acct = await (await fetch(`${alpacaBase}/v2/account`, { headers: ah })).json();
         qty = Math.max(1, Math.floor((parseFloat(acct.buying_power || acct.cash || 0) * sizePct) / price));
       } catch {}
@@ -759,8 +765,8 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       const symbol = (opts.symbol || "").toUpperCase();
       if (!symbol) return ephemeral("Provide a ticker: `/sell symbol:AAPL`");
 
-      const alpacaBase = (env.ALPACA_BASE_URL || "https://paper-api.alpaca.markets").trim();
-      const ah = { "APCA-API-KEY-ID": (env.ALPACA_KEY||"").trim(), "APCA-API-SECRET-KEY": (env.ALPACA_SECRET||"").trim() };
+      const alpacaBase = "https://paper-api.alpaca.markets";
+      const ah = screenerHeaders(env);
 
       let position = null;
       try { const r = await fetch(`${alpacaBase}/v2/positions/${symbol}`, { headers: ah }); if (r.ok) position = await r.json(); } catch {}
