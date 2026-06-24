@@ -1,15 +1,22 @@
 name: Daily Screener
 
-# Runs at 8 AM ET (before market open) every weekday.
-# 1. Runs daily_sentiment_runner.py — scores every stock, computes 6-component regime
-# 2. Pushes regime_signal + stock_buckets + screener_summary to Cloudflare KV
-#    so the TradingView webhook handler can gate orders in real time
-# 3. Posts top picks embed to Discord
+# Runs 3x per weekday at ET:
+#   08:00 — pre-market setup (Fear & Greed just refreshed)
+#   11:00 — mid-morning (ADX + breadth reflect real intraday trend, past opening noise)
+#   15:30 — pre-close (sets overnight regime signal)
+# Each run: scores stocks, computes 6-component regime, pushes to Cloudflare KV.
 
 on:
   schedule:
-    - cron: "0 12 * * 1-5"   # 8 AM EDT (summer)
-    - cron: "0 13 * * 1-5"   # 8 AM EST (winter)
+    # 8:00 AM ET
+    - cron: "0 12 * * 1-5"    # EDT (summer)
+    - cron: "0 13 * * 1-5"    # EST (winter)
+    # 11:00 AM ET
+    - cron: "0 15 * * 1-5"    # EDT (summer)
+    - cron: "0 16 * * 1-5"    # EST (winter)
+    # 3:30 PM ET
+    - cron: "30 19 * * 1-5"   # EDT (summer)
+    - cron: "30 20 * * 1-5"   # EST (winter)
   workflow_dispatch:
 
 jobs:
@@ -20,12 +27,13 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-      - name: Guard — only run at 8 AM New York
+      - name: Guard — only run at 08, 11, or 15 New York
         id: tz
         run: |
           HOUR=$(TZ=America/New_York date +%H)
-          echo "NY hour: $HOUR"
-          if [ "$HOUR" = "08" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          MIN=$(TZ=America/New_York date +%M)
+          echo "NY time: $HOUR:$MIN"
+          if [ "$HOUR" = "08" ] || [ "$HOUR" = "11" ] || [ "$HOUR" = "15" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "go=true" >> $GITHUB_OUTPUT
           else
             echo "go=false" >> $GITHUB_OUTPUT
