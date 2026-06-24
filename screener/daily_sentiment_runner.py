@@ -269,11 +269,12 @@ def _get_alpaca_ohlcv(symbol: str, days: int = 260) -> list:
     Fetch daily OHLCV bars from Alpaca for a single symbol.
     Returns list of (timestamp, high, low, close) tuples — same format
     as get_historical_ohlcv() so compute_adx() can consume it directly.
+    Uses a 120-day calendar buffer so 260 trading-day requests never fall short.
     """
     if not ALPACA_AVAILABLE:
         return []
     from datetime import timedelta
-    start_date = (date.today() - timedelta(days=days + 30)).isoformat()
+    start_date = (date.today() - timedelta(days=days + 120)).isoformat()
     try:
         r = SESSION.get(
             f"{ALPACA_DATA}/v2/stocks/bars",
@@ -282,7 +283,7 @@ def _get_alpaca_ohlcv(symbol: str, days: int = 260) -> list:
                 "symbols":    symbol,
                 "timeframe":  "1Day",
                 "start":      start_date,
-                "limit":      days + 30,
+                "limit":      days + 120,
                 "feed":       "iex",
                 "adjustment": "split",
             },
@@ -376,7 +377,7 @@ def get_sector_breadth() -> dict:
     # ── Try Alpaca first (single batch call, no rate-limit risk) ──────────
     if ALPACA_AVAILABLE:
         from datetime import timedelta
-        start_date = (date.today() - timedelta(days=260)).isoformat()
+        start_date = (date.today() - timedelta(days=380)).isoformat()
         try:
             r = SESSION.get(
                 f"{ALPACA_DATA}/v2/stocks/bars",
@@ -385,7 +386,7 @@ def get_sector_breadth() -> dict:
                     "symbols":    ",".join(etf_symbols),
                     "timeframe":  "1Day",
                     "start":      start_date,
-                    "limit":      260,
+                    "limit":      380,
                     "feed":       "iex",
                     "adjustment": "split",
                 },
