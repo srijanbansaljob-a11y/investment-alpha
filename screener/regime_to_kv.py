@@ -81,16 +81,25 @@ def parse_screener_output(output_file: Path) -> tuple:
             "regime_ok": regime_ok,
             "near_earnings": near_earnings,
         }
-        if regime_ok and score >= 55 and not near_earnings:
-            top_picks.append({"ticker": ticker, "score": score, "bucket": bucket})
+        if regime_ok and not near_earnings:
+            top_picks.append({
+                "ticker":            ticker,
+                "score":             score,
+                "bucket":            bucket,
+                "conviction_ok":     score >= 55,   # cleared the high-conviction bar
+            })
+
+    top_picks_sorted = sorted(top_picks, key=lambda x: -x["score"])
+    high_conviction  = [p for p in top_picks_sorted if p["conviction_ok"]]
 
     screener_summary = {
-        "date": datetime.now(timezone.utc).date().isoformat(),
-        "regime_label": regime_data.get("label", "UNKNOWN"),
-        "regime_score": regime_data.get("total", 0),
-        "permitted_strategies": list(permitted),
-        "top_picks": sorted(top_picks, key=lambda x: -x["score"])[:10],
-        "total_scored": len(stock_buckets),
+        "date":                  datetime.now(timezone.utc).date().isoformat(),
+        "regime_label":          regime_data.get("label", "UNKNOWN"),
+        "regime_score":          regime_data.get("total", 0),
+        "permitted_strategies":  list(permitted),
+        "top_picks":             top_picks_sorted[:5],   # always top 5 by score
+        "high_conviction_count": len(high_conviction),  # how many cleared ≥55
+        "total_scored":          len(stock_buckets),
     }
 
     return regime_data, stock_buckets, screener_summary

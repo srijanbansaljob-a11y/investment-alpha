@@ -504,21 +504,38 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
           }});
         }
         const s = JSON.parse(raw);
-        const picks = (s.top_picks || [])
-          .map((p, idx) => `${idx + 1}. **${p.ticker}** — score ${p.score} (${p.bucket})`)
-          .join("\n");
+        const picks = s.top_picks || [];
+        const highConviction = s.high_conviction_count ?? picks.filter(p => p.conviction_ok).length;
+        const allBelowThreshold = picks.length > 0 && highConviction === 0;
+
+        const pickLines = picks.map((p, idx) => {
+          const badge = p.conviction_ok ? "✅" : "⚠️";
+          return `${badge} ${idx + 1}. **${p.ticker}** — score ${p.score}/100 (${p.bucket})`;
+        }).join("\n");
+
+        let description = pickLines || "_No stocks passed the regime gate today._";
+        let convictionNote = "";
+        if (allBelowThreshold) {
+          convictionNote = "⚠️ **Regime is healthy but no stocks cleared the 55-pt conviction bar.** " +
+            "These are the best available — consider reduced position size or wait for a stronger setup. " +
+            "✅ = high conviction (≥55)  ⚠️ = below threshold but regime-permitted.";
+        } else if (picks.length > 0 && highConviction < picks.length) {
+          convictionNote = `✅ ${highConviction} high-conviction pick${highConviction > 1 ? "s" : ""}. ` +
+            "⚠️ stocks are below the 55-pt threshold — viable but lower confidence.";
+        }
+
         return json({ type: R_CHANNEL_MESSAGE, data: {
           flags: EPHEMERAL,
           embeds: [{
             title: `📊 Screener — ${s.date || "today"}`,
-            description: picks || "_No picks passed regime gate today._",
-            color: C_BLUE,
+            description: (convictionNote ? convictionNote + "\n\n" : "") + description,
+            color: allBelowThreshold ? C_ORANGE : C_BLUE,
             fields: [
-              { name: "Regime",    value: `${s.regime_label} (${s.regime_score}/100)`, inline: true },
-              { name: "Permitted", value: (s.permitted_strategies || []).join(", ") || "—", inline: true },
-              { name: "Scored",    value: String(s.total_scored || 0), inline: true },
+              { name: "Regime",     value: `${s.regime_label} (${s.regime_score}/100)`, inline: true },
+              { name: "Permitted",  value: (s.permitted_strategies || []).join(", ") || "—", inline: true },
+              { name: "Scored",     value: String(s.total_scored || 0), inline: true },
             ],
-            footer: { text: "Updated 8 AM ET by daily screener" },
+            footer: { text: "Updated 8 AM ET · ✅ ≥55 pts = high conviction · ⚠️ = below threshold" },
           }],
         }});
       } catch (e) {
@@ -617,7 +634,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
 
     const err = await dispatchToGitHub(env, { command, ...common });
     return err
-      ? ephemeral(`❌ Failed to dispatch: ${err}`)
+      ? ephemeral("❌ Failed to dispatch: " + err)
       : ephemeral("⏳ Running… results will appear shortly.");
   }
 
