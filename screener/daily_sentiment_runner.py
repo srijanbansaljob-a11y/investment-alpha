@@ -96,21 +96,32 @@ def _alpaca_headers() -> dict:
 ALPACA_AVAILABLE = bool(ALPACA_KEY and ALPACA_SECRET)
 
 DEFAULT_TICKERS = [
-    # Mega Cap Tech
+    # ── Mega-Cap Tech ──────────────────────────────────────────────────────
     "AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA",
-    # Financials
-    "JPM", "GS", "BAC", "MS",
-    # Healthcare / Biotech
-    "UNH", "LLY", "PFE", "MRNA",
-    # Energy
-    "XOM", "CVX", "OXY",
-    # Industrials / Defense
-    "CAT", "BA", "RTX", "LMT",
-    # Small/Mid Cap High Momentum
+    "AVGO", "ORCL", "AMD", "CRM", "ADBE", "QCOM", "TXN", "IBM",
+    "CSCO", "NOW", "AMAT", "MU", "INTC", "ARM",
+    # ── Cybersecurity / Cloud ──────────────────────────────────────────────
+    "PANW", "CRWD", "NET", "DDOG", "SNOW", "ZS",
+    # ── Financials ────────────────────────────────────────────────────────
+    "JPM", "GS", "BAC", "MS", "V", "MA", "BLK", "C", "WFC",
+    "AXP", "COF", "SCHW", "PYPL",
+    # ── Healthcare / Biotech ──────────────────────────────────────────────
+    "UNH", "LLY", "PFE", "MRNA", "JNJ", "ABBV", "MRK", "ABT",
+    "TMO", "AMGN", "GILD", "ISRG", "REGN", "VRTX", "BMY",
+    # ── Consumer Discretionary & Staples ──────────────────────────────────
+    "COST", "WMT", "HD", "MCD", "NKE", "SBUX", "TGT", "LOW",
+    "PG", "KO", "PEP", "NFLX", "DIS", "CMCSA",
+    # ── Energy ────────────────────────────────────────────────────────────
+    "XOM", "CVX", "OXY", "COP", "SLB", "MPC",
+    # ── Industrials / Defense ─────────────────────────────────────────────
+    "CAT", "BA", "RTX", "LMT", "HON", "GE", "DE", "UPS", "FDX",
+    # ── High-Momentum Growth ───────────────────────────────────────────────
     "SMCI", "MSTR", "PLTR", "HOOD", "SOFI",
-    # Sector ETFs for rotation signals
-    "XLK", "XLF", "XLE", "XLV", "XLI", "XLP", "XLU", "XLB", "XLRE",
+    "COIN", "UBER", "DASH", "ABNB", "SPOT", "RBLX", "RDDT",
+    "MELI", "NU", "AFRM", "IONQ",
 ]
+# Note: Sector ETFs (XLK, XLF, etc.) are NOT in this list — they are fetched
+# separately via SECTOR_ETFS for the regime/breadth calculation only.
 
 SECTOR_ETFS = {
     "Technology":    "XLK",
@@ -1267,7 +1278,7 @@ def run_daily_analysis(tickers: list = None, quick: bool = False) -> dict:
     print(f"{'='*62}\n")
 
     if tickers is None:
-        tickers = [t for t in DEFAULT_TICKERS if not t.startswith("X")]
+        tickers = list(DEFAULT_TICKERS)  # ETFs are no longer in DEFAULT_TICKERS
 
     print("📊 STEP 1 — Market Overview")
     market   = get_market_overview()

@@ -81,12 +81,29 @@ MAX_SCORE = sum(MOMENTUM_SIGNAL_WEIGHTS.values())
 
 # ── Universe (same as live screener — excludes sector ETFs, crypto proxies) ─
 DEFAULT_TICKERS = [
+    # ── Mega-Cap Tech ──────────────────────────────────────────────────────
     "AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA",
-    "JPM", "GS", "BAC", "MS",
-    "UNH", "LLY", "PFE", "MRNA",
-    "XOM", "CVX", "OXY",
-    "CAT", "BA", "RTX", "LMT",
+    "AVGO", "ORCL", "AMD", "CRM", "ADBE", "QCOM", "TXN", "IBM",
+    "CSCO", "NOW", "AMAT", "MU", "INTC", "ARM",
+    # ── Cybersecurity / Cloud ──────────────────────────────────────────────
+    "PANW", "CRWD", "NET", "DDOG", "SNOW", "ZS",
+    # ── Financials ────────────────────────────────────────────────────────
+    "JPM", "GS", "BAC", "MS", "V", "MA", "BLK", "C", "WFC",
+    "AXP", "COF", "SCHW", "PYPL",
+    # ── Healthcare / Biotech ──────────────────────────────────────────────
+    "UNH", "LLY", "PFE", "MRNA", "JNJ", "ABBV", "MRK", "ABT",
+    "TMO", "AMGN", "GILD", "ISRG", "REGN", "VRTX", "BMY",
+    # ── Consumer Discretionary & Staples ──────────────────────────────────
+    "COST", "WMT", "HD", "MCD", "NKE", "SBUX", "TGT", "LOW",
+    "PG", "KO", "PEP", "NFLX", "DIS", "CMCSA",
+    # ── Energy ────────────────────────────────────────────────────────────
+    "XOM", "CVX", "OXY", "COP", "SLB", "MPC",
+    # ── Industrials / Defense ─────────────────────────────────────────────
+    "CAT", "BA", "RTX", "LMT", "HON", "GE", "DE", "UPS", "FDX",
+    # ── High-Momentum Growth ───────────────────────────────────────────────
     "SMCI", "MSTR", "PLTR", "HOOD", "SOFI",
+    "COIN", "UBER", "DASH", "ABNB", "SPOT", "RBLX", "RDDT",
+    "MELI", "NU", "AFRM", "IONQ",
 ]
 
 
