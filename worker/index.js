@@ -588,26 +588,242 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
     const opts = Object.fromEntries((i.data.options || []).map((o) => [o.name, o.value]));
 
     if (name === "help") {
-      return json({
+      // Help uses follow-up webhooks to bypass the 6000-char single-message limit.
+      // Initial response: embeds 1+2 (Overview + Regime)
+      // ctx.waitUntil -> follow-up 1: Screener workflow
+      // ctx.waitUntil -> follow-up 2: Pipeline workflow
+      // ctx.waitUntil -> follow-up 3: Command reference
+      const appId = env.DISCORD_APP_ID || "";
+      const token = i.token;
+      const followUpUrl = `https://discord.com/api/v10/webhooks/${appId}/${token}`;
+
+      async function postFollowUp(embeds) {
+        await fetch(followUpUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ embeds, flags: EPHEMERAL }),
+        });
+      }
+
+      // Embed 1: System Overview
+      const e1 = {
+        title: "\U0001f916  Investment Alpha — System Overview",
+        color: C_BLUE,
+        description: [
+          "Two parallel trading workflows, both gated by a shared **Regime Engine** that scores the market 3x daily.",
+          "```",
+          "        REGIME ENGINE  (auto, 3x daily)",
+          "  Reads: VIX / Fear&Greed / SPY / Breadth / ADX",
+          "  Score: 0-100 -> STRONG BULL / MOD BULL / NEUTRAL / BEARISH",
+          "                    |",
+          "          +---------+---------+",
+          "          v                   v",
+          "   SCREENER (daily)    PIPELINE (monthly)",
+          "   100 stocks          575 stocks",
+          "   Tactical entries    Full rebalance",
+          "   Screener acct       Pipeline acct",
+          "```",
+          "The two Alpaca accounts are **intentionally separate** so you can compare performance before committing real capital.",
+        ].join("\n"),
+        footer: { text: "3 more sections follow — Regime · Screener · Pipeline · Commands" },
+      };
+
+      // Embed 2: Regime Engine
+      const e2 = {
+        title: "\U0001f321️  Workflow 0 — The Regime Engine",
+        color: C_GREY,
+        description: "Runs automatically 3x per day (8 AM / 11 AM / 3:30 PM ET on weekdays). Score stored in Cloudflare KV — every command reads from it.",
+        fields: [
+          {
+            name: "Scoring (100 pts total)",
+            value: [
+              "```",
+              "VIX Level          20pt  Low VIX = calm market",
+              "VIX Term Structure 10pt  Short vs long-term fear",
+              "Fear & Greed       15pt  CNN index (0=fear, 100=greed)",
+              "ADX on SPY         20pt  Trend strength of S&P 500",
+              "SPY vs 200MA       20pt  S&P above long-term average?",
+              "Sector Breadth     15pt  % of 11 sectors above 200MA",
+              "```",
+            ].join("\n"),
+            inline: false,
+          },
+          {
+            name: "Regime levels & what they unlock",
+            value: [
+              "```",
+              ">=75  STRONG BULL   momentum + breakout + mean_rev + catalyst",
+              "55-74 MOD BULL      momentum + mean_reversion + catalyst",
+              "40-54 NEUTRAL       mean_reversion + defensive",
+              "<40   BEARISH       defensive only",
+              "```",
+              "Position size: **5%** (Strong Bull) · **3%** (Mod Bull/Neutral) · **1.5%** (Bearish) of buying power",
+            ].join("\n"),
+            inline: false,
+          },
+        ],
+      };
+
+      // Return initial response immediately (embeds 1+2 are well within 6000-char limit)
+      const initialResp = json({
         type: R_CHANNEL_MESSAGE,
-        data: {
-          flags: EPHEMERAL,
-          content: [
-            "**Investment Alpha — commands**",
-            "`/status` — positions, P&L, stops, regime (~1 min)",
-            "`/screener` — today's top picks from the morning screener",
-            "`/strategy` — how the model picks stocks, live from config (~1 min)",
-            "`/chart symbol:AAPL` or `symbol:portfolio` — price/equity charts (~2 min)",
-            "`/regime` — current market regime (~1 min)",
-            "`/monitor` — run a position check right now (~2 min)",
-            "`/stoploss mode:check` — stop levels, no orders (~2 min)",
-            "`/stoploss mode:execute` — exit breached positions (confirm button)",
-            "`/pipeline mode:dry` — full pipeline, signals only (~10–30 min)",
-            "`/pipeline mode:execute` — rebalance portfolio (confirm button)",
-            "`/help` — this message",
-          ].join("\n"),
-        },
+        data: { flags: EPHEMERAL, embeds: [e1, e2] },
       });
+
+      // Follow-up 1: Screener Workflow
+      const e3 = {
+        title: "\U0001f4ca  Workflow 1 — Daily Screener (Tactical)",
+        color: C_GREEN,
+        description: "Runs automatically 3x per day. Finds the best stock opportunities within the current regime. All trades go to the **Screener Alpaca account** (separate from Pipeline).",
+        fields: [
+          {
+            name: "How it works (fully automated)",
+            value: [
+              "```",
+              "AUTO: 8AM / 11AM / 3:30PM ET",
+              "  1. Regime scored (6 components) -> KV",
+              "  2. 100 stocks fetched",
+              "     Price & MA data  -> Alpaca",
+              "     Fundamentals     -> Finnhub",
+              "  3. Each stock classified into a bucket:",
+              "     avoid / watch / catalyst / breakout",
+              "     momentum / defensive / mean_reversion",
+              "  4. Regime gate: only permitted buckets pass",
+              "  5. Remaining stocks scored 0-100",
+              "  6. Top 5 stored in KV with conviction flags",
+              "     [check] >=55 pts = high conviction",
+              "     [warn]  <55 pts  = viable, lower confidence",
+              "```",
+            ].join("\n"),
+            inline: false,
+          },
+          {
+            name: "Your daily action (manual)",
+            value: [
+              "```",
+              "/screener        -> see today's top 5 picks",
+              "/buy symbol:C    -> preview order:",
+              "                    Price / Shares / Total cost",
+              "                    Stop loss  -5%  (Alpaca auto-manages)",
+              "                    Take profit +12% (Alpaca auto-manages)",
+              "Click confirm    -> bracket order placed",
+              "                    No further action needed",
+              "```",
+            ].join("\n"),
+            inline: false,
+          },
+          {
+            name: "\U0001f4e6 Universe",
+            value: "~100 large-cap US stocks: Mega-cap tech · Cybersecurity · Financials · Healthcare · Consumer · Energy · Industrials · Growth.",
+            inline: true,
+          },
+          {
+            name: "\U0001f4b0 Position sizing",
+            value: "Auto by regime: 5% (Strong Bull) · 3% (Mod Bull/Neutral) · 1.5% (Bearish) of buying power.",
+            inline: true,
+          },
+        ],
+      };
+
+      // Follow-up 2: Pipeline Workflow
+      const e4 = {
+        title: "\U0001f504  Workflow 2 — Monthly Pipeline (Strategic)",
+        color: C_ORANGE,
+        description: "Runs **manually once a month** (1st of month). Scores 575 stocks on a 6-factor model and rebalances the full portfolio. All trades go to the **Pipeline Alpaca account**.",
+        fields: [
+          {
+            name: "How it works",
+            value: [
+              "```",
+              "YOU: /pipeline mode:dry  (run on 1st of month)",
+              "  1. 575 stocks scored on 6 factors:",
+              "     momentum    28%  [========]",
+              "     trend       20%  [======]",
+              "     quality     18%  [=====]",
+              "     valuation   14%  [====]",
+              "     sentiment   10%  [===]  (analyst rev + congress trades)",
+              "     volatility  10%  [===]  (penalty)",
+              "  2. Regime sets portfolio size:",
+              "     STRONG/MOD BULL -> top 10 positions",
+              "     NEUTRAL         -> top  8 positions",
+              "     BEARISH         -> top  5 positions",
+              "  3. ATR-based stop levels per position:",
+              "     BULL    -> ATR x 2.5  (wider, avoids shakeouts)",
+              "     NEUTRAL -> ATR x 2.0",
+              "     BEAR    -> ATR x 1.5  (tight, protect capital)",
+              "  4. Rebalance proposal shown with BUY/SELL signals",
+              "     + confirm button",
+              "YOU: /pipeline mode:execute -> orders placed",
+              "```",
+            ].join("\n"),
+            inline: false,
+          },
+          {
+            name: "\U0001f4c8 Sentiment factor (10%)",
+            value: "Analyst revisions (70%) + congressional stock trades (30%). Unusual political buying is a historically strong leading indicator.",
+            inline: false,
+          },
+          {
+            name: "\U0001f6d1 Stop loss",
+            value: "ATR x multiplier. Wider in bull markets to avoid shake-outs, tightens in bear markets to protect capital. `/stoploss mode:check` shows current distances.",
+            inline: true,
+          },
+          {
+            name: "\U0001f501 Learning loop",
+            value: "Every Saturday: approve/reject decisions scored vs the model. Stop exits get a 30-day post-mortem. Factor weights auto-adjust over time.",
+            inline: true,
+          },
+        ],
+      };
+
+      // Follow-up 3: Command Reference
+      const e5 = {
+        title: "⌨️  Command Reference",
+        color: C_BLUE,
+        fields: [
+          {
+            name: "\U0001f4ca Daily Screener",
+            value: "`/screener` Top 5 picks + conviction badges\n`/buy symbol:X` Preview & confirm bracket order\n`/sell symbol:X` See P&L then confirm close",
+            inline: false,
+          },
+          {
+            name: "\U0001f321️ Regime",
+            value: "`/regime` Score, label, VIX, SPY vs 200MA, sector breadth, permitted strategies",
+            inline: false,
+          },
+          {
+            name: "\U0001f504 Pipeline",
+            value: "`/pipeline mode:dry` 575-stock analysis, signals only (~10-30 min)\n`/pipeline mode:execute` Rebalance portfolio (confirm button)",
+            inline: false,
+          },
+          {
+            name: "\U0001f4cb Portfolio & Charts",
+            value: "`/status` All positions, P&L, cost basis\n`/chart symbol:AAPL` Price chart\n`/chart symbol:portfolio` Equity curve vs SPY\n`/monitor` Immediate position check",
+            inline: false,
+          },
+          {
+            name: "\U0001f6d1 Stop Loss",
+            value: "`/stoploss mode:check` Stop distances, no orders\n`/stoploss mode:execute` Exit breached positions (confirm button)",
+            inline: false,
+          },
+          {
+            name: "ℹ️ Info",
+            value: "`/strategy` Factor weights, universe, sleeve details\n`/help` This guide (4 messages)",
+            inline: false,
+          },
+          {
+            name: "\U0001f4a1 Morning routine",
+            value: "`/regime` check market · `/screener` see picks · `/buy symbol:X` trade\nMonthly (1st): `/pipeline mode:dry` review · `/pipeline mode:execute` rebalance",
+            inline: false,
+          },
+        ],
+        footer: { text: "Screener -> Screener Alpaca acct  |  Pipeline -> Pipeline Alpaca acct  |  Bracket stops auto-managed by Alpaca" },
+      };
+
+      ctx.waitUntil(postFollowUp([e3]));
+      ctx.waitUntil(postFollowUp([e4]));
+      ctx.waitUntil(postFollowUp([e5]));
+      return initialResp;
     }
 
     // /screener — served directly from KV (no GitHub round-trip needed)
