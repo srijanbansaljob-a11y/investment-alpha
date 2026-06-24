@@ -1087,11 +1087,16 @@ def score_stock(ticker: str, quote: dict, news: list, macro_score: dict) -> dict
     elif not above_200 and ma200:
         mom_raw -= 0.15; signals.append(f"Below 200MA (structural downtrend)")
 
-    # MA50 slope proxy: price vs MA50 distance
+    # MA50 trend extension — further above = stronger trend, more reward
+    # (Changed from proximity logic which penalised momentum names running
+    #  far above MA50. For this universe, extension = continuation signal.)
     if ma50 and price > 0:
         pct_above_50 = (price - ma50) / ma50 * 100
-        if   pct_above_50 > 5:  mom_raw += 0.08   # extended above 50MA
-        elif pct_above_50 < -5: mom_raw -= 0.08   # weak below 50MA
+        if   pct_above_50 > 20: mom_raw += 0.10; signals.append(f"Strong trend: {pct_above_50:.0f}% above 50MA")
+        elif pct_above_50 > 10: mom_raw += 0.08
+        elif pct_above_50 >  5: mom_raw += 0.06
+        elif pct_above_50 >  0: mom_raw += 0.03
+        elif pct_above_50 < -5: mom_raw -= 0.08;  signals.append(f"Weak: {pct_above_50:.0f}% below 50MA")
 
     # ── 52-week range position (0 = at low, 1 = at high) ──
     if high52 > low52 and price > 0:
@@ -1100,10 +1105,14 @@ def score_stock(ticker: str, quote: dict, news: list, macro_score: dict) -> dict
         elif pos52 > 0.60: mom_raw += 0.05
         elif pos52 < 0.25: mom_raw -= 0.08; signals.append(f"Near 52w low ({pos52*100:.0f}th pct)")
 
-    # ── 52-week return (sustained momentum, if available) ──
+    # ── 52-week return — extended thresholds for high-momentum names ──
+    # Old max bucket was >30%. Stocks up 100%+ (NVDA, MSTR type) were scored
+    # the same as a stock up 35%. Added >50% and >100% buckets.
     if week52_chg is not None:
-        if   week52_chg > 0.30: mom_raw += 0.10; signals.append(f"52w return +{week52_chg*100:.0f}%")
-        elif week52_chg > 0.10: mom_raw += 0.05
+        if   week52_chg > 1.00: mom_raw += 0.10; signals.append(f"52w return +{week52_chg*100:.0f}% (100%+)")
+        elif week52_chg > 0.50: mom_raw += 0.08; signals.append(f"52w return +{week52_chg*100:.0f}%")
+        elif week52_chg > 0.25: mom_raw += 0.06; signals.append(f"52w return +{week52_chg*100:.0f}%")
+        elif week52_chg > 0.10: mom_raw += 0.03
         elif week52_chg < -0.15: mom_raw -= 0.10; signals.append(f"52w return {week52_chg*100:.0f}%")
 
     # ── Today's price move ──

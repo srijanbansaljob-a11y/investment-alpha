@@ -186,16 +186,21 @@ def compute_momentum_score(closes: list, volumes: list) -> float | None:
     else:
         score -= w["ma_structure"] * 0.5
 
-    # 2. Distance from MA50 (healthy proximity vs over-extension)
+    # 2. Distance from MA50 — reward trend extension, not proximity.
+    # Original logic penalised >15% above MA50 (mean-reversion instinct).
+    # For a momentum universe this is wrong: stocks 20%+ above MA50 are in
+    # strong uptrends and tend to continue. Further above = more reward.
     pct50 = (price - ma50) / ma50 if ma50 else 0
-    if 0 < pct50 <= 0.05:
-        score += w["ma50_distance"] * 1.0
-    elif 0.05 < pct50 <= 0.15:
-        score += w["ma50_distance"] * 0.5
-    elif pct50 > 0.15:
-        score += w["ma50_distance"] * 0.2   # over-extended — caution
+    if pct50 > 0.20:
+        score += w["ma50_distance"] * 1.0   # strong trend extension
+    elif pct50 > 0.10:
+        score += w["ma50_distance"] * 0.8
+    elif pct50 > 0.05:
+        score += w["ma50_distance"] * 0.6
+    elif pct50 > 0:
+        score += w["ma50_distance"] * 0.3
     else:
-        score -= w["ma50_distance"] * 0.5
+        score -= w["ma50_distance"] * 0.7   # below MA50 — weak
 
     # 3. 52-week range position (higher = stronger trend)
     hi52 = max(window)
@@ -204,18 +209,24 @@ def compute_momentum_score(closes: list, volumes: list) -> float | None:
     pos  = (price - lo52) / rng if rng > 0 else 0.5
     score += w["week52_position"] * (pos * 2 - 1)  # maps [0,1] → [-1,+1]
 
-    # 4. 52-week return (captures trend persistence)
+    # 4. 52-week return (captures trend persistence).
+    # Original max bucket was >30%. NVDA/MSTR/PLTR type stocks at +100-200%
+    # were scored identically to a stock up +35%. Added >50% and >100% buckets.
     ret52 = (price - window[0]) / window[0] if window[0] else 0
-    if ret52 > 0.30:
-        score += w["week52_return"] * 1.0
+    if ret52 > 1.00:
+        score += w["week52_return"] * 1.0   # >100% — high-momentum names
+    elif ret52 > 0.50:
+        score += w["week52_return"] * 0.85
+    elif ret52 > 0.25:
+        score += w["week52_return"] * 0.65
     elif ret52 > 0.10:
-        score += w["week52_return"] * 0.5
+        score += w["week52_return"] * 0.40
     elif ret52 > 0:
-        score += w["week52_return"] * 0.2
+        score += w["week52_return"] * 0.15
     elif ret52 > -0.10:
-        score -= w["week52_return"] * 0.3
+        score -= w["week52_return"] * 0.30
     else:
-        score -= w["week52_return"] * 0.8
+        score -= w["week52_return"] * 0.80
 
     # 5. 5-day momentum (short-term trend confirmation)
     prev5 = window[-6] if len(window) >= 6 else window[0]
