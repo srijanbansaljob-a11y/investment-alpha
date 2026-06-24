@@ -36,10 +36,11 @@ const R_PONG = 1, R_CHANNEL_MESSAGE = 4, R_DEFERRED_MESSAGE = 5,
       R_DEFERRED_UPDATE = 6, R_UPDATE_MESSAGE = 7;
 const EPHEMERAL = 64;
 
-// ── Order sizing (% of buying power per trade) ─────────────────────────────
-const POSITION_SIZE_PCT = 0.05;    // 5% of buying power per trade
-const STOP_LOSS_PCT     = 0.05;    // 5% below entry
-const TAKE_PROFIT_PCT   = 0.12;    // 12% above entry
+// ── Order sizing (% of buying power per trade, by regime) ─────────────────
+// Regime score ≥60 = bull (5%), 30–59 = neutral (3%), <30 = bear (1.5%)
+const POSITION_SIZE_BY_REGIME = { bull: 0.05, neutral: 0.03, bear: 0.015 };
+const STOP_LOSS_PCT            = 0.05;   // 5% below entry
+const TAKE_PROFIT_PCT          = 0.12;   // 12% above entry
 
 // ── Discord colours ────────────────────────────────────────────────────────
 const C_GREEN = 0x2ECC71, C_RED = 0xE74C3C, C_ORANGE = 0xE67E22,
@@ -250,15 +251,18 @@ async function handleTradingViewWebhook(request, env) {
     "Content-Type":        "application/json",
   };
 
-  // Determine qty from buying power
+  // Determine qty from buying power — scaled by regime
+  const regimeKey = regimeScore >= 60 ? "bull" : regimeScore >= 30 ? "neutral" : "bear";
+  const positionSizePct = POSITION_SIZE_BY_REGIME[regimeKey];
   let qty = 1;
   try {
     const acctResp = await fetch(`${alpacaBase}/v2/account`, { headers: alpacaHeaders });
     const acct = await acctResp.json();
     const buyingPower = parseFloat(acct.buying_power || acct.cash || 0);
     const entryPrice = price || 100;  // fallback if price not sent
-    const dollarAlloc = buyingPower * POSITION_SIZE_PCT;
+    const dollarAlloc = buyingPower * positionSizePct;
     qty = Math.max(1, Math.floor(dollarAlloc / entryPrice));
+    console.log(`Regime ${regimeKey} (score ${regimeScore}) → sizing ${positionSizePct*100}% → $${dollarAlloc.toFixed(0)} → ${qty} shares`);
   } catch (e) {
     console.warn("Could not fetch Alpaca buying power:", e.message);
   }

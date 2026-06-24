@@ -80,6 +80,10 @@ COMMANDS = [
         }],
     },
     {
+        "name": "screener",
+        "description": "Latest screener results: top picks, regime, stock buckets (from KV cache)",
+    },
+    {
         "name": "help",
         "description": "Show all Investment Alpha commands and what they do",
     },

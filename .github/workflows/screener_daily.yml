@@ -82,9 +82,14 @@ jobs:
           python screener/regime_to_kv.py \
             --regime-file screener/outputs/daily_sentiment_data.json
 
-      - name: Commit screener outputs
+      - name: Commit screener outputs (8AM only)
         if: steps.tz.outputs.go == 'true'
         run: |
+          HOUR=$(TZ=America/New_York date +%H)
+          if [ "$HOUR" != "08" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "Skipping commit — not the 8AM run (hour=$HOUR)"
+            exit 0
+          fi
           git config user.name "investment-alpha-bot"
           git config user.email "actions@github.com"
           git add screener/outputs/ || true
@@ -95,3 +100,14 @@ jobs:
           else
             echo "No screener output changes to commit"
           fi
+
+      - name: Alert Discord on failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          HOUR=$(TZ=America/New_York date +%H:%M)
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"❌ Daily Screener Failed\",\"description\":\"The $HOUR ET screener run failed — KV was not updated.\\n[View run]($RUN_URL)\",\"color\":15158332}]}"

@@ -67,3 +67,13 @@ jobs:
           else
             echo "No trade log changes to commit"
           fi
+
+      - name: Alert Discord on failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"❌ Nightly Updater Failed\",\"description\":\"Trade log was not updated — forward prices missing.\\n[View run]($RUN_URL)\",\"color\":15158332}]}"
