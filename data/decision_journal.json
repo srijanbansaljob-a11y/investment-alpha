@@ -35,5 +35,14 @@
     "qty": 19.1079,
     "order_status": "OrderStatus.PENDING_NEW",
     "timestamp": "2026-06-23T11:10:25.353707+00:00"
+  },
+  {
+    "decision": "approve_sell",
+    "ticker": "DAL",
+    "trigger": "profit_target",
+    "price_at_decision": 86.95,
+    "order_status": "OrderStatus.PENDING_NEW",
+    "pnl_pct_at_decision": 22.98,
+    "timestamp": "2026-06-24T11:23:48.465562+00:00"
   }
 ]
