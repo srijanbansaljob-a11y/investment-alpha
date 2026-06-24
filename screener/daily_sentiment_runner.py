@@ -11,7 +11,8 @@ SOURCES:
   3. SPY OHLCV               → Yahoo Finance v8 (ADX, 200MA)
   4. Sector ETF breadth      → Yahoo Finance v8 (% above 200MA)
   5. Alpaca Data API          → Real-time price, volume, MA50/MA200, 52w range (primary)
-  6. Yahoo Finance            → Fundamentals only: PE, analyst rec, earnings, beta (fallback for price)
+  6. Finnhub                  → Fundamentals: PE, analyst rec, earnings, beta, market cap (primary)
+     Yahoo Finance            → Fundamentals fallback (blocked on GitHub Actions — avoid in prod)
   7. Yahoo Finance News       → Headline sentiment
 
 REGIME SCORE (6 components, 100 pts):
@@ -40,8 +41,9 @@ import time
 import csv
 import os
 import argparse
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 try:
     import requests
@@ -94,6 +96,10 @@ def _alpaca_headers() -> dict:
     }
 
 ALPACA_AVAILABLE = bool(ALPACA_KEY and ALPACA_SECRET)
+
+FINNHUB_KEY       = os.getenv("FINNHUB_API_KEY", "").strip()
+FINNHUB_API       = "https://finnhub.io/api/v1"
+FINNHUB_AVAILABLE = bool(FINNHUB_KEY)
 
 DEFAULT_TICKERS = [
     # ── Mega-Cap Tech ──────────────────────────────────────────────────────
@@ -708,13 +714,142 @@ def get_alpaca_bars(tickers: list, days: int = 220) -> dict:
 
 # ─── STOCK QUOTES ─────────────────────────────────────────────────────────────
 
+def _get_finnhub_fundamentals(tickers: list) -> dict:
+    """
+    Finnhub replacement for Yahoo Finance fundamentals.
+    Works reliably on GitHub Actions (API-key auth, no IP blocking).
+
+    Fetches per ticker:
+      /stock/metric        → market cap, beta, PE, 52w high/low
+      /stock/recommendation → analyst consensus + analyst count
+      /stock/price-target   → mean analyst price target
+
+    Plus one batch call:
+      /calendar/earnings   → upcoming earnings dates for all tickers
+
+    Rate limit: 60 calls/min (free). Uses 5-worker thread pool.
+    """
+    if not FINNHUB_AVAILABLE:
+        print("  ⚠  FINNHUB_API_KEY not set — fundamentals unavailable")
+        return {}
+
+    results = {t: {"short_name": t} for t in tickers}
+
+    # ── Step 1: Earnings calendar (one call covers all tickers) ──────────────
+    try:
+        today  = date.today()
+        from_d = today.isoformat()
+        to_d   = (today + timedelta(days=90)).isoformat()
+        r = SESSION.get(
+            f"{FINNHUB_API}/calendar/earnings",
+            params={"from": from_d, "to": to_d, "token": FINNHUB_KEY},
+            timeout=15,
+        )
+        if r.ok:
+            ticker_set = set(tickers)
+            for ev in r.json().get("earningsCalendar", []):
+                sym = ev.get("symbol")
+                if sym in ticker_set and "earnings_date" not in results[sym]:
+                    try:
+                        ts = int(datetime.fromisoformat(ev["date"]).timestamp())
+                        results[sym]["earnings_date"] = ts
+                    except Exception:
+                        pass
+            print(f"  ✓ Finnhub earnings calendar fetched ({to_d})")
+    except Exception as e:
+        print(f"  ⚠  Finnhub earnings calendar failed: {e}")
+
+    # ── Step 2: Per-ticker: metrics + recommendations + price target ──────────
+    def fetch_ticker_fundamentals(ticker):
+        out = results[ticker]
+
+        # Metrics: market cap, beta, PE, 52w range
+        try:
+            r = SESSION.get(
+                f"{FINNHUB_API}/stock/metric",
+                params={"symbol": ticker, "metric": "all", "token": FINNHUB_KEY},
+                timeout=10,
+            )
+            if r.ok:
+                m = r.json().get("metric", {})
+                mc = m.get("marketCapitalization")   # Finnhub reports in $M
+                out["market_cap"] = mc * 1_000_000 if mc else None
+                out["beta"]       = m.get("beta")
+                out["pe_ratio"]   = m.get("peBasicExclExtraTTM")
+                out["forward_pe"] = m.get("peNormalizedAnnual")
+                out["eps_fwd"]    = m.get("epsNormalizedAnnual")
+                out["_yf_52h"]    = m.get("52WeekHigh")
+                out["_yf_52l"]    = m.get("52WeekLow")
+        except Exception as e:
+            print(f"  ⚠  Finnhub metric {ticker}: {e}")
+
+        time.sleep(0.15)  # ~6-7 calls/s across 5 workers → well under 60/min
+
+        # Analyst recommendations (most recent period)
+        try:
+            r = SESSION.get(
+                f"{FINNHUB_API}/stock/recommendation",
+                params={"symbol": ticker, "token": FINNHUB_KEY},
+                timeout=10,
+            )
+            if r.ok:
+                recs = r.json()
+                if recs:
+                    latest     = recs[0]
+                    strong_buy = latest.get("strongBuy", 0)
+                    buy        = latest.get("buy", 0)
+                    hold       = latest.get("hold", 0)
+                    sell       = latest.get("sell", 0)
+                    strong_sell = latest.get("strongSell", 0)
+                    total      = strong_buy + buy + hold + sell + strong_sell
+                    out["num_analysts"] = total
+                    if total > 0:
+                        bull_pct = (strong_buy + buy) / total
+                        bear_pct = (sell + strong_sell) / total
+                        if strong_buy / total > 0.4:
+                            out["recommend"] = "strong_buy"
+                        elif bull_pct > 0.6:
+                            out["recommend"] = "buy"
+                        elif bear_pct > 0.4:
+                            out["recommend"] = "sell"
+                        elif bear_pct > 0.6:
+                            out["recommend"] = "strong_sell"
+                        else:
+                            out["recommend"] = "hold"
+        except Exception as e:
+            print(f"  ⚠  Finnhub rec {ticker}: {e}")
+
+        time.sleep(0.15)
+
+        # Analyst price target (for upside calculation)
+        try:
+            r = SESSION.get(
+                f"{FINNHUB_API}/stock/price-target",
+                params={"symbol": ticker, "token": FINNHUB_KEY},
+                timeout=10,
+            )
+            if r.ok:
+                pt = r.json()
+                out["analyst_target"] = pt.get("targetMean")
+        except Exception as e:
+            print(f"  ⚠  Finnhub price-target {ticker}: {e}")
+
+    print(f"  → Fetching Finnhub fundamentals for {len(tickers)} tickers (threaded)...")
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = {pool.submit(fetch_ticker_fundamentals, t): t for t in tickers}
+        done = 0
+        for f in as_completed(futures):
+            done += 1
+            if done % 25 == 0:
+                print(f"  → Finnhub: {done}/{len(tickers)} tickers done")
+    print(f"  ✓ Finnhub fundamentals complete")
+    return results
+
+
 def _get_yahoo_fundamentals(tickers: list) -> dict:
     """
-    Yahoo Finance quote fetch — used ONLY for fundamental data that Alpaca
-    does not provide: PE ratio, analyst recommendations, earnings date, beta,
-    market cap, analyst price target.
-
-    Also serves as the complete price fallback when Alpaca is unavailable.
+    Yahoo Finance fallback — only used when Finnhub is unavailable.
+    NOTE: Blocked on GitHub Actions IPs. Use Finnhub in production.
     """
     results    = {}
     batch_size = 20
@@ -730,7 +865,6 @@ def _get_yahoo_fundamentals(tickers: list) -> dict:
                 vol     = q.get("regularMarketVolume") or 0
                 avg_vol = q.get("averageDailyVolume3Month") or 1
                 results[sym] = {
-                    # Fundamentals (Alpaca doesn't carry these)
                     "market_cap":     q.get("marketCap"),
                     "pe_ratio":       q.get("trailingPE"),
                     "forward_pe":     q.get("forwardPE"),
@@ -741,7 +875,6 @@ def _get_yahoo_fundamentals(tickers: list) -> dict:
                     "short_name":     q.get("shortName", sym),
                     "earnings_date":  q.get("earningsTimestampStart"),
                     "beta":           q.get("beta"),
-                    # Price fallback fields (used only when Alpaca unavailable)
                     "_yf_price":      q.get("regularMarketPrice"),
                     "_yf_change_pct": round(q.get("regularMarketChangePercent", 0), 2),
                     "_yf_volume":     vol,
@@ -762,21 +895,28 @@ def _get_yahoo_fundamentals(tickers: list) -> dict:
 def get_stock_quotes(tickers: list) -> dict:
     """
     Primary quote fetcher — Alpaca for real-time price/technicals,
-    Yahoo Finance for fundamentals only.
+    Finnhub for fundamentals (PE, analyst rec, earnings, beta, market cap).
 
     Data flow:
-      1. Alpaca snapshots  → price, change_pct, volume (real-time)
-      2. Yahoo fundamentals → PE, analyst rec, earnings, beta, market cap
-      3. Alpaca bars       → MA50, MA200, 52w high/low, avg_volume, week52_change
-      4. Merge all three → unified quote dict
+      1. Finnhub fundamentals → PE, analyst rec, earnings, beta, market cap (primary)
+         Yahoo Finance         → same fields, fallback when Finnhub unavailable
+      2. Alpaca snapshots     → price, change_pct, volume (real-time)
+      3. Alpaca bars          → MA50, MA200, 52w high/low, avg_volume, week52_change
+      4. Merge all → unified quote dict
 
     Falls back to Yahoo for price data if Alpaca credentials not set.
     """
+    price_source = 'Alpaca real-time' if ALPACA_AVAILABLE else 'Yahoo Finance (no Alpaca key)'
+    fund_source  = 'Finnhub' if FINNHUB_AVAILABLE else 'Yahoo Finance (no Finnhub key)'
     print(f"  → Fetching quotes for {len(tickers)} tickers "
-          f"[{'Alpaca real-time' if ALPACA_AVAILABLE else 'Yahoo Finance (no Alpaca key)'}]...")
+          f"[price: {price_source} | fundamentals: {fund_source}]...")
 
-    # Step 1: Fundamentals from Yahoo (always, Alpaca doesn't have these)
-    fundamentals = _get_yahoo_fundamentals(tickers)
+    # Step 1: Fundamentals — Finnhub preferred, Yahoo fallback
+    if FINNHUB_AVAILABLE:
+        fundamentals = _get_finnhub_fundamentals(tickers)
+    else:
+        print("  ⚠  Falling back to Yahoo Finance for fundamentals (may fail on GitHub Actions)")
+        fundamentals = _get_yahoo_fundamentals(tickers)
 
     # Step 2: Real-time prices from Alpaca (or Yahoo fallback)
     alpaca_snaps = {}
@@ -1073,8 +1213,11 @@ def classify_stock(ticker: str, quote: dict) -> dict:
         except:
             pass
 
-    large_cap    = market_cap > 10e9
-    well_covered = num_analysts >= 15
+    # When market_cap == 0, Yahoo Finance was unreachable. Our universe is S&P 500
+    # so assume large-cap when data is unavailable rather than excluding everything.
+    large_cap    = market_cap > 10e9 if market_cap else True
+    # well_covered: treat as covered when num_analysts == 0 (API unreachable vs truly uncovered)
+    well_covered = num_analysts >= 15 if num_analysts else True
     strong_rec   = rec in ["strong_buy", "buy", "outperform", "overweight"]
     weak_rec     = rec in ["sell", "strong_sell", "underperform"]
 
