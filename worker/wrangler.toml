@@ -8,7 +8,7 @@ compatibility_date = "2026-01-01"
 # Then paste the returned id below.
 [[kv_namespaces]]
 binding = "KV"
-id = "PASTE_KV_NAMESPACE_ID_HERE"
+id = "3e0d7e6bb3e94d4a93670ba6a5da1ecf"
 
 # ── Worker secrets (never stored here — set via CLI) ───────────────────────
 # After `npx wrangler login`, run these commands once:

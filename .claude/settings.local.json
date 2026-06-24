@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash('C:\\\\Users\\\\srija\\\\AppData\\\\Local\\\\Python\\\\pythoncore-3.14-64\\\\python.exe' -c ' *)"
+      "Bash('C:\\\\Users\\\\srija\\\\AppData\\\\Local\\\\Python\\\\pythoncore-3.14-64\\\\python.exe' -c ' *)",
+      "Bash(claude mcp *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(claude mcp *)",
+      "PowerShell(Out-File *)",
+      "WebFetch(domain:investment-alpha-bot.srijan-alpha.workers.dev)"
     ]
   }
 }

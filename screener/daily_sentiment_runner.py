@@ -10,8 +10,9 @@ SOURCES:
   2. VIX + VIX3M             → Yahoo Finance (term structure)
   3. SPY OHLCV               → Yahoo Finance v8 (ADX, 200MA)
   4. Sector ETF breadth      → Yahoo Finance v8 (% above 200MA)
-  5. Yahoo Finance            → Stock quotes, analyst data
-  6. Yahoo Finance News       → Headline sentiment
+  5. Alpaca Data API          → Real-time price, volume, MA50/MA200, 52w range (primary)
+  6. Yahoo Finance            → Fundamentals only: PE, analyst rec, earnings, beta (fallback for price)
+  7. Yahoo Finance News       → Headline sentiment
 
 REGIME SCORE (6 components, 100 pts):
   VIX Level          20 pts
@@ -78,6 +79,21 @@ HEADERS = {
                   "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept": "application/json, text/html, */*",
 }
+
+# Alpaca Data API — real-time prices, bars, snapshots
+# Reads from environment (set in GitHub Secrets or .env file)
+ALPACA_KEY    = os.getenv("ALPACA_API_KEY", "").strip()
+ALPACA_SECRET = os.getenv("ALPACA_SECRET_KEY", "").strip()
+ALPACA_DATA   = "https://data.alpaca.markets"
+
+def _alpaca_headers() -> dict:
+    return {
+        "APCA-API-KEY-ID":     ALPACA_KEY,
+        "APCA-API-SECRET-KEY": ALPACA_SECRET,
+        "Accept": "application/json",
+    }
+
+ALPACA_AVAILABLE = bool(ALPACA_KEY and ALPACA_SECRET)
 
 DEFAULT_TICKERS = [
     # Mega Cap Tech
@@ -460,10 +476,156 @@ def get_sector_rotation() -> list:
     return sectors
 
 
+
+# ─── ALPACA DATA API ──────────────────────────────────────────────────────────
+
+def get_alpaca_snapshots(tickers: list) -> dict:
+    """
+    Fetch real-time snapshots from Alpaca for a batch of tickers.
+    Returns dict keyed by ticker with price, change_pct, volume, vol_ratio.
+    Falls back gracefully if Alpaca unavailable or ticker not found.
+
+    Snapshot fields used:
+      latestTrade.p       → current price (real-time)
+      dailyBar            → today's OHLCV
+      prevDailyBar        → previous close (for change_pct calculation)
+    """
+    if not ALPACA_AVAILABLE:
+        return {}
+
+    results = {}
+    batch_size = 100  # Alpaca allows up to 1000, 100 is safe
+    for i in range(0, len(tickers), batch_size):
+        batch = tickers[i:i + batch_size]
+        sym_str = ",".join(batch)
+        url = f"{ALPACA_DATA}/v2/stocks/snapshots"
+        try:
+            r = SESSION.get(
+                url,
+                headers=_alpaca_headers(),
+                params={"symbols": sym_str, "feed": "iex"},
+                timeout=12,
+            )
+            if r.status_code == 403:
+                print("  ⚠  Alpaca data: subscription required for SIP feed, using IEX")
+            if not r.ok:
+                continue
+            data = r.json()
+            for sym, snap in data.items():
+                daily  = snap.get("dailyBar") or {}
+                prev   = snap.get("prevDailyBar") or {}
+                latest = snap.get("latestTrade") or {}
+
+                price    = latest.get("p") or daily.get("c") or 0
+                prev_c   = prev.get("c") or 0
+                today_v  = daily.get("v") or 0
+
+                # 20-day avg volume: Alpaca doesn't return it in snapshot,
+                # so we estimate from recent bars; approximated here as 3-month avg
+                # (filled properly by get_alpaca_bars if called after)
+                change_pct = ((price - prev_c) / prev_c * 100) if prev_c > 0 else 0
+
+                results[sym] = {
+                    "_source": "alpaca",
+                    "price":      round(price, 4),
+                    "change_pct": round(change_pct, 2),
+                    "volume":     today_v,
+                    "avg_volume": None,   # filled by get_alpaca_bars or Yahoo fallback
+                    "vol_ratio":  None,   # filled after avg_volume known
+                    "open":       daily.get("o"),
+                    "high":       daily.get("h"),
+                    "low":        daily.get("l"),
+                    "prev_close": prev_c,
+                }
+        except Exception as e:
+            print(f"  ⚠  Alpaca snapshot batch {i//batch_size+1} failed: {e}")
+        time.sleep(0.1)
+    return results
+
+
+def get_alpaca_bars(tickers: list, days: int = 220) -> dict:
+    """
+    Fetch daily bars from Alpaca for a list of tickers.
+    Returns dict keyed by ticker with computed:
+      ma50, ma200, 52w_high, 52w_low, week52_change, avg_volume (20d)
+
+    Called after get_alpaca_snapshots() to fill in the technical fields.
+    Only runs for tickers that passed the initial snapshot filter.
+    """
+    if not ALPACA_AVAILABLE:
+        return {}
+
+    from datetime import timedelta
+    start_date = (date.today() - timedelta(days=days + 30)).isoformat()  # buffer for weekends
+    results = {}
+    batch_size = 50  # smaller batches for historical data
+    for i in range(0, len(tickers), batch_size):
+        batch = tickers[i:i + batch_size]
+        try:
+            r = SESSION.get(
+                f"{ALPACA_DATA}/v2/stocks/bars",
+                headers=_alpaca_headers(),
+                params={
+                    "symbols":   ",".join(batch),
+                    "timeframe": "1Day",
+                    "start":     start_date,
+                    "limit":     days + 30,
+                    "feed":      "iex",
+                    "adjustment":"split",
+                },
+                timeout=20,
+            )
+            if not r.ok:
+                continue
+            data = r.json().get("bars", {})
+            for sym, bars in data.items():
+                if not bars or len(bars) < 20:
+                    continue
+                closes  = [b["c"] for b in bars]
+                volumes = [b["v"] for b in bars]
+
+                # Moving averages
+                ma50  = sum(closes[-50:])  / min(50,  len(closes[-50:]))  if len(closes) >= 50  else None
+                ma200 = sum(closes[-200:]) / min(200, len(closes[-200:])) if len(closes) >= 200 else None
+
+                # 52-week range (use up to 252 bars)
+                year_closes = closes[-252:] if len(closes) >= 252 else closes
+                hi52 = max(b["h"] for b in bars[-252:]) if len(bars) >= 252 else max(b["h"] for b in bars)
+                lo52 = min(b["l"] for b in bars[-252:]) if len(bars) >= 252 else min(b["l"] for b in bars)
+
+                # 52-week price return
+                week52_chg = None
+                if len(closes) >= 252:
+                    c252 = closes[-252]
+                    c_now = closes[-1]
+                    week52_chg = round((c_now - c252) / c252, 4) if c252 > 0 else None
+
+                # 20-day avg volume
+                avg_vol_20 = int(sum(volumes[-20:]) / min(20, len(volumes[-20:]))) if volumes else None
+
+                results[sym] = {
+                    "ma50":          round(ma50, 4)  if ma50  else None,
+                    "ma200":         round(ma200, 4) if ma200 else None,
+                    "52w_high":      round(hi52, 4),
+                    "52w_low":       round(lo52, 4),
+                    "week52_change": week52_chg,
+                    "avg_volume":    avg_vol_20,
+                }
+        except Exception as e:
+            print(f"  ⚠  Alpaca bars batch {i//batch_size+1} failed: {e}")
+        time.sleep(0.15)
+    return results
+
 # ─── STOCK QUOTES ─────────────────────────────────────────────────────────────
 
-def get_stock_quotes(tickers: list) -> dict:
-    print(f"  → Fetching quotes for {len(tickers)} tickers...")
+def _get_yahoo_fundamentals(tickers: list) -> dict:
+    """
+    Yahoo Finance quote fetch — used ONLY for fundamental data that Alpaca
+    does not provide: PE ratio, analyst recommendations, earnings date, beta,
+    market cap, analyst price target.
+
+    Also serves as the complete price fallback when Alpaca is unavailable.
+    """
     results    = {}
     batch_size = 20
     for i in range(0, len(tickers), batch_size):
@@ -478,13 +640,7 @@ def get_stock_quotes(tickers: list) -> dict:
                 vol     = q.get("regularMarketVolume") or 0
                 avg_vol = q.get("averageDailyVolume3Month") or 1
                 results[sym] = {
-                    "price":          q.get("regularMarketPrice"),
-                    "change_pct":     round(q.get("regularMarketChangePercent", 0), 2),
-                    "volume":         vol,
-                    "avg_volume":     avg_vol,
-                    "vol_ratio":      round(vol / avg_vol, 2) if avg_vol else 1.0,
-                    "52w_high":       q.get("fiftyTwoWeekHigh"),
-                    "52w_low":        q.get("fiftyTwoWeekLow"),
+                    # Fundamentals (Alpaca doesn't carry these)
                     "market_cap":     q.get("marketCap"),
                     "pe_ratio":       q.get("trailingPE"),
                     "forward_pe":     q.get("forwardPE"),
@@ -495,11 +651,125 @@ def get_stock_quotes(tickers: list) -> dict:
                     "short_name":     q.get("shortName", sym),
                     "earnings_date":  q.get("earningsTimestampStart"),
                     "beta":           q.get("beta"),
+                    # Price fallback fields (used only when Alpaca unavailable)
+                    "_yf_price":      q.get("regularMarketPrice"),
+                    "_yf_change_pct": round(q.get("regularMarketChangePercent", 0), 2),
+                    "_yf_volume":     vol,
+                    "_yf_avg_vol":    avg_vol,
+                    "_yf_52h":        q.get("fiftyTwoWeekHigh"),
+                    "_yf_52l":        q.get("fiftyTwoWeekLow"),
+                    "_yf_ma50":       q.get("fiftyDayAverage"),
+                    "_yf_ma200":      q.get("twoHundredDayAverage"),
+                    "_yf_wk52chg":    q.get("52WeekChange"),
                 }
         except Exception as e:
             for t in batch:
                 results[t] = {"error": str(e)}
         time.sleep(0.2)
+    return results
+
+
+def get_stock_quotes(tickers: list) -> dict:
+    """
+    Primary quote fetcher — Alpaca for real-time price/technicals,
+    Yahoo Finance for fundamentals only.
+
+    Data flow:
+      1. Alpaca snapshots  → price, change_pct, volume (real-time)
+      2. Yahoo fundamentals → PE, analyst rec, earnings, beta, market cap
+      3. Alpaca bars       → MA50, MA200, 52w high/low, avg_volume, week52_change
+      4. Merge all three → unified quote dict
+
+    Falls back to Yahoo for price data if Alpaca credentials not set.
+    """
+    print(f"  → Fetching quotes for {len(tickers)} tickers "
+          f"[{'Alpaca real-time' if ALPACA_AVAILABLE else 'Yahoo Finance (no Alpaca key)'}]...")
+
+    # Step 1: Fundamentals from Yahoo (always, Alpaca doesn't have these)
+    fundamentals = _get_yahoo_fundamentals(tickers)
+
+    # Step 2: Real-time prices from Alpaca (or Yahoo fallback)
+    alpaca_snaps = {}
+    alpaca_bars  = {}
+    if ALPACA_AVAILABLE:
+        alpaca_snaps = get_alpaca_snapshots(tickers)
+        # Only fetch bars for tickers we got snapshots for (avoid wasted calls)
+        snap_tickers = [t for t in tickers if t in alpaca_snaps]
+        if snap_tickers:
+            print(f"  → Fetching {len(snap_tickers)}-ticker bar history from Alpaca (MA50/MA200)...")
+            alpaca_bars = get_alpaca_bars(snap_tickers)
+    else:
+        print("  ⚠  ALPACA_API_KEY not set — using Yahoo Finance for price data")
+
+    # Step 3: Merge into unified quote dict
+    results = {}
+    for sym in tickers:
+        fund  = fundamentals.get(sym, {})
+        snap  = alpaca_snaps.get(sym, {})
+        bars  = alpaca_bars.get(sym, {})
+
+        if fund.get("error") and not snap:
+            results[sym] = {"error": fund.get("error", "no data")}
+            continue
+
+        if ALPACA_AVAILABLE and snap:
+            # Alpaca price data + computed technicals from bars
+            avg_vol  = bars.get("avg_volume") or fund.get("_yf_avg_vol") or 1
+            volume   = snap.get("volume") or 0
+            vol_ratio = round(volume / avg_vol, 2) if avg_vol else 1.0
+
+            results[sym] = {
+                "_source":        "alpaca",
+                "price":          snap.get("price"),
+                "change_pct":     snap.get("change_pct"),
+                "volume":         volume,
+                "avg_volume":     avg_vol,
+                "vol_ratio":      vol_ratio,
+                "52w_high":       bars.get("52w_high") or fund.get("_yf_52h"),
+                "52w_low":        bars.get("52w_low")  or fund.get("_yf_52l"),
+                "ma50":           bars.get("ma50")     or fund.get("_yf_ma50"),
+                "ma200":          bars.get("ma200")    or fund.get("_yf_ma200"),
+                "week52_change":  bars.get("week52_change") or fund.get("_yf_wk52chg"),
+                # Fundamentals (from Yahoo)
+                "market_cap":     fund.get("market_cap"),
+                "pe_ratio":       fund.get("pe_ratio"),
+                "forward_pe":     fund.get("forward_pe"),
+                "eps_fwd":        fund.get("eps_fwd"),
+                "analyst_target": fund.get("analyst_target"),
+                "recommend":      fund.get("recommend"),
+                "num_analysts":   fund.get("num_analysts"),
+                "short_name":     fund.get("short_name", sym),
+                "earnings_date":  fund.get("earnings_date"),
+                "beta":           fund.get("beta"),
+            }
+        else:
+            # Yahoo fallback for everything
+            avg_vol  = fund.get("_yf_avg_vol") or 1
+            volume   = fund.get("_yf_volume") or 0
+            results[sym] = {
+                "_source":        "yahoo",
+                "price":          fund.get("_yf_price"),
+                "change_pct":     fund.get("_yf_change_pct"),
+                "volume":         volume,
+                "avg_volume":     avg_vol,
+                "vol_ratio":      round(volume / avg_vol, 2) if avg_vol else 1.0,
+                "52w_high":       fund.get("_yf_52h"),
+                "52w_low":        fund.get("_yf_52l"),
+                "ma50":           fund.get("_yf_ma50"),
+                "ma200":          fund.get("_yf_ma200"),
+                "week52_change":  fund.get("_yf_wk52chg"),
+                "market_cap":     fund.get("market_cap"),
+                "pe_ratio":       fund.get("pe_ratio"),
+                "forward_pe":     fund.get("forward_pe"),
+                "eps_fwd":        fund.get("eps_fwd"),
+                "analyst_target": fund.get("analyst_target"),
+                "recommend":      fund.get("recommend"),
+                "num_analysts":   fund.get("num_analysts"),
+                "short_name":     fund.get("short_name", sym),
+                "earnings_date":  fund.get("earnings_date"),
+                "beta":           fund.get("beta"),
+            }
+
     return results
 
 
@@ -721,9 +991,18 @@ def classify_stock(ticker: str, quote: dict) -> dict:
     info = {"near_earnings": near_earnings, "days_to_earnings": days_to_earnings,
             "vol_ratio": round(vol_ratio, 2)}
 
+    # MA200 filter — stocks in a structural downtrend get downgraded
+    ma200 = quote.get("ma200")
+    ma50  = quote.get("ma50")
+    below_200ma = (ma200 and price > 0 and price < ma200 * 0.97)  # >3% below 200MA
+    below_50ma  = (ma50  and price > 0 and price < ma50)
+
     # Avoid
     if weak_rec or num_analysts < 5 or (forward_pe and forward_pe > 150):
         return {**info, "bucket": "avoid"}
+    if below_200ma and not near_earnings:
+        # Stock in structural downtrend → watch (not avoid, may recover)
+        return {**info, "bucket": "watch", "below_200ma": True}
 
     # Catalyst: near earnings with rising volume and strong rec
     if near_earnings and strong_rec and vol_ratio > 1.2:
@@ -787,27 +1066,59 @@ def score_stock(ticker: str, quote: dict, news: list, macro_score: dict) -> dict
     if upside > 15:
         signals.append(f"+{upside:.0f}% analyst upside ({n_anal} analysts)")
 
-    # Momentum (default 25 pts)
+    # Momentum (default 25 pts) — multi-signal: MA trend + today's move + volume + 52w position
     chg_pct   = quote.get("change_pct") or 0
     vol_ratio = quote.get("vol_ratio") or 1.0
-    mom_raw   = 0.48
-    if   chg_pct > 3:   mom_raw += 0.32; signals.append(f"Strong momentum +{chg_pct}%")
-    elif chg_pct > 1:   mom_raw += 0.20; signals.append(f"Positive momentum +{chg_pct}%")
-    elif chg_pct > 0:   mom_raw += 0.08
-    elif chg_pct < -3:  mom_raw -= 0.32; signals.append(f"Selling pressure {chg_pct}%")
-    elif chg_pct < -1:  mom_raw -= 0.16
-    if   vol_ratio > 2.0: mom_raw += 0.20; signals.append(f"Volume surge {vol_ratio:.1f}x avg")
-    elif vol_ratio > 1.5: mom_raw += 0.12
-    elif vol_ratio < 0.5: mom_raw -= 0.08
-    breakdown["momentum"] = round(max(0, min(1.0, mom_raw)) * W["momentum"])
+    ma50      = quote.get("ma50")
+    ma200     = quote.get("ma200")
+    week52_chg = quote.get("week52_change")   # ~12M return, from Yahoo
+    high52    = quote.get("52w_high") or price
+    low52     = quote.get("52w_low")  or price
 
-    # 52-Week Position
-    high52 = quote.get("52w_high") or price
-    low52  = quote.get("52w_low")  or price
+    mom_raw = 0.40  # neutral base (slightly lower — MAs must confirm)
+
+    # ── Trend structure: where price sits relative to MAs ──
+    above_200 = ma200 and price > ma200
+    above_50  = ma50  and price > ma50
+    if above_200 and above_50:
+        mom_raw += 0.15; signals.append("Price above 200MA + 50MA ✓")
+    elif above_200:
+        mom_raw += 0.07; signals.append("Price above 200MA")
+    elif not above_200 and ma200:
+        mom_raw -= 0.15; signals.append(f"Below 200MA (structural downtrend)")
+
+    # MA50 slope proxy: price vs MA50 distance
+    if ma50 and price > 0:
+        pct_above_50 = (price - ma50) / ma50 * 100
+        if   pct_above_50 > 5:  mom_raw += 0.08   # extended above 50MA
+        elif pct_above_50 < -5: mom_raw -= 0.08   # weak below 50MA
+
+    # ── 52-week range position (0 = at low, 1 = at high) ──
     if high52 > low52 and price > 0:
-        pos = (price - low52) / (high52 - low52)
-        if pos > 0.90:  signals.append("Near 52-week high — strength")
-        elif pos < 0.15: signals.append("Near 52-week low — potential reversal")
+        pos52 = (price - low52) / (high52 - low52)
+        if   pos52 > 0.80: mom_raw += 0.10; signals.append(f"Near 52w high ({pos52*100:.0f}th pct)")
+        elif pos52 > 0.60: mom_raw += 0.05
+        elif pos52 < 0.25: mom_raw -= 0.08; signals.append(f"Near 52w low ({pos52*100:.0f}th pct)")
+
+    # ── 52-week return (sustained momentum, if available) ──
+    if week52_chg is not None:
+        if   week52_chg > 0.30: mom_raw += 0.10; signals.append(f"52w return +{week52_chg*100:.0f}%")
+        elif week52_chg > 0.10: mom_raw += 0.05
+        elif week52_chg < -0.15: mom_raw -= 0.10; signals.append(f"52w return {week52_chg*100:.0f}%")
+
+    # ── Today's price move ──
+    if   chg_pct > 3:   mom_raw += 0.12; signals.append(f"Strong day +{chg_pct}%")
+    elif chg_pct > 1:   mom_raw += 0.07; signals.append(f"Positive day +{chg_pct}%")
+    elif chg_pct > 0:   mom_raw += 0.03
+    elif chg_pct < -3:  mom_raw -= 0.12; signals.append(f"Selling pressure {chg_pct}%")
+    elif chg_pct < -1:  mom_raw -= 0.07
+
+    # ── Volume confirmation ──
+    if   vol_ratio > 2.0: mom_raw += 0.10; signals.append(f"Volume surge {vol_ratio:.1f}x avg")
+    elif vol_ratio > 1.5: mom_raw += 0.05
+    elif vol_ratio < 0.5: mom_raw -= 0.05
+
+    breakdown["momentum"] = round(max(0, min(1.0, mom_raw)) * W["momentum"])
 
     # News Sentiment (default 20 pts)
     news_raw  = score_headline_sentiment(news)
@@ -1102,19 +1413,6 @@ if __name__ == "__main__":
                         help="Skip SPY technicals, VIX term structure, breadth")
     parser.add_argument("--stocks", nargs="+", metavar="TICKER",
                         help="Score specific tickers only")
-    parser.add_argument("--save-json", metavar="PATH",
-                        help="Write JSON output to this path (overrides default location). "
-                             "Used by GitHub Actions to write to screener/outputs/.")
     args    = parser.parse_args()
     tickers = args.stocks if args.stocks else None
-
-    # Override JSON output path if --save-json is given (GitHub Actions uses this)
-    if args.save_json:
-        import os as _os
-        _os.makedirs(_os.path.dirname(_os.path.abspath(args.save_json)), exist_ok=True)
-        # Monkey-patch the module-level constant before run_daily_analysis uses it
-        import sys as _sys
-        _mod = _sys.modules[__name__]
-        _mod.JSON_OUTPUT = _os.path.abspath(args.save_json)
-
     run_daily_analysis(tickers=tickers, quick=args.quick)
