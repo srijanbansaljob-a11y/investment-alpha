@@ -65,10 +65,12 @@ jobs:
           DISCORD_CHANNEL_ID:  ${{ secrets.DISCORD_CHANNEL_ID }}
           FINNHUB_API_KEY:     ${{ secrets.FINNHUB_API_KEY }}
         run: |
+          set -o pipefail
           mkdir -p screener/outputs
           python screener/daily_sentiment_runner.py \
             --save-json screener/outputs/daily_sentiment_data.json \
-            2>&1 | tail -100
+            2>&1
+          echo "Exit code: $?"
 
       - name: Push regime to Cloudflare KV
         if: steps.tz.outputs.go == 'true'
