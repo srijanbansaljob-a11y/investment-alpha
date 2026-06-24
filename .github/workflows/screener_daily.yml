@@ -53,9 +53,7 @@ jobs:
       - name: Install dependencies
         if: steps.tz.outputs.go == 'true'
         run: |
-          pip install requests python-dotenv
-          # The screener only needs requests — no alpaca-py, no yfinance needed separately
-          # (daily_sentiment_runner uses Yahoo Finance v8 API via requests)
+          pip install requests pandas python-dotenv
 
       - name: Run daily screener
         if: steps.tz.outputs.go == 'true'
