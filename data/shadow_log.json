@@ -292,5 +292,152 @@
         }
       }
     ]
+  },
+  {
+    "date": "2026-06-24",
+    "regime": "bull",
+    "evaluated": false,
+    "stocks": [
+      {
+        "ticker": "HST",
+        "rank": 1,
+        "composite": 0.6207,
+        "price": 24.82,
+        "scores": {
+          "momentum": 0.6949,
+          "trend": 0.63,
+          "quality": 0.5757,
+          "valuation": 0.8456,
+          "sentiment": 0.442,
+          "volatility": 0.1496
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "rank": 2,
+        "composite": 0.5975,
+        "price": 15.75,
+        "scores": {
+          "momentum": 0.7725,
+          "trend": 0.6057,
+          "quality": 0.5063,
+          "valuation": 0.9496,
+          "sentiment": 0.48,
+          "volatility": 0.5235
+        }
+      },
+      {
+        "ticker": "MATX",
+        "rank": 3,
+        "composite": 0.592,
+        "price": 195.76,
+        "scores": {
+          "momentum": 0.7307,
+          "trend": 0.6746,
+          "quality": 0.4671,
+          "valuation": 0.8845,
+          "sentiment": 0.5857,
+          "volatility": 0.5217
+        }
+      },
+      {
+        "ticker": "QRVO",
+        "rank": 4,
+        "composite": 0.5798,
+        "price": 99.6,
+        "scores": {
+          "momentum": 0.7233,
+          "trend": 0.7024,
+          "quality": 0.6231,
+          "valuation": 0.8381,
+          "sentiment": 0.3807,
+          "volatility": 0.7652
+        }
+      },
+      {
+        "ticker": "MTCH",
+        "rank": 5,
+        "composite": 0.5758,
+        "price": 35.31,
+        "scores": {
+          "momentum": 0.621,
+          "trend": 0.5617,
+          "quality": 0.7198,
+          "valuation": 0.8781,
+          "sentiment": 0.471,
+          "volatility": 0.4609
+        }
+      },
+      {
+        "ticker": "BIIB",
+        "rank": 6,
+        "composite": 0.565,
+        "price": 197.19,
+        "scores": {
+          "momentum": 0.5888,
+          "trend": 0.6811,
+          "quality": 0.6522,
+          "valuation": 0.7677,
+          "sentiment": 0.5043,
+          "volatility": 0.5409
+        }
+      },
+      {
+        "ticker": "DAL",
+        "rank": 7,
+        "composite": 0.5623,
+        "price": 86.72,
+        "scores": {
+          "momentum": 0.6759,
+          "trend": 0.6909,
+          "quality": 0.4928,
+          "valuation": 0.9238,
+          "sentiment": 0.5022,
+          "volatility": 0.6696
+        }
+      },
+      {
+        "ticker": "MO",
+        "rank": 8,
+        "composite": 0.5619,
+        "price": 71.61,
+        "scores": {
+          "momentum": 0.6259,
+          "trend": 0.635,
+          "quality": 0.7245,
+          "valuation": 0.7179,
+          "sentiment": 0.3538,
+          "volatility": 0.313
+        }
+      },
+      {
+        "ticker": "MRK",
+        "rank": 9,
+        "composite": 0.5596,
+        "price": 119.6,
+        "scores": {
+          "momentum": 0.6434,
+          "trend": 0.6196,
+          "quality": 0.5999,
+          "valuation": 0.6893,
+          "sentiment": 0.508,
+          "volatility": 0.3583
+        }
+      },
+      {
+        "ticker": "EXPE",
+        "rank": 10,
+        "composite": 0.5561,
+        "price": 245.07,
+        "scores": {
+          "momentum": 0.6231,
+          "trend": 0.6133,
+          "quality": 0.6723,
+          "valuation": 0.7822,
+          "sentiment": 0.5053,
+          "volatility": 0.6852
+        }
+      }
+    ]
   }
 ]

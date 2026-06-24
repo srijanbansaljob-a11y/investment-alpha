@@ -3145,5 +3145,192 @@
       "start_date": "2026-05-01",
       "end_date": "2026-07-30"
     }
+  },
+  {
+    "timestamp": "2026-06-24T12:34:17.879904+00:00",
+    "run_date": "2026-05-01",
+    "regime": "unknown",
+    "total_capital": 1000.0,
+    "portfolio_value": 1000.0,
+    "realised_pnl": 0.0,
+    "total_portfolio_value": 1000.0,
+    "total_return_pct": 0.0,
+    "benchmark_return_pct": 2.0565,
+    "alpha_pct": -2.0565,
+    "sharpe_ratio": 0.0273,
+    "max_drawdown_pct": -1.337,
+    "win_rate_pct": 0.0,
+    "avg_gain_pct": 0.0,
+    "avg_loss_pct": 0.0,
+    "positions": [
+      {
+        "ticker": "HST",
+        "weight": 0.14628,
+        "entry_price": 24.82,
+        "current_price": 24.82,
+        "cost_basis": 146.28,
+        "current_value": 146.28,
+        "unrealised_pnl": -0.0,
+        "unrealised_pct": -0.0,
+        "score": 0.6207,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "weight": 0.09711,
+        "entry_price": 15.75,
+        "current_price": 15.75,
+        "cost_basis": 97.11,
+        "current_value": 97.11,
+        "unrealised_pnl": 0.0,
+        "unrealised_pct": 0.0,
+        "score": 0.5975,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "MATX",
+        "weight": 0.09748,
+        "entry_price": 195.76,
+        "current_price": 195.76,
+        "cost_basis": 97.48,
+        "current_value": 97.48,
+        "unrealised_pnl": -0.0,
+        "unrealised_pct": -0.0,
+        "score": 0.592,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "QRVO",
+        "weight": 0.069408,
+        "entry_price": 99.6,
+        "current_price": 99.6,
+        "cost_basis": 69.41,
+        "current_value": 69.41,
+        "unrealised_pnl": -0.0,
+        "unrealised_pct": -0.0,
+        "score": 0.5798,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "MTCH",
+        "weight": 0.104107,
+        "entry_price": 35.31,
+        "current_price": 35.31,
+        "cost_basis": 104.11,
+        "current_value": 104.11,
+        "unrealised_pnl": 0.0,
+        "unrealised_pct": 0.0,
+        "score": 0.5758,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "BIIB",
+        "weight": 0.095861,
+        "entry_price": 197.19,
+        "current_price": 197.19,
+        "cost_basis": 95.86,
+        "current_value": 95.86,
+        "unrealised_pnl": 0.0,
+        "unrealised_pct": 0.0,
+        "score": 0.565,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "moderate",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "DAL",
+        "weight": 0.078167,
+        "entry_price": 86.72,
+        "current_price": 86.72,
+        "cost_basis": 78.17,
+        "current_value": 78.17,
+        "unrealised_pnl": 0.0,
+        "unrealised_pct": 0.0,
+        "score": 0.5623,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "MO",
+        "weight": 0.12007,
+        "entry_price": 71.61,
+        "current_price": 71.61,
+        "cost_basis": 120.07,
+        "current_value": 120.07,
+        "unrealised_pnl": 0.0,
+        "unrealised_pct": 0.0,
+        "score": 0.5619,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "MRK",
+        "weight": 0.115269,
+        "entry_price": 119.6,
+        "current_price": 119.6,
+        "cost_basis": 115.27,
+        "current_value": 115.27,
+        "unrealised_pnl": -0.0,
+        "unrealised_pct": -0.0,
+        "score": 0.5596,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "EXPE",
+        "weight": 0.076248,
+        "entry_price": 245.07,
+        "current_price": 245.07,
+        "cost_basis": 76.25,
+        "current_value": 76.25,
+        "unrealised_pnl": 0.0,
+        "unrealised_pct": 0.0,
+        "score": 0.5561,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      }
+    ],
+    "closed_positions": [],
+    "paper_trading": {
+      "in_validation": true,
+      "days_elapsed": 54,
+      "days_remaining": 36,
+      "start_date": "2026-05-01",
+      "end_date": "2026-07-30"
+    }
   }
 ]
