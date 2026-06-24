@@ -1088,7 +1088,10 @@ def classify_stock(ticker: str, quote: dict) -> dict:
     below_50ma  = (ma50  and price > 0 and price < ma50)
 
     # Avoid
-    if weak_rec or num_analysts < 5 or (forward_pe and forward_pe > 150):
+    # Only apply analyst-count threshold when we actually received coverage data.
+    # If num_analysts == 0 it means the API was unreachable, not that the stock is uncovered.
+    sparse_coverage = num_analysts > 0 and num_analysts < 5
+    if weak_rec or sparse_coverage or (forward_pe and forward_pe > 150):
         return {**info, "bucket": "avoid"}
     if below_200ma and not near_earnings:
         # Stock in structural downtrend → watch (not avoid, may recover)

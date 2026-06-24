@@ -89,6 +89,15 @@ def parse_screener_output(output_file: Path) -> tuple:
                 "conviction_ok":     score >= 55,   # cleared the high-conviction bar
             })
 
+    # Debug: show bucket breakdown
+    from collections import Counter
+    bucket_counts = Counter(v["bucket"] for v in stock_buckets.values())
+    log.info("Bucket breakdown: %s", dict(bucket_counts))
+    log.info("Permitted strategies: %s", permitted)
+    log.info("Regime-OK (before earnings filter): %d stocks", sum(1 for v in stock_buckets.values() if v["regime_ok"]))
+    log.info("Near-earnings filtered out: %d stocks", sum(1 for v in stock_buckets.values() if v["near_earnings"]))
+    log.info("Top picks (regime_ok + not near_earnings): %d", len(top_picks))
+
     top_picks_sorted = sorted(top_picks, key=lambda x: -x["score"])
     high_conviction  = [p for p in top_picks_sorted if p["conviction_ok"]]
 
