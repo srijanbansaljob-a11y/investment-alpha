@@ -391,7 +391,7 @@ async function handleTradingViewWebhook(request, env) {
 //  DISCORD INTERACTION HANDLER (unchanged from original)
 // ══════════════════════════════════════════════════════════════════════════
 
-async function handleDiscordInteraction(bodyText, env) {
+async function handleDiscordInteraction(bodyText, env, ctx) {
   const i = JSON.parse(bodyText);
   if (i.type === PING) return json({ type: R_PONG });
 
@@ -567,9 +567,10 @@ async function handleDiscordInteraction(bodyText, env) {
                         "stoploss_check", "stoploss_execute", "pipeline_dry"].includes(command);
 
     if (needsDefer) {
-      // Kick off GitHub dispatch (background, don't await) then return defer
+      // Kick off GitHub dispatch — ctx.waitUntil ensures Cloudflare keeps the
+      // Worker alive until the fetch completes even after the Response is sent.
       const payload = { command, symbol: opts.symbol, mode: opts.mode, ...common };
-      dispatchToGitHub(env, payload);  // fire-and-forget
+      ctx.waitUntil(dispatchToGitHub(env, payload));
       return json({ type: R_DEFERRED_MESSAGE, data: { flags: EPHEMERAL } });
     }
 
@@ -588,7 +589,7 @@ async function handleDiscordInteraction(bodyText, env) {
 // ══════════════════════════════════════════════════════════════════════════
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     // Health check
@@ -610,6 +611,6 @@ export default {
     if (!(await verifyDiscordSignature(request, bodyText, env.DISCORD_PUBLIC_KEY))) {
       return new Response("invalid request signature", { status: 401 });
     }
-    return handleDiscordInteraction(bodyText, env);
+    return handleDiscordInteraction(bodyText, env, ctx);
   },
 };
