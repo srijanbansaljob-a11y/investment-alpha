@@ -10,6 +10,7 @@ NEUTRAL regime: top 8 stocks selected
 BEAR   regime: top 5 stocks selected
 """
 
+import json
 import logging
 import sys
 from pathlib import Path
@@ -20,6 +21,55 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
 
 log = logging.getLogger(__name__)
+
+
+def _load_prior_tickers() -> set:
+    """Tickers held as of the last run (latest_portfolio.json). Empty on first run."""
+    path = config.PORTFOLIO_STATE_FILE
+    if not path.exists():
+        return set()
+    try:
+        raw = path.read_bytes().rstrip(b"\x00")
+        data = json.loads(raw)
+        return {p["ticker"] for p in data.get("portfolio", []) if p.get("ticker")}
+    except Exception as exc:
+        log.warning("Selection: could not read prior holdings (%s)", exc)
+        return set()
+
+
+def _apply_turnover_guard(ranked, selected, n_select):
+    """
+    Hysteresis to cut weekly churn: keep an existing holding that has slipped just
+    below the top-N cut (rank <= n_select + REBALANCE_RANK_BUFFER) instead of
+    swapping it out for a marginally higher-ranked NEW name. No-op if buffer is 0.
+    """
+    buffer = int(getattr(config, "REBALANCE_RANK_BUFFER", 0) or 0)
+    if buffer <= 0 or len(ranked) <= n_select:
+        return selected
+    prior = _load_prior_tickers()
+    if not prior:
+        return selected
+    selected_tickers = set(selected["ticker"])
+    keep_zone = ranked[(ranked["rank"] > n_select)
+                       & (ranked["rank"] <= n_select + buffer)]
+    carryover = keep_zone[keep_zone["ticker"].isin(prior)
+                          & ~keep_zone["ticker"].isin(selected_tickers)]
+    if carryover.empty:
+        return selected
+    new_in_selected = selected[~selected["ticker"].isin(prior)].sort_values("rank")
+    n_swap = min(len(carryover), len(new_in_selected))
+    if n_swap <= 0:
+        return selected
+    drop_tickers = set(new_in_selected.tail(n_swap)["ticker"])
+    keep_carry   = carryover.head(n_swap)
+    adjusted = pd.concat(
+        [selected[~selected["ticker"].isin(drop_tickers)], keep_carry]
+    ).sort_values("composite_score", ascending=False).reset_index(drop=True)
+    for _, r in keep_carry.iterrows():
+        log.info("  TURNOVER GUARD: keeping held %s (rank %d, within N+%d) - "
+                 "not churned for a marginal newcomer", r["ticker"], int(r["rank"]), buffer)
+    log.info("  TURNOVER GUARD: %d carryover(s), dropped %s", n_swap, sorted(drop_tickers))
+    return adjusted
 
 
 def run(filter_result, top_n=None, regime_result=None):
@@ -62,6 +112,10 @@ def run(filter_result, top_n=None, regime_result=None):
     ranked["rank"] = ranked.index + 1
 
     selected = ranked.head(n_select).copy()
+
+    # Turnover guard (hysteresis): keep holdings that slipped just below the cut
+    # rather than churning them for marginal newcomers (weekly rebalance).
+    selected = _apply_turnover_guard(ranked, selected, n_select)
 
     if len(selected) < n_select:
         log.warning("Stage 5: Only %d stocks available (requested %d)", len(selected), n_select)

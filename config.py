@@ -40,8 +40,9 @@ STOP_LOSS_LOG_FILE   = OUTPUT_DIR / "stop_loss_log.json"
 
 # ── Logging / Cache ────────────────────────────────────────────────────────
 LOG_LEVEL            = "INFO"          # DEBUG for verbose output
-CACHE_MAX_AGE_HOURS  = 8              # refresh cache if older than this
-HISTORY_DAYS         = 400            # alias for PRICE_HISTORY_DAYS (used by ingestion.py)
+# CACHE_MAX_AGE_HOURS and HISTORY_DAYS are defined ONCE in the Cache / Data
+# Ingestion sections below. Earlier duplicate definitions removed 2026-06 to
+# stop silent last-wins overrides (effective values were CACHE=4h, HISTORY=400d).
 
 # ── Factor Weights ─────────────────────────────────────────────────────────
 # Phase 3: 6-factor model adds valuation (lower P/E & EV/EBITDA = better)
@@ -85,7 +86,8 @@ RSI_PERIOD           = 14     # RSI lookback
 MACD_FAST            = 12     # MACD fast EMA
 MACD_SLOW            = 26     # MACD slow EMA
 MACD_SIGNAL          = 9      # MACD signal line
-MIN_HISTORY_DAYS     = 60     # minimum price history required for a ticker
+# MIN_HISTORY_DAYS defined once below (Technical Indicator Parameters = 252).
+# Earlier duplicate (=60) removed 2026-06; 252 was the effective value.
 
 # ── Portfolio Construction ─────────────────────────────────────────────────
 TOP_N_STOCKS        = 10
@@ -191,6 +193,27 @@ ALPACA_RECONCILE_ON_EXECUTE  = True    # always compare Alpaca vs pipeline befor
 ALPACA_WEIGHT_DRIFT_THRESHOLD = 0.03  # rebalance if position weight drifts >3% from target
 MANUAL_POSITION_ACTION        = "keep" # "keep" = log & ignore | "exit" = sell manual buys
 
+# ── Execution safety rails (weekly auto/approve flow) ──────────────────────
+EXECUTION_ENABLED      = True    # master kill switch — if False, executor places NO orders
+EXECUTION_REQUIRE_MARKET_OPEN = True  # skip (don't fake-fill) when market closed; fractional
+                                      # orders are rejected outside RTH and cannot be queued
+CASH_BUFFER_MULTIPLIER = 1.00    # max fraction of available cash a BUY may consume (was 1.05)
+
+# ── Turnover guard (weekly rebalance) ──────────────────────────────────────
+# A held name is only EXITed if it falls out of the top-N by more than this
+# buffer, so weekly noise around the rank-N boundary doesn't churn the book.
+REBALANCE_RANK_BUFFER  = 3       # keep holding until rank > active_top_n + buffer
+
+# ── Re-entry cooldown ──────────────────────────────────────────────────────
+# Don't re-buy a ticker that was stopped out / exited within this many days.
+REENTRY_COOLDOWN_DAYS  = 5
+
+# ── Inverse-vol weighting floor ────────────────────────────────────────────
+VOL_FLOOR = 0.05   # treat any vol below 5% as 5% so 1/vol can't over-concentrate
+
+# ── State file schema ──────────────────────────────────────────────────────
+STATE_SCHEMA_VERSION = 2   # bumped when latest_portfolio.json layout changes
+
 # ── Intraday Monitor (broker/monitor.py) ──────────────────────────────────
 # Runs continuously during market hours, checking positions every N minutes.
 # Setup: add DISCORD_WEBHOOK_URL to .env, then:
@@ -222,9 +245,11 @@ RSI_OVERSOLD      = 30
 VOLATILITY_CUTOFF = 0.80   # exclude top 20% most volatile stocks
 
 # ── Signal Label Thresholds (used by portfolio.py for trend/momentum labels) ──
-TREND_BULLISH_THRESHOLD   = 0.65   # score_trend >= this → "bullish"
+# Single source of truth for signal-label thresholds (set to the values that
+# were previously effective via last-wins duplicates: bullish 0.5, strong 0.6).
+TREND_BULLISH_THRESHOLD   = 0.50   # score_trend >= this → "bullish"
 TREND_BEARISH_THRESHOLD   = 0.35   # score_trend <= this → "bearish"
-MOMENTUM_STRONG_THRESHOLD = 0.65   # score_momentum >= this → "strong"
+MOMENTUM_STRONG_THRESHOLD = 0.60   # score_momentum >= this → "strong"
 MOMENTUM_WEAK_THRESHOLD   = 0.35   # score_momentum <= this → "weak"
 
 # ── Universe ───────────────────────────────────────────────────────────────
@@ -369,20 +394,20 @@ MOMENTUM_3M  = 63
 MOMENTUM_6M  = 126
 MOMENTUM_12M = 252
 
-# ── Cache ──────────────────────────────────────────────────────────────────
+# ---- Cache ----------------------------------------------------------------
 CACHE_MAX_AGE_HOURS = 4   # refresh cache if older than this
 # Backward compat alias: PRICE_HISTORY_DAYS was previously HISTORY_DAYS
 HISTORY_DAYS = PRICE_HISTORY_DAYS
 
-# ── Scoring Thresholds (for signal labelling in portfolio.py) ──────────────
-MOMENTUM_STRONG_THRESHOLD = 0.6   # normalized score above this -> "strong"
-TREND_BULLISH_THRESHOLD   = 0.5   # normalized score above this -> "bullish"
+# ---- Scoring Thresholds (for signal labelling in portfolio.py) ------------
+# MOMENTUM_STRONG_THRESHOLD / TREND_BULLISH_THRESHOLD are defined once above
+# (Signal Label Thresholds). Duplicates removed 2026-06 to stop silent overrides.
 
-# ── Executor ───────────────────────────────────────────────────────────────
+# ---- Executor -------------------------------------------------------------
 EQUAL_WEIGHT = 1.0 / TOP_N_STOCKS   # 10% per position in equal-weight mode
 
 
-# ──────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     print("=== Investment Alpha Config v2.0 ===")
     print(f"Universe size      : {len(ALL_TICKERS)} tickers")

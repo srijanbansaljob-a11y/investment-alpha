@@ -131,10 +131,18 @@ def save_json(
 
 
 def save_portfolio_state(portfolio: list) -> None:
-    """Overwrite the latest portfolio state for next month's HOLD/EXIT detection."""
-    with open(config.PORTFOLIO_STATE_FILE, "w") as f:
-        json.dump({"portfolio": portfolio}, f, indent=2)
-    log.info(f"  Portfolio state saved → {config.PORTFOLIO_STATE_FILE.name}")
+    """DEPRECATED — do not use.
+
+    latest_portfolio.json is now owned solely by pipeline/signals.py, which
+    preserves regime, entry_date and sticky entry_price. This thin writer used
+    to overwrite those fields (entry_price = current_price every run), which
+    silently reset the stop-loss baseline. Kept as a guarded no-op so any stray
+    caller doesn't corrupt state. See ARCHITECTURE_REVIEW_CORNER_CASES.md C1/C2.
+    """
+    log.warning(
+        "  output.save_portfolio_state() is deprecated and now a no-op; "
+        "signals.py owns latest_portfolio.json. Ignoring call."
+    )
 
 
 # ── Output 2: Excel ────────────────────────────────────────────────────────
@@ -703,10 +711,12 @@ def run(all_stage_results: dict) -> dict:
     run_label = _run_label()
     outputs   = {"stage": "output", "run_label": run_label}
 
-    # 1. Save portfolio state (for next run's BUY/HOLD/EXIT)
-    portfolio = all_stage_results.get("portfolio", {}).get("portfolio", [])
-    if portfolio:
-        save_portfolio_state(portfolio)
+    # 1. Portfolio state is NO LONGER written here.
+    #    pipeline/signals.py (_save_portfolio_state) is the SINGLE writer of
+    #    latest_portfolio.json — it preserves regime, entry_date and sticky
+    #    entry_price. Writing it here too (with current_price as entry_price)
+    #    was clobbering those fields and resetting the stop-loss baseline every
+    #    run. See ARCHITECTURE_REVIEW_CORNER_CASES.md C1/C2.
 
     # 2. JSON
     try:

@@ -22,9 +22,15 @@ Write-Host "  Python  : $PythonExe"
 Write-Host "=================================================="
 Write-Host ""
 
-# --- Task 1: Monthly Rebalance (1st of each month, 8:30 AM) ---
-$TaskName1 = "InvestmentAlpha_MonthlyRebalance"
-$Trigger1  = New-ScheduledTaskTrigger -Monthly -DaysOfMonth 1 -At "08:30AM"
+# --- Task 1: Weekly Rebalance — ANALYSIS ONLY (every Monday, 10:00 AM ET) ---
+# Runs the pipeline and produces the proposed trades, but does NOT execute.
+# Approval required: trades only happen after you approve (Discord Approve/Reject
+# flow — see IMPROVEMENT_PLAN.md "Weekly approval flow"). Until that flow is wired,
+# review the proposals and run run_weekly_execute.bat manually to execute.
+# 10:00 AM (after the 9:30 ET open) keeps prices fresh for an approve-then-execute
+# during market hours and avoids Alpaca's closed-market fractional-order rejects.
+$TaskName1 = "InvestmentAlpha_WeeklyRebalance"
+$Trigger1  = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday -At "10:00AM"
 $Action1   = New-ScheduledTaskAction `
     -Execute $PythonExe `
     -Argument "`"$ProjectDir\main.py`"" `
@@ -41,10 +47,10 @@ Register-ScheduledTask `
     -Trigger    $Trigger1 `
     -Action     $Action1 `
     -Settings   $Settings1 `
-    -Description "Investment Alpha: monthly pipeline run (analysis only, no trade execution)" `
+    -Description "Investment Alpha: WEEKLY rebalance analysis (no auto-trade; approval required)" `
     -Force | Out-Null
 
-Write-Host "  [OK] $TaskName1  ->  1st of each month at 8:30 AM"
+Write-Host "  [OK] $TaskName1  ->  Every Monday at 10:00 AM (analysis only; approval required to trade)"
 
 # --- Task 2: Weekly Stop-Loss Check (every Monday, 9:00 AM) ---
 $TaskName2 = "InvestmentAlpha_WeeklyStopLoss"
@@ -71,6 +77,7 @@ Write-Host ""
 Write-Host "  To view tasks  : Open Task Scheduler -> Task Scheduler Library"
 Write-Host "  To test now    : Right-click task -> Run"
 Write-Host ""
-Write-Host "  NOTE: Monthly task runs pipeline only (no trade execution)."
-Write-Host "        To execute trades: run run_monthly_execute.bat manually."
+Write-Host "  NOTE: Weekly rebalance runs ANALYSIS ONLY (Mon 10:00 AM) — no auto-trading."
+Write-Host "        Trades require your approval. Until the Discord approval flow is built,"
+Write-Host "        review the proposals and run run_weekly_execute.bat to execute."
 Write-Host "=================================================="

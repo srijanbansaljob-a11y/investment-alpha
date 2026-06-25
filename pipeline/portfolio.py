@@ -59,6 +59,9 @@ def _compute_weights(selected_df, mode, max_weight):
         # Replace NaN / zero vols with median to avoid division errors
         median_vol = float(np.nanmedian(vols)) if not np.all(np.isnan(vols)) else 0.20
         vols = np.where(np.isnan(vols) | (vols <= 0), median_vol, vols)
+        # Floor vols so a stale/near-zero vol can't blow up 1/vol and dominate
+        vol_floor = float(getattr(config, "VOL_FLOOR", 0.05))
+        vols = np.maximum(vols, vol_floor)
         inv_vols = 1.0 / vols
         raw = inv_vols / inv_vols.sum()
         # Cap and renormalise

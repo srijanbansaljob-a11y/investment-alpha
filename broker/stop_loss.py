@@ -126,6 +126,26 @@ def _exit_via_alpaca(ticker: str) -> bool:
         return False
 
 
+def _load_alpaca_holdings() -> dict:
+    """Live positions from Alpaca as {ticker: avg_entry_price}. {} if unavailable.
+
+    Alpaca's avg_entry_price is the REAL cost basis — the correct baseline for a
+    stop-loss. The state file's entry_price can be stale, so we prefer this.
+    """
+    try:
+        from broker.alpaca_client import get_client, get_positions
+        positions = get_positions(get_client())
+        out = {}
+        for tkr, p in positions.items():
+            basis = p.get("avg_entry_price") or p.get("cost_basis")
+            if basis:
+                out[tkr] = float(basis)
+        return out
+    except Exception as exc:
+        logger.warning("Could not load Alpaca holdings (%s) — using state file", exc)
+        return {}
+
+
 # ── Core Logic ─────────────────────────────────────────────────────────────
 
 def check_and_execute(regime: str = None, dry_run: bool = True) -> dict:
@@ -150,10 +170,7 @@ def check_and_execute(regime: str = None, dry_run: bool = True) -> dict:
         logger.info("Stop-loss disabled (STOP_LOSS_ENABLED=False)")
         return {"checked": [], "triggered": [], "skipped": [], "log": []}
 
-    state = _load_portfolio_state()
-    if not state:
-        logger.info("Portfolio state empty – nothing to check")
-        return {"checked": [], "triggered": [], "skipped": [], "log": []}
+    state = _load_portfolio_state() or {}
 
     # Resolve regime
     if regime is None:
@@ -173,28 +190,36 @@ def check_and_execute(regime: str = None, dry_run: bool = True) -> dict:
         regime.upper(), f"ATR({atr_period})×{atr_mult}" if use_atr else f"fixed {stop_multiplier:.0%}", dry_run,
     )
 
-    # Extract held positions from state
-    portfolio = state.get("portfolio", [])
-    if not portfolio:
-        logger.info("No positions in portfolio state")
-        return {"checked": [], "triggered": [], "skipped": [], "log": []}
+    # Holdings: Alpaca is the source of truth (real avg_entry_price). Fall back
+    # to the state file only when Alpaca is unavailable.
+    state_by_ticker = {p.get("ticker"): p for p in state.get("portfolio", []) if p.get("ticker")}
+    alpaca_holdings = _load_alpaca_holdings()
 
     held = []
     skipped = []
-    for pos in portfolio:
-        ticker = pos.get("ticker")
-        entry_price = pos.get("entry_price")
-        if not ticker:
-            continue
-        if entry_price is None:
-            logger.warning("%s has no entry_price – skipping stop-loss check", ticker)
-            skipped.append(ticker)
-            continue
-        held.append({"ticker": ticker, "entry_price": float(entry_price),
-                     "entry_date": pos.get("entry_date", "unknown")})
+    if alpaca_holdings:
+        logger.info("Holdings source: Alpaca (%d positions, real avg_entry_price)",
+                    len(alpaca_holdings))
+        for ticker, entry_price in alpaca_holdings.items():
+            sd = state_by_ticker.get(ticker, {})
+            held.append({"ticker": ticker, "entry_price": float(entry_price),
+                         "entry_date": sd.get("entry_date", "unknown")})
+    else:
+        logger.info("Holdings source: state file (Alpaca unavailable)")
+        for pos in state.get("portfolio", []):
+            ticker = pos.get("ticker")
+            entry_price = pos.get("entry_price")
+            if not ticker:
+                continue
+            if entry_price is None:
+                logger.warning("%s has no entry_price – skipping stop-loss check", ticker)
+                skipped.append(ticker)
+                continue
+            held.append({"ticker": ticker, "entry_price": float(entry_price),
+                         "entry_date": pos.get("entry_date", "unknown")})
 
     if not held:
-        logger.info("No positions with entry_price – nothing to check")
+        logger.info("No positions to check (no Alpaca holdings, empty/no state)")
         return {"checked": [], "triggered": [], "skipped": skipped, "log": []}
 
     # Fetch current prices
