@@ -18,6 +18,8 @@ on:
     - cron: "30 19 * * 1-5"   # EDT (summer)
     - cron: "30 20 * * 1-5"   # EST (winter)
   workflow_dispatch:
+  repository_dispatch:
+    types: [screener-refresh]   # triggered by /brief mode:fresh or 🔄 button in Discord
 
 jobs:
   screener:

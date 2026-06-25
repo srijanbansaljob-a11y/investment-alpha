@@ -1078,16 +1078,16 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       const token = i.token;
       ctx.waitUntil((async () => {
         const ghR = await fetch(
-          `https://api.github.com/repos/${env.GH_REPO}/actions/workflows/screener_daily.yml/dispatches`,
+          `https://api.github.com/repos/${env.GH_REPO}/dispatches`,
           {
             method: "POST",
             headers: {
-              "Authorization": `Bearer ${env.GH_TOKEN}`,
+              "Authorization": `Bearer ${(env.GH_TOKEN || "").trim()}`,
               "Accept": "application/vnd.github+json",
               "Content-Type": "application/json",
-              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "investment-alpha-worker",
             },
-            body: JSON.stringify({ ref: "main" }),
+            body: JSON.stringify({ event_type: "screener-refresh", client_payload: {} }),
           }
         );
         const ok = ghR.status === 204;
@@ -1434,16 +1434,16 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
         const token = i.token;
         ctx.waitUntil((async () => {
           const ghR = await fetch(
-            `https://api.github.com/repos/${env.GH_REPO}/actions/workflows/screener_daily.yml/dispatches`,
+            `https://api.github.com/repos/${env.GH_REPO}/dispatches`,
             {
               method: "POST",
               headers: {
-                "Authorization": `Bearer ${env.GH_TOKEN}`,
+                "Authorization": `Bearer ${(env.GH_TOKEN || "").trim()}`,
                 "Accept": "application/vnd.github+json",
                 "Content-Type": "application/json",
-                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "investment-alpha-worker",
               },
-              body: JSON.stringify({ ref: "main" }),
+              body: JSON.stringify({ event_type: "screener-refresh", client_payload: {} }),
             }
           );
           const ok = ghR.status === 204;
