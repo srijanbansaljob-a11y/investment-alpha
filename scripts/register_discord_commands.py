@@ -34,6 +34,14 @@ COMMANDS = [
     {
         "name": "status",
         "description": "Portfolio status: positions, P&L, stop distances, regime (~1 min)",
+        "options": [{
+            "name": "portfolio", "type": 3, "required": True,
+            "description": "Which account to check",
+            "choices": [
+                {"name": "Screener", "value": "screener"},
+                {"name": "Pipeline", "value": "pipeline"},
+            ],
+        }],
     },
     {
         "name": "regime",
@@ -42,18 +50,36 @@ COMMANDS = [
     {
         "name": "monitor",
         "description": "Run an immediate position check — alerts post here if anything triggers (~2 min)",
+        "options": [{
+            "name": "portfolio", "type": 3, "required": True,
+            "description": "Which account to monitor",
+            "choices": [
+                {"name": "Screener", "value": "screener"},
+                {"name": "Pipeline", "value": "pipeline"},
+            ],
+        }],
     },
     {
         "name": "stoploss",
         "description": "Check stop-loss levels, or exit breached positions",
-        "options": [{
-            "name": "mode", "type": 3, "required": True,
-            "description": "check = report only · execute = sell breached positions (asks to confirm)",
-            "choices": [
-                {"name": "check (no orders)", "value": "check"},
-                {"name": "execute (places orders, asks to confirm)", "value": "execute"},
-            ],
-        }],
+        "options": [
+            {
+                "name": "mode", "type": 3, "required": True,
+                "description": "check = report only · execute = sell breached positions",
+                "choices": [
+                    {"name": "check (no orders)", "value": "check"},
+                    {"name": "execute (places orders, asks to confirm)", "value": "execute"},
+                ],
+            },
+            {
+                "name": "portfolio", "type": 3, "required": True,
+                "description": "Which account to check",
+                "choices": [
+                    {"name": "Screener", "value": "screener"},
+                    {"name": "Pipeline", "value": "pipeline"},
+                ],
+            },
+        ],
     },
     {
         "name": "pipeline",

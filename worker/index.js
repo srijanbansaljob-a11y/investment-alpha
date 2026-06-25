@@ -1560,12 +1560,12 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
     if (needsDefer) {
       // Kick off GitHub dispatch — ctx.waitUntil ensures Cloudflare keeps the
       // Worker alive until the fetch completes even after the Response is sent.
-      const payload = { command, symbol: opts.symbol, mode: opts.mode, ...common };
+      const payload = { command, symbol: opts.symbol, mode: opts.mode, portfolio: opts.portfolio || null, ...common };
       ctx.waitUntil(dispatchToGitHub(env, payload));
       return json({ type: R_DEFERRED_MESSAGE, data: { flags: EPHEMERAL } });
     }
 
-    const err = await dispatchToGitHub(env, { command, ...common });
+    const err = await dispatchToGitHub(env, { command, portfolio: opts.portfolio || null, ...common });
     return err
       ? ephemeral("❌ Failed to dispatch: " + err)
       : ephemeral("⏳ Running… results will appear shortly.");

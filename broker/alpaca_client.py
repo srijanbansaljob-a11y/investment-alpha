@@ -45,22 +45,36 @@ PAPER_BASE_URL = "https://paper-api.alpaca.markets"
 
 # ── Client Factory ─────────────────────────────────────────────────────────
 
-def get_client() -> TradingClient:
+def get_client(portfolio: str = "pipeline") -> TradingClient:
     """
     Create and return an authenticated Alpaca TradingClient.
+
+    Args:
+        portfolio: "screener" → uses ALPACA_API_KEY_SCREENER / ALPACA_SECRET_KEY_SCREENER
+                   "pipeline" (default) → uses ALPACA_API_KEY / ALPACA_SECRET_KEY
+
     Reads credentials from environment variables (set via .env file).
     Raises clear errors if keys are missing or invalid.
     """
-    api_key    = os.getenv("ALPACA_API_KEY", "").strip()
-    secret_key = os.getenv("ALPACA_SECRET_KEY", "").strip()
+    portfolio = (portfolio or "pipeline").lower().strip()
+    if portfolio == "screener":
+        api_key    = os.getenv("ALPACA_API_KEY_SCREENER", "").strip()
+        secret_key = os.getenv("ALPACA_SECRET_KEY_SCREENER", "").strip()
+        label = "Screener"
+    else:
+        api_key    = os.getenv("ALPACA_API_KEY", "").strip()
+        secret_key = os.getenv("ALPACA_SECRET_KEY", "").strip()
+        label = "Pipeline"
 
     if not api_key or api_key.startswith("PASTE_"):
         raise ValueError(
-            "ALPACA_API_KEY not set. Open your .env file and paste your Alpaca paper trading key."
+            f"ALPACA_API_KEY{'_SCREENER' if portfolio == 'screener' else ''} not set. "
+            f"Open your .env file and paste your Alpaca {label} paper trading key."
         )
     if not secret_key or secret_key.startswith("PASTE_"):
         raise ValueError(
-            "ALPACA_SECRET_KEY not set. Open your .env file and paste your Alpaca paper trading secret."
+            f"ALPACA_SECRET_KEY{'_SCREENER' if portfolio == 'screener' else ''} not set. "
+            f"Open your .env file and paste your Alpaca {label} paper trading secret."
         )
 
     client = TradingClient(

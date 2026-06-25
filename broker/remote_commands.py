@@ -132,10 +132,12 @@ def _journal(event: dict) -> None:
 # ── Commands ───────────────────────────────────────────────────────────────
 
 def cmd_status(payload):
-    client = get_client()
-    acct = get_account_summary(client)
-    positions = get_positions(client)
-    regime = _detect_regime()
+    portfolio  = (payload.get("portfolio") or "pipeline").lower()
+    port_label = "Screener" if portfolio == "screener" else "Pipeline"
+    client     = get_client(portfolio)
+    acct       = get_account_summary(client)
+    positions  = get_positions(client)
+    regime     = _detect_regime()
 
     lines = []
     for t, p in sorted(positions.items()):
@@ -147,13 +149,14 @@ def cmd_status(payload):
         )
     desc = "\n".join(lines) if lines else "_No open positions._"
     fields = [
-        {"name": "Equity", "value": f"${acct['equity']:,.2f}", "inline": True},
-        {"name": "Cash", "value": f"${acct['cash']:,.2f}", "inline": True},
-        {"name": "Regime", "value": regime.upper(), "inline": True},
-        {"name": "Market", "value": "🟢 Open" if is_market_open(client) else "🔴 Closed", "inline": True},
-        {"name": "Positions", "value": str(len(positions)), "inline": True},
+        {"name": "Portfolio", "value": port_label,                                            "inline": True},
+        {"name": "Equity",    "value": f"${acct['equity']:,.2f}",                             "inline": True},
+        {"name": "Cash",      "value": f"${acct['cash']:,.2f}",                               "inline": True},
+        {"name": "Regime",    "value": regime.upper(),                                         "inline": True},
+        {"name": "Market",    "value": "🟢 Open" if is_market_open(client) else "🔴 Closed", "inline": True},
+        {"name": "Positions", "value": str(len(positions)),                                    "inline": True},
     ]
-    _reply(payload, [_embed("📊 Portfolio Status", desc, _BLUE, fields)])
+    _reply(payload, [_embed(f"📊 Portfolio Status — {port_label}", desc, _BLUE, fields)])
 
 
 def cmd_regime(payload):
@@ -183,20 +186,23 @@ def cmd_regime(payload):
 
 def cmd_monitor_check(payload):
     from broker.monitor import check_positions
-    client = get_client()
-    n = check_positions(client)
+    portfolio  = (payload.get("portfolio") or "pipeline").lower()
+    port_label = "Screener" if portfolio == "screener" else "Pipeline"
+    client     = get_client(portfolio)
+    n          = check_positions(client)
     _reply(payload, [_embed(
-        "🔍 Monitor Check Complete",
+        f"🔍 Monitor Check Complete — {port_label}",
         f"**{n}** new alert(s) raised." if n else "All positions within bounds ✓",
         _ORANGE if n else _GREEN,
+        [{"name": "Portfolio", "value": port_label, "inline": True}],
     )])
 
 
-def _stoploss_scan():
-    """Evaluate every Alpaca position against its stop. Returns (rows, breached)."""
-    client = get_client()
+def _stoploss_scan(portfolio: str = "pipeline"):
+    """Evaluate every Alpaca position against its stop. Returns (client, rows, breached, regime)."""
+    client    = get_client(portfolio)
     positions = get_positions(client)
-    regime = _detect_regime()
+    regime    = _detect_regime()
     rows, breached = [], []
     for t, p in sorted(positions.items()):
         stop, method = _stop_price(t, p["avg_entry_price"], regime)
@@ -211,20 +217,25 @@ def _stoploss_scan():
 
 
 def cmd_stoploss_check(payload):
-    _, rows, breached, regime = _stoploss_scan()
-    desc = "\n".join(rows) if rows else "_No open positions._"
+    portfolio  = (payload.get("portfolio") or "pipeline").lower()
+    port_label = "Screener" if portfolio == "screener" else "Pipeline"
+    _, rows, breached, regime = _stoploss_scan(portfolio)
+    desc  = "\n".join(rows) if rows else "_No open positions._"
     color = _RED if breached else _GREEN
-    title = f"🛑 Stop-Loss Check — {len(breached)} BREACHED" if breached else "✅ Stop-Loss Check — all clear"
+    title = f"🛑 Stop-Loss Check [{port_label}] — {len(breached)} BREACHED" if breached else f"✅ Stop-Loss Check [{port_label}] — all clear"
     _reply(payload, [_embed(title, desc, color, [
-        {"name": "Regime", "value": regime.upper(), "inline": True},
+        {"name": "Portfolio", "value": port_label,   "inline": True},
+        {"name": "Regime",    "value": regime.upper(), "inline": True},
         {"name": "Note", "value": "No orders placed. Use `/stoploss mode:execute` to exit breached positions.", "inline": False},
     ])])
 
 
 def cmd_stoploss_execute(payload):
-    client, rows, breached, regime = _stoploss_scan()
+    portfolio  = (payload.get("portfolio") or "pipeline").lower()
+    port_label = "Screener" if portfolio == "screener" else "Pipeline"
+    client, rows, breached, regime = _stoploss_scan(portfolio)
     if not breached:
-        _reply(payload, [_embed("✅ Stop-Loss Execute", "No positions are below their stop — nothing to exit.", _GREEN)])
+        _reply(payload, [_embed(f"✅ Stop-Loss Execute [{port_label}]", "No positions are below their stop — nothing to exit.", _GREEN)])
         return
     results = []
     for t in breached:
@@ -232,11 +243,12 @@ def cmd_stoploss_execute(payload):
         ok = r.get("status") not in ("failed",)
         results.append(f"{'✅' if ok else '❌'} {t}: {r.get('status')}" + (f" — {r.get('error')}" if r.get("error") else ""))
         _journal({"decision": "stoploss_execute", "ticker": t,
-                  "order_status": r.get("status"), "regime": regime})
+                  "order_status": r.get("status"), "regime": regime, "portfolio": portfolio})
     _reply(payload, [_embed(
-        f"🛑 Stop-Loss Executed — {len(breached)} position(s)",
+        f"🛑 Stop-Loss Executed [{port_label}] — {len(breached)} position(s)",
         "\n".join(results) + "\n\n" + "\n".join(rows),
         _RED,
+        [{"name": "Portfolio", "value": port_label, "inline": True}],
     )])
 
 
