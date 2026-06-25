@@ -184,9 +184,45 @@ def execute_signals(
         log.error("  Cannot connect to Alpaca: %s", e)
         return {"status": "failed", "error": str(e)}
 
-    market_open       = alpaca.is_market_open(client)
-    if not market_open and not dry_run:
-        log.warning("  Market is CLOSED -- orders queued as DAY orders for next open")
+    # -- Kill switch --
+    if not getattr(config, "EXECUTION_ENABLED", True) and not dry_run:
+        log.warning("  EXECUTION_ENABLED=False -- forcing dry-run; NO orders will be placed")
+        dry_run = True
+
+    # -- Execution lock (prevents simultaneous local + cloud runs) --
+    lock_acquired = True
+    if not dry_run:
+        try:
+            from broker.kv_lock import acquire_lock
+            lock_acquired = acquire_lock(owner="executor")
+        except Exception as _le:
+            log.warning("  Lock check skipped (%s) — proceeding", _le)
+        if not lock_acquired:
+            return {
+                "status":      "skipped_lock_held",
+                "dry_run":     dry_run,
+                "executed_at": datetime.now().isoformat(),
+                "orders":      [],
+                "summary":     {"orders_placed": 0, "reason": "execution_lock_held"},
+            }
+
+    # -- Market-closed guard --
+    # Fractional-share orders are REJECTED outside regular trading hours and
+    # cannot be queued. Rather than submit orders that silently fail (and get
+    # counted as "placed"), skip execution entirely when the market is closed.
+    market_open = alpaca.is_market_open(client)
+    if not market_open and not dry_run and getattr(config, "EXECUTION_REQUIRE_MARKET_OPEN", True):
+        log.warning("  Market is CLOSED -- skipping execution (fractional orders can't be "
+                    "queued). Re-run during regular trading hours.")
+        return {
+            "status":      "skipped_market_closed",
+            "dry_run":     dry_run,
+            "market_open": market_open,
+            "executed_at": datetime.now().isoformat(),
+            "orders":      [],
+            "summary":     {"orders_placed": 0, "orders_failed": 0,
+                            "reason": "market_closed"},
+        }
 
     account_before    = alpaca.get_account_summary(client)
     current_positions = alpaca.get_positions(client)
@@ -267,6 +303,13 @@ def execute_signals(
         reconcile_reason = sig.get("reconcile_reason", "")
         reason_note      = "  [" + reconcile_reason + "]" if reconcile_reason else ""
 
+        # Re-entry cooldown: signals.py flags names stopped out within N days.
+        if sig.get("cooldown_blocked"):
+            log.info("    BUY %-6s: re-entry cooldown active -- skipping%s", ticker, reason_note)
+            orders.append({"ticker": ticker, "action": "BUY",
+                           "status": "skipped_cooldown"})
+            continue
+
         price = sig.get("current_price")
         if not price:
             log.warning("    BUY %-6s: no price -- skipping%s", ticker, reason_note)
@@ -290,7 +333,7 @@ def execute_signals(
         if delta_qty > 0:
             # Need to buy more shares
             cost = delta_qty * price
-            if cost > available_cash * 1.05:
+            if cost > available_cash * getattr(config, "CASH_BUFFER_MULTIPLIER", 1.0):
                 log.warning(
                     "    BUY %-6s: insufficient cash (need $%.2f, have $%.2f)%s",
                     ticker, cost, available_cash, reason_note,
@@ -339,7 +382,7 @@ def execute_signals(
     # ── Summary ────────────────────────────────────────────────────────────
     terminal_statuses = {
         "dry_run", "held", "no_position", "at_target",
-        "skipped_no_price", "skipped_insufficient_cash",
+        "skipped_no_price", "skipped_insufficient_cash", "skipped_cooldown",
     }
     summary = {
         "signals_processed": len(signals),
@@ -360,6 +403,14 @@ def execute_signals(
     log.info("    Buys          : %d", summary["buys"])
     log.info("    Orders placed : %d", summary["orders_placed"])
     log.info("    Orders failed : %d", summary["orders_failed"])
+
+    # Release execution lock now that orders are submitted
+    if lock_acquired and not dry_run:
+        try:
+            from broker.kv_lock import release_lock
+            release_lock()
+        except Exception as _le:
+            log.warning("  Lock release skipped (%s)", _le)
 
     return {
         "status":         "success" if summary["orders_failed"] == 0 else "partial",

@@ -31,35 +31,72 @@ import config
 log = logging.getLogger(__name__)
 
 EARNINGS_BLACKOUT_DAYS = 5   # block new BUY within this many trading days of earnings
+_EARNINGS_CACHE: dict[str, int | None] = {}  # ticker → days_to_earnings, cleared each process
 
 
 def _days_to_earnings(ticker: str) -> int | None:
     """
     Return number of calendar days until the stock's next earnings date,
     or None if unavailable. Uses yfinance Ticker.calendar.
-    Cached in module-level dict for the duration of this run.
+    Cached in _EARNINGS_CACHE for the duration of this process run
+    (prevents 3x repeated API calls per ticker from signals.py).
     """
+    if ticker in _EARNINGS_CACHE:
+        return _EARNINGS_CACHE[ticker]
+    result = None
     try:
         import yfinance as yf
         cal = yf.Ticker(ticker).calendar
-        if cal is None or cal.empty:
-            return None
-        # calendar is a DataFrame with columns as dates, index as event types
-        # Earnings Date is typically in the columns
-        if hasattr(cal, "columns"):
-            from datetime import date, datetime as dt
+        if cal is not None and not cal.empty and hasattr(cal, "columns"):
+            from datetime import date
             today = date.today()
             for col in cal.columns:
                 try:
                     edate = pd.Timestamp(col).date()
                     days  = (edate - today).days
                     if days >= 0:
-                        return days
+                        result = days
+                        break
                 except Exception:
                     continue
-        return None
     except Exception:
-        return None
+        pass
+    _EARNINGS_CACHE[ticker] = result
+    return result
+
+
+def _recent_stop_exits(cooldown_days):
+    """
+    Tickers stopped out within the last `cooldown_days` (from stop_loss_log.json).
+    Prevents the pre-flight stop-loss exiting a name and the same run re-buying it.
+    Returns {ticker: iso_timestamp}.
+    """
+    from datetime import timedelta
+    out = {}
+    log_path = getattr(config, "STOP_LOSS_LOG_FILE", None)
+    if not log_path or not Path(log_path).exists():
+        return out
+    try:
+        raw = Path(log_path).read_bytes().rstrip(b"\x00")
+        events = json.loads(raw)
+    except Exception:
+        return out
+    cutoff = datetime.now(timezone.utc) - timedelta(days=cooldown_days)
+    for ev in events if isinstance(events, list) else []:
+        if not ev.get("breached"):
+            continue
+        ts = ev.get("timestamp")
+        try:
+            when = datetime.fromisoformat(ts)
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
+        if when >= cutoff:
+            tkr = ev.get("ticker")
+            if tkr and (tkr not in out or ts > out[tkr]):
+                out[tkr] = ts
+    return out
 
 
 def _load_prior_portfolio():
@@ -154,6 +191,10 @@ def run(portfolio_result, selection_result, regime_result=None):
     today_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     regime_label = (regime_result or {}).get("regime", "unknown")
 
+    # Re-entry cooldown: names stopped out within the last N days are not re-bought
+    cooldown_days = int(getattr(config, "REENTRY_COOLDOWN_DAYS", 0) or 0)
+    recent_stops  = _recent_stop_exits(cooldown_days) if cooldown_days > 0 else {}
+
     trade_signals = []
     exit_signals  = []
 
@@ -186,6 +227,13 @@ def run(portfolio_result, selection_result, regime_result=None):
                 log.info("  EARNINGS BLACKOUT: %s reports in %d days — BUY downgraded to HOLD",
                          ticker, days_out)
 
+        # Re-entry cooldown: don't re-buy a name stopped out in the last N days
+        cooldown_blocked = False
+        if action == "BUY" and ticker in recent_stops:
+            cooldown_blocked = True
+            log.info("  COOLDOWN: %s stopped out recently (<%dd) - BUY suppressed this run",
+                     ticker, cooldown_days)
+
         signal = {
             "ticker":          ticker,
             "name":            item["name"],
@@ -198,6 +246,7 @@ def run(portfolio_result, selection_result, regime_result=None):
             "risk_note":       ("EARNINGS BLACKOUT: reports within " + str(_days_to_earnings(ticker) or "?") + " days — hold off entry. " + risk) if earnings_blocked else risk,
             "signals":         item["signals"],
             "earnings_blocked": earnings_blocked,
+            "cooldown_blocked": cooldown_blocked,
         }
         trade_signals.append(signal)
         log.info("  %-4s %-6s  score=%.4f  entry=%.2f  %s",
@@ -249,8 +298,14 @@ def run(portfolio_result, selection_result, regime_result=None):
 
 
 def _save_portfolio_state(trade_signals, summary, regime_result=None):
-    """Write latest_portfolio.json with entry_price, entry_date, and regime."""
+    """Write latest_portfolio.json - the SINGLE source for next run's HOLD/EXIT
+    detection and stop_loss.py. Preserves regime, entry_date and sticky
+    entry_price. Written atomically (temp file + os.replace) to survive OneDrive
+    mid-sync corruption.
+    """
+    import os, tempfile
     state = {
+        "schema_version": getattr(config, "STATE_SCHEMA_VERSION", 2),
         "run_date":  summary["run_date"],
         "regime":    (regime_result or {}).get("regime", "unknown"),
         "regime_detail": regime_result or {},
@@ -270,8 +325,17 @@ def _save_portfolio_state(trade_signals, summary, regime_result=None):
         ],
     }
     try:
-        config.PORTFOLIO_STATE_FILE.write_text(json.dumps(state, indent=2))
-        log.info("Portfolio state saved -> %s", config.PORTFOLIO_STATE_FILE)
+        path = config.PORTFOLIO_STATE_FILE
+        payload = json.dumps(state, indent=2)
+        fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(payload); f.flush(); os.fsync(f.fileno())
+            os.replace(tmp, path)
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        log.info("Portfolio state saved (atomic) -> %s", path)
     except Exception as exc:
         log.error("Failed to save portfolio state: %s", exc)
 
