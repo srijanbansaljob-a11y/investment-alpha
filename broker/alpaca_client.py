@@ -61,6 +61,16 @@ def get_client(portfolio: str = "pipeline") -> TradingClient:
         api_key    = os.getenv("ALPACA_API_KEY_SCREENER", "").strip()
         secret_key = os.getenv("ALPACA_SECRET_KEY_SCREENER", "").strip()
         label = "Screener"
+        # Graceful fallback: if screener-specific keys aren't set, use pipeline keys
+        # (happens on local runs where .env only has one set of credentials)
+        if not api_key or api_key.startswith("PASTE_"):
+            api_key    = os.getenv("ALPACA_API_KEY", "").strip()
+            secret_key = os.getenv("ALPACA_SECRET_KEY", "").strip()
+            import logging as _log
+            _log.getLogger(__name__).warning(
+                "ALPACA_API_KEY_SCREENER not set — falling back to pipeline keys for screener portfolio"
+            )
+            label = "Screener (using pipeline keys)"
     else:
         api_key    = os.getenv("ALPACA_API_KEY", "").strip()
         secret_key = os.getenv("ALPACA_SECRET_KEY", "").strip()
@@ -68,13 +78,11 @@ def get_client(portfolio: str = "pipeline") -> TradingClient:
 
     if not api_key or api_key.startswith("PASTE_"):
         raise ValueError(
-            f"ALPACA_API_KEY{'_SCREENER' if portfolio == 'screener' else ''} not set. "
-            f"Open your .env file and paste your Alpaca {label} paper trading key."
+            f"ALPACA_API_KEY not set. Open your .env file and paste your Alpaca paper trading key."
         )
     if not secret_key or secret_key.startswith("PASTE_"):
         raise ValueError(
-            f"ALPACA_SECRET_KEY{'_SCREENER' if portfolio == 'screener' else ''} not set. "
-            f"Open your .env file and paste your Alpaca {label} paper trading secret."
+            f"ALPACA_SECRET_KEY not set. Open your .env file and paste your Alpaca paper trading secret."
         )
 
     client = TradingClient(

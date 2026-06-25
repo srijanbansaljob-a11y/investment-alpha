@@ -45,14 +45,16 @@ jobs:
 
       - name: Dispatch command
         env:
-          ALPACA_API_KEY:      ${{ secrets.ALPACA_API_KEY }}
-          ALPACA_SECRET_KEY:   ${{ secrets.ALPACA_SECRET_KEY }}
-          ALPACA_BASE_URL:     ${{ secrets.ALPACA_BASE_URL }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          DISCORD_BOT_TOKEN:   ${{ secrets.DISCORD_BOT_TOKEN }}
-          DISCORD_CHANNEL_ID:  ${{ secrets.DISCORD_CHANNEL_ID }}
-          FINNHUB_API_KEY:     ${{ secrets.FINNHUB_API_KEY }}
-          COMMAND_PAYLOAD:     ${{ toJson(github.event.client_payload) }}
+          ALPACA_API_KEY:             ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:          ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_API_KEY_SCREENER:    ${{ secrets.ALPACA_API_KEY_SCREENER }}
+          ALPACA_SECRET_KEY_SCREENER: ${{ secrets.ALPACA_SECRET_KEY_SCREENER }}
+          ALPACA_BASE_URL:            ${{ secrets.ALPACA_BASE_URL }}
+          DISCORD_WEBHOOK_URL:        ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_BOT_TOKEN:          ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:         ${{ secrets.DISCORD_CHANNEL_ID }}
+          FINNHUB_API_KEY:            ${{ secrets.FINNHUB_API_KEY }}
+          COMMAND_PAYLOAD:            ${{ toJson(github.event.client_payload) }}
         run: |
           python broker/remote_commands.py
 
