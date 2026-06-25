@@ -121,6 +121,10 @@ COMMANDS = [
                     {"name": "Pipeline", "value": "pipeline"},
                 ],
             },
+            {
+                "name": "qty", "type": 4, "required": False,
+                "description": "Shares to sell (leave blank to sell entire position)",
+            },
         ],
     },
     {

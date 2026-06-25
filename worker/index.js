@@ -1024,18 +1024,50 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
     if (action === "confirm_sell_execute") {
       const alpacaBase = "https://paper-api.alpaca.markets";
       const headers = portfolioHeaders(env, portfolio);
+      // qtyOverride encodes "sellQty:totalQty" e.g. "30:71" for partial, "71:71" for full
+      const [sellQtyStr, totalQtyStr] = (qtyOverride || "").split(":");
+      const sellQty  = parseInt(sellQtyStr) || 0;
+      const totalQty = parseInt(totalQtyStr) || sellQty;
+      const partial  = sellQty > 0 && sellQty < totalQty;
       let ok = false, errMsg = "";
       try {
-        const r = await fetch(`${alpacaBase}/v2/positions/${ticker}`, { method: "DELETE", headers });
-        ok = r.status === 200 || r.status === 204;
-        if (!ok) { const b = await r.json(); errMsg = b?.message || `HTTP ${r.status}`; }
+        // Step 1: Cancel all open orders for this ticker (clears bracket stop/TP legs)
+        const openR = await fetch(`${alpacaBase}/v2/orders?status=open&limit=50`, { headers });
+        if (openR.ok) {
+          const openOrders = await openR.json();
+          const toCancel = (Array.isArray(openOrders) ? openOrders : [])
+            .filter(o => o.symbol === ticker);
+          await Promise.all(toCancel.map(o =>
+            fetch(`${alpacaBase}/v2/orders/${o.id}`, { method: "DELETE", headers }).catch(() => {})
+          ));
+          if (toCancel.length > 0) {
+            // Brief pause so Alpaca registers the cancellations before we sell
+            await new Promise(res => setTimeout(res, 800));
+          }
+        }
+        // Step 2: Close position (full closeout or partial market order)
+        let r;
+        if (partial) {
+          r = await fetch(`${alpacaBase}/v2/orders`, {
+            method: "POST", headers,
+            body: JSON.stringify({ symbol: ticker, qty: String(sellQty), side: "sell", type: "market", time_in_force: "day" }),
+          });
+        } else {
+          r = await fetch(`${alpacaBase}/v2/positions/${ticker}`, { method: "DELETE", headers });
+        }
+        ok = r.status >= 200 && r.status < 300;
+        if (!ok) { const b = await r.json().catch(() => ({})); errMsg = b?.message || `HTTP ${r.status}`; }
       } catch (e) { errMsg = e.message; }
 
       const embeds = i.message.embeds || [];
       if (embeds[0]) {
         embeds[0].color = ok ? C_GREEN : C_RED;
-        embeds[0].title = ok ? `✅ SELL ${ticker} — Position Closed` : `❌ SELL ${ticker} — Failed`;
-        embeds[0].footer = { text: ok ? "Market order submitted · Paper trading" : `Error: ${errMsg}` };
+        embeds[0].title = ok
+          ? (partial ? `✅ SELL ${ticker} — ${sellQty} shares sold` : `✅ SELL ${ticker} — Position Closed`)
+          : `❌ SELL ${ticker} — Failed`;
+        embeds[0].footer = { text: ok
+          ? (partial ? `${sellQty} of ${totalQty} shares sold · ${totalQty - sellQty} remain · Paper trading` : "Full position closed · Bracket legs cancelled first · Paper trading")
+          : `Error: ${errMsg}` };
       }
       return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: [] } });
     }
@@ -1430,6 +1462,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
     if (name === "sell") {
       const symbol = (opts.symbol || "").toUpperCase();
       const portfolio = (opts.portfolio || "screener").toLowerCase();
+      const customQty = opts.qty ? parseInt(opts.qty) : null;
       if (!symbol) return ephemeral("Provide a ticker: `/sell symbol:AAPL`");
 
       const alpacaBase = "https://paper-api.alpaca.markets";
@@ -1446,23 +1479,31 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       if (posApiErr) return ephemeral(`❌ Alpaca API error for **${symbol}**: ${posApiErr}`);
       if (!position) return ephemeral(`❌ No open position found for **${symbol}**. Confirmed via Alpaca API (404).`);
 
-      const qty    = position.qty;
-      const price  = parseFloat(position.current_price || 0);
-      const pnl    = parseFloat(position.unrealized_pl || 0);
-      const pnlPct = parseFloat(position.unrealized_plpc || 0) * 100;
-      const pnlStr = `$${pnl.toFixed(2)} (${pnl >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%)`;
+      const totalQty = parseInt(position.qty || 0);
+      const sellQty  = (customQty && customQty > 0 && customQty < totalQty) ? customQty : totalQty;
+      const partial  = sellQty < totalQty;
+      const price    = parseFloat(position.current_price || 0);
+      const pnl      = parseFloat(position.unrealized_pl || 0);
+      const pnlPct   = parseFloat(position.unrealized_plpc || 0) * 100;
+      const pnlStr   = `$${pnl.toFixed(2)} (${pnl >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%)`;
+      const label    = partial
+        ? `🔴 Sell ${sellQty} of ${totalQty} [${portfolio === 'screener' ? 'Screener' : 'Pipeline'}]`
+        : `🔴 Sell all ${totalQty} shares [${portfolio === 'screener' ? 'Screener' : 'Pipeline'}]`;
+      const footerTxt = partial
+        ? `Partial sell — ${totalQty - sellQty} shares remain · Paper trading`
+        : "Closes entire position (cancels bracket legs first) · Paper trading";
 
       return json({ type: R_CHANNEL_MESSAGE, data: { flags: EPHEMERAL, embeds: [{
         title: `⚠️ Confirm SELL ${symbol}?`,
         color: C_ORANGE,
         fields: [
-          { name: "Shares",       value: String(qty),              inline: true },
-          { name: "Current price",value: `$${price.toFixed(2)}`,  inline: true },
-          { name: "Unrealised P&L",value: pnlStr,                 inline: true },
+          { name: "Shares",        value: `${sellQty}${partial ? ` of ${totalQty}` : ""}`, inline: true },
+          { name: "Current price", value: `$${price.toFixed(2)}`,                           inline: true },
+          { name: "Unrealised P&L",value: pnlStr,                                           inline: true },
         ],
-        footer: { text: "Market order — closes entire position · Paper trading" },
+        footer: { text: footerTxt },
       }], components: [{ type: 1, components: [
-        { type: 2, style: 4, label: `🔴 Sell all ${qty} shares [${portfolio === 'screener' ? 'Screener' : 'Pipeline'}]`, custom_id: `ia|confirm_sell_execute|${symbol}|sell||${portfolio}` },
+        { type: 2, style: 4, label, custom_id: `ia|confirm_sell_execute|${symbol}|sell|${sellQty}:${totalQty}|${portfolio}` },
         { type: 2, style: 2, label: "❌ Cancel", custom_id: `ia|cancel||sell` },
       ]}]}});
     }
