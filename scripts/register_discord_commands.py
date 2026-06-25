@@ -163,7 +163,7 @@ COMMANDS = [
     },
     {
         "name": "brief",
-        "description": "Morning brief: positions, regime, top picks with buy buttons. Optionally trigger a fresh screener run.",
+        "description": "Morning brief: positions, regime, top picks + buy buttons. Trigger fresh screener on demand.",
         "options": [{
             "name": "mode",
             "type": 3,

@@ -47,3 +47,6 @@ desktop.ini
 Discord Bot dets.txt
 
 Discord Bot dets.txt
+
+# ── Wrangler build artefacts ───────────────────────────────────────────────
+worker/.wrangler/
