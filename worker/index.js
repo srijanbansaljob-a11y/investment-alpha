@@ -1072,6 +1072,44 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: [] } });
     }
 
+    if (action === "brief_refresh") {
+      // Defer-update the message (removes button while workflow dispatches)
+      const appId = env.DISCORD_APP_ID || "";
+      const token = i.token;
+      ctx.waitUntil((async () => {
+        const ghR = await fetch(
+          `https://api.github.com/repos/${env.GH_REPO}/actions/workflows/screener_daily.yml/dispatches`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${env.GH_TOKEN}`,
+              "Accept": "application/vnd.github+json",
+              "Content-Type": "application/json",
+              "X-GitHub-Api-Version": "2022-11-28",
+            },
+            body: JSON.stringify({ ref: "main" }),
+          }
+        );
+        const ok = ghR.status === 204;
+        await fetch(`https://discord.com/api/v10/webhooks/${appId}/${token}/messages/@original`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            embeds: [{
+              title: ok ? "🔄 Fresh Screener Triggered" : "❌ Screener Trigger Failed",
+              description: ok
+                ? "Screener is running on GitHub Actions (~5 min).\nRun `/brief` again once it completes to see updated picks."
+                : `Failed to trigger screener (HTTP ${ghR.status}). Try from GitHub Actions manually.`,
+              color: ok ? 0x2ECC71 : 0xE74C3C,
+              footer: { text: "GitHub → Actions → Daily Screener → Run workflow" },
+            }],
+            components: [],
+          }),
+        });
+      })());
+      return json({ type: R_DEFERRED_UPDATE });
+    }
+
     if (action === "cancel") {
       return json({ type: R_UPDATE_MESSAGE, data: { content: "🚫 Cancelled.", components: [] } });
     }
@@ -1387,7 +1425,137 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       }
     }
 
-    // /regime — served directly from KV (updated 3x daily by screener)
+    // /brief — on-demand morning brief from KV + optional fresh screener trigger
+    if (name === "brief") {
+      const mode = (opts.mode || "cached").toLowerCase();
+
+      if (mode === "fresh") {
+        const appId = env.DISCORD_APP_ID || "";
+        const token = i.token;
+        ctx.waitUntil((async () => {
+          const ghR = await fetch(
+            `https://api.github.com/repos/${env.GH_REPO}/actions/workflows/screener_daily.yml/dispatches`,
+            {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${env.GH_TOKEN}`,
+                "Accept": "application/vnd.github+json",
+                "Content-Type": "application/json",
+                "X-GitHub-Api-Version": "2022-11-28",
+              },
+              body: JSON.stringify({ ref: "main" }),
+            }
+          );
+          const ok = ghR.status === 204;
+          await fetch(`https://discord.com/api/v10/webhooks/${appId}/${token}/messages/@original`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              embeds: [{
+                title: ok ? "🔄 Fresh Screener Triggered" : "❌ Screener Trigger Failed",
+                description: ok
+                  ? "Screener is running on GitHub Actions (~5 min).\nRun `/brief` again once it completes to see updated picks with buy buttons."
+                  : `Failed to trigger screener (HTTP ${ghR.status}). Try from GitHub Actions manually.`,
+                color: ok ? 0x2ECC71 : 0xE74C3C,
+                footer: { text: "GitHub → Actions → Daily Screener → Run workflow" },
+              }],
+            }),
+          });
+        })());
+        return json({ type: R_DEFERRED_MESSAGE, data: { flags: EPHEMERAL } });
+      }
+
+      // cached mode — build brief inline from KV + live Alpaca positions
+      try {
+        const alpacaBase = "https://paper-api.alpaca.markets";
+        let sPos = [], pPos = [], sAcct = null, pAcct = null, regime = null, summary = null;
+        const [spR, saR, ppR, paR, rr, sr] = await Promise.all([
+          fetch(`${alpacaBase}/v2/positions`, { headers: portfolioHeaders(env, "screener") }),
+          fetch(`${alpacaBase}/v2/account`,   { headers: portfolioHeaders(env, "screener") }),
+          fetch(`${alpacaBase}/v2/positions`, { headers: portfolioHeaders(env, "pipeline") }),
+          fetch(`${alpacaBase}/v2/account`,   { headers: portfolioHeaders(env, "pipeline") }),
+          env.KV.get("regime_signal"),
+          env.KV.get("screener_summary"),
+        ]);
+        if (spR.ok) sPos  = await spR.json();
+        if (saR.ok) sAcct = await saR.json();
+        if (ppR.ok) pPos  = await ppR.json();
+        if (paR.ok) pAcct = await paR.json();
+        if (rr) regime  = JSON.parse(rr);
+        if (sr) summary = JSON.parse(sr);
+
+        const fmtPos = (positions) => {
+          const pnl = positions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
+          const val = positions.reduce((s, p) => s + parseFloat(p.market_value  || 0), 0);
+          const lines = positions.length
+            ? positions.map(p => {
+                const pp = parseFloat(p.unrealized_pl || 0);
+                const pc = parseFloat(p.unrealized_plpc || 0) * 100;
+                return `${pp >= 0 ? "📈" : "📉"} **${p.symbol}** ${pp >= 0 ? "+" : ""}$${pp.toFixed(2)} (${pc.toFixed(1)}%)`;
+              }).join("\n")
+            : "_No positions_";
+          return { pnl, val, lines };
+        };
+
+        const sc = fmtPos(Array.isArray(sPos) ? sPos : []);
+        const pc = fmtPos(Array.isArray(pPos) ? pPos : []);
+        const totalPnl = sc.pnl + pc.pnl;
+        const sBp      = parseFloat(sAcct?.buying_power || 0);
+        const pBp      = parseFloat(pAcct?.buying_power || 0);
+        const regLabel = regime?.label || "UNKNOWN";
+        const regScore = regime?.total  || 0;
+        const today    = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+        const allPicks = summary?.top_picks || [];
+
+        const heldSymbols = new Set((Array.isArray(sPos) ? sPos : []).map(p => p.symbol));
+        const newPicks    = allPicks.filter(p => !heldSymbols.has(p.ticker));
+        const heldPicks   = allPicks.filter(p =>  heldSymbols.has(p.ticker));
+
+        const picksLine = allPicks.length
+          ? allPicks.map(p => `${heldSymbols.has(p.ticker) ? "✅" : "🆕"} **${p.ticker}** ${p.score}/100`).join("  ·  ")
+          : "_No picks today — use mode:fresh to re-run the screener_";
+
+        const dataAge = summary?.date ? `Screener data from ${summary.date}` : "Screener data age unknown";
+
+        // Up to 4 buy buttons (leave room for Refresh in a second row)
+        const buyBtns = newPicks.slice(0, 4).map(p => ({
+          type: 2, style: 1,
+          label: `🛒 Buy ${p.ticker}${p.conviction_ok ? " ✅" : ""}`,
+          custom_id: `ia|screener_buy|${p.ticker}|screener`,
+        }));
+        const refreshBtn = { type: 2, style: 2, label: "🔄 Run Fresh Screener", custom_id: "ia|brief_refresh|_|_" };
+
+        const components = [
+          ...(buyBtns.length ? [{ type: 1, components: buyBtns }] : []),
+          { type: 1, components: [refreshBtn] },
+        ];
+
+        return json({ type: R_CHANNEL_MESSAGE, data: {
+          flags: EPHEMERAL,
+          embeds: [{
+            title: `☀️ Morning Brief — ${today}`,
+            color: totalPnl >= 0 ? C_GREEN : C_RED,
+            description: `**📊 Screener**\n${sc.lines}\n\n**🔧 Pipeline**\n${pc.lines}`,
+            fields: [
+              { name: "Regime",              value: `${regLabel} (${regScore}/100)`,                    inline: true },
+              { name: "Screener P&L",        value: `${sc.pnl >= 0 ? "+" : ""}$${sc.pnl.toFixed(2)}`, inline: true },
+              { name: "Pipeline P&L",        value: `${pc.pnl >= 0 ? "+" : ""}$${pc.pnl.toFixed(2)}`, inline: true },
+              { name: "Screener buying pwr", value: `$${sBp.toFixed(2)}`,                               inline: true },
+              { name: "Pipeline buying pwr", value: `$${pBp.toFixed(2)}`,                               inline: true },
+              { name: `Today\'s picks (${newPicks.length} new · ${heldPicks.length} held)`,
+                value: picksLine, inline: false },
+            ],
+            footer: { text: `${dataAge} · 🛒 = preview & confirm buy · ✅ = high conviction · 🔄 = trigger fresh run` },
+            timestamp: new Date().toISOString(),
+          }],
+          components,
+        }});
+      } catch (e) {
+        return ephemeral(`Error building brief: ${e.message}`);
+      }
+    }
+
+        // /regime — served directly from KV (updated 3x daily by screener)
     if (name === "regime") {
       try {
         const raw = await env.KV.get("regime_signal");

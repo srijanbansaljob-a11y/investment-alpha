@@ -161,6 +161,20 @@ COMMANDS = [
         "name": "resumetrading",
         "description": "Resume auto-trading after /pausetrading — re-enables webhook buys and take-profit auto-sells.",
     },
+    {
+        "name": "brief",
+        "description": "Morning brief: positions, regime, top picks with buy buttons. Optionally trigger a fresh screener run.",
+        "options": [{
+            "name": "mode",
+            "type": 3,
+            "required": False,
+            "description": "cached = show latest data instantly · fresh = re-run screener first (~5 min)",
+            "choices": [
+                {"name": "cached — instant from KV (default)", "value": "cached"},
+                {"name": "fresh — re-run screener then show picks (~5 min)", "value": "fresh"},
+            ],
+        }],
+    },
 ]
 
 resp = requests.put(
