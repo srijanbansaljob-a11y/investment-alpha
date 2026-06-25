@@ -681,6 +681,33 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: [] } });
     }
 
+    // ── Weekly rebalance approval buttons ───────────────────────────────
+    if (action === "approve_rebalance") {
+      const err = await dispatchToGitHub(env, {
+        command: "approve_rebalance", message_id: i.message.id, ...common,
+      });
+      const embeds = i.message.embeds || [];
+      if (embeds[0]) {
+        embeds[0].color = err ? 0xE74C3C : 0x2ECC71;
+        embeds[0].footer = { text: err
+          ? `❌ Approval NOT sent — ${err}`
+          : "✅ Approved — executing rebalance now. Results post here in ~1–2 min." };
+      }
+      return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: [] } });
+    }
+
+    if (action === "reject_rebalance") {
+      await dispatchToGitHub(env, {
+        command: "reject_rebalance", message_id: i.message.id, ...common,
+      });
+      const embeds = i.message.embeds || [];
+      if (embeds[0]) {
+        embeds[0].color = 0x95A5A6;
+        embeds[0].footer = { text: "❌ Rejected — no trades this week. Proposal expired." };
+      }
+      return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: [] } });
+    }
+
     if (action === "approve_buy") {
       const err = await dispatchToGitHub(env, {
         command: "approve_buy", ticker, trigger, message_id: i.message.id, ...common,

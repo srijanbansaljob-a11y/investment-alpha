@@ -1,0 +1,139 @@
+name: Weekly Rebalance
+
+# Monday 9:00 AM ET  → pre-run reminder on Discord
+# Monday 10:00 AM ET → run analysis, post BUY/HOLD/EXIT proposal with Approve/Reject buttons
+#
+# NOTHING TRADES automatically. Execution only happens when the owner
+# taps "Approve" in Discord, which fires the Cloudflare Worker →
+# repository_dispatch → command.yml → cmd_approve_rebalance.
+
+on:
+  schedule:
+    # 9:00 AM ET (14:00 UTC summer / 13:00 UTC winter) — reminder
+    - cron: "0 14 * * 1"   # EDT (summer)
+    - cron: "0 13 * * 1"   # EST (winter)
+    # 10:00 AM ET (15:00 UTC summer / 14:00 UTC winter) — proposal
+    - cron: "0 15 * * 1"   # EDT (summer)
+    - cron: "0 14 * * 1"   # EST (winter)
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which job to run"
+        required: false
+        default: "proposal"
+        type: choice
+        options: [reminder, proposal]
+
+permissions:
+  contents: write   # commit proposed_rebalance.json back to repo
+
+concurrency:
+  group: discord-commands
+  cancel-in-progress: false
+
+jobs:
+  # ── Job 1: 9 AM reminder ──────────────────────────────────────────────────
+  reminder:
+    name: Pre-run reminder
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    if: |
+      (github.event_name == 'schedule' &&
+        (github.event.schedule == '0 14 * * 1' || github.event.schedule == '0 13 * * 1')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'reminder')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Post reminder to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python broker/post_weekly_proposal.py --reminder-only
+
+  # ── Job 2: 10 AM analysis + proposal ────────────────────────────────────
+  proposal:
+    name: Run analysis and post proposal
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    if: |
+      (github.event_name == 'schedule' &&
+        (github.event.schedule == '0 15 * * 1' || github.event.schedule == '0 14 * * 1')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'proposal') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.job == '')
+
+    steps:
+      - name: Guard — only run at ET 09 or 10 (avoid double-fire on shared crons)
+        id: tz
+        run: |
+          HOUR=$(TZ=America/New_York date +%H)
+          echo "NY hour: $HOUR"
+          if [ "$HOUR" = "10" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "go=true" >> $GITHUB_OUTPUT
+          else
+            echo "go=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout
+        if: steps.tz.outputs.go == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        if: steps.tz.outputs.go == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        if: steps.tz.outputs.go == 'true'
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline analysis + post proposal to Discord
+        if: steps.tz.outputs.go == 'true'
+        env:
+          ALPACA_API_KEY:      ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:   ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL:     ${{ secrets.ALPACA_BASE_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_BOT_TOKEN:   ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:  ${{ secrets.DISCORD_CHANNEL_ID }}
+          FINNHUB_API_KEY:     ${{ secrets.FINNHUB_API_KEY }}
+        run: python broker/post_weekly_proposal.py
+
+      - name: Commit proposal file back to repo
+        if: steps.tz.outputs.go == 'true'
+        run: |
+          git config user.name "investment-alpha-bot"
+          git config user.email "actions@github.com"
+          git add data/proposed_rebalance.json || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: weekly rebalance proposal [skip ci]"
+            git pull --rebase origin main || true
+            git push
+          else
+            echo "No proposal changes to commit"
+          fi
+
+      - name: Alert Discord on failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"❌ Weekly Rebalance Analysis Failed\",\"description\":\"Proposal not posted — no trades will execute this week until you fix and re-run.\\n[View run]($RUN_URL)\",\"color\":15158332}]}"

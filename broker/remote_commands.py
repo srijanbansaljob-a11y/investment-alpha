@@ -606,21 +606,110 @@ def cmd_reject(payload):
     # The worker already updated the message UI — journal is the real work here.
 
 
+# ── Weekly rebalance approval ───────────────────────────────────────────────
+
+def cmd_approve_rebalance(payload):
+    """
+    Owner tapped 'Approve' on the weekly rebalance proposal.
+    Loads data/proposed_rebalance.json (written by post_weekly_proposal.py),
+    validates it hasn't expired, then executes the pipeline with --execute.
+    """
+    from datetime import datetime, timezone
+
+    proposal_path = config.DATA_DIR / "proposed_rebalance.json"
+    if not proposal_path.exists():
+        _reply(payload, [_embed(
+            "❌ No proposal found",
+            "Could not find `data/proposed_rebalance.json`. "
+            "The weekly analysis may not have run yet, or the file was not committed.",
+            _RED,
+        )])
+        return
+
+    try:
+        proposal = json.loads(proposal_path.read_bytes().rstrip(b"\x00"))
+    except Exception as e:
+        _reply(payload, [_embed("❌ Proposal unreadable", f"```\n{e}\n```", _RED)])
+        return
+
+    # Expiry check
+    expires_at = proposal.get("expires_at")
+    if expires_at:
+        try:
+            expiry = datetime.fromisoformat(expires_at)
+            if datetime.now(timezone.utc) > expiry:
+                _reply(payload, [_embed(
+                    "⏰ Proposal expired",
+                    f"This proposal expired at {expiry.strftime('%H:%M UTC')}. "
+                    "The next proposal will arrive Monday morning.",
+                    _ORANGE,
+                )])
+                return
+        except Exception:
+            pass  # if we can't parse expiry, proceed anyway
+
+    # Check proposal was from a successful run
+    if not proposal.get("run_ok", True):
+        _reply(payload, [_embed(
+            "⚠️ Pipeline failed — cannot execute",
+            "The pipeline analysis that generated this proposal reported a failure. "
+            "Check the GitHub Actions log and re-run manually before approving.",
+            _RED,
+        )])
+        return
+
+    regime    = proposal.get("regime", "unknown")
+    summary   = proposal.get("signal_summary") or {}
+    n_buy     = summary.get("buy", 0)
+    n_exit    = summary.get("exit", 0)
+    proposed  = proposal.get("proposed_at", "?")[:10]
+
+    _journal({"decision": "approve_rebalance", "regime": regime,
+              "buy": n_buy, "exit": n_exit, "proposed_at": proposed})
+
+    # Immediate acknowledgement (execution takes time)
+    _reply(payload, [_embed(
+        "✅ Rebalance approved — executing now",
+        f"Regime: **{regime.upper()}** | {n_buy} BUY · {n_exit} EXIT\n"
+        "Orders are being placed via Alpaca paper account. "
+        "Results will post here when done (~30-60 seconds).",
+        _GREEN,
+    )])
+
+    # Execute — this is the actual trade submission
+    ok, out = _run_pipeline(execute=True)
+    _journal({"decision": "approve_rebalance_executed", "success": ok})
+
+    dn.post_message([_embed(
+        "🚀 Rebalance executed" if ok else "❌ Rebalance execution FAILED",
+        f"```\n{out[-2000:]}\n```",
+        _GREEN if ok else _RED,
+        footer="Pipeline Alpaca account · Paper trading",
+    )])
+
+
+def cmd_reject_rebalance(payload):
+    """Owner tapped Reject — log and do nothing (worker already updated the UI)."""
+    _journal({"decision": "reject_rebalance", "reason": "manual reject via Discord"})
+
+
 # ── Entry point ────────────────────────────────────────────────────────────
 
 COMMANDS = {
-    "status":            cmd_status,
-    "regime":            cmd_regime,
-    "strategy":          cmd_strategy,
-    "chart":             cmd_chart,
-    "monitor_check":     cmd_monitor_check,
-    "stoploss_check":    cmd_stoploss_check,
-    "stoploss_execute":  cmd_stoploss_execute,
-    "pipeline_dry":      cmd_pipeline_dry,
-    "pipeline_execute":  cmd_pipeline_execute,
-    "approve_sell":      cmd_approve_sell,
-    "approve_buy":       cmd_approve_buy,
-    "reject":            cmd_reject,
+    "status":              cmd_status,
+    "regime":              cmd_regime,
+    "strategy":            cmd_strategy,
+    "chart":               cmd_chart,
+    "monitor_check":       cmd_monitor_check,
+    "stoploss_check":      cmd_stoploss_check,
+    "stoploss_execute":    cmd_stoploss_execute,
+    "pipeline_dry":        cmd_pipeline_dry,
+    "pipeline_execute":    cmd_pipeline_execute,
+    "approve_sell":        cmd_approve_sell,
+    "approve_buy":         cmd_approve_buy,
+    "reject":              cmd_reject,
+    "approve_rebalance":   cmd_approve_rebalance,
+    "reject_rebalance":    cmd_reject_rebalance,
 }
 
 
@@ -636,7 +725,7 @@ def main():
     handler = COMMANDS.get(command)
     if not handler:
         log.error("Unknown command: %r", command)
-        dn.post_message([_embed("❌ Unknown command", f"`{command}` is not recognised.", _RED)])
+        dn.post_message([_embed("Unknown command", f"`{command}` is not recognised.", _RED)])
         sys.exit(1)
 
     log.info("Dispatching command: %s", command)
@@ -644,7 +733,7 @@ def main():
         handler(payload)
     except Exception as exc:
         log.error("Command %s failed: %s", command, exc, exc_info=True)
-        _reply(payload, [_embed(f"❌ {command} failed", f"```\n{exc}\n```", _RED)])
+        _reply(payload, [_embed(f"{command} failed", f"```\n{exc}\n```", _RED)])
         sys.exit(1)
 
 
