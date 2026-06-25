@@ -1628,26 +1628,48 @@ async function runMorningBrief(env) {
   const pBp      = parseFloat(pAcct?.buying_power || 0);
   const regLabel = regime?.label || "UNKNOWN";
   const regScore = regime?.total  || 0;
-  const topPick  = summary?.top_picks?.[0];
-  const today    = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const today     = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const allPicks  = summary?.top_picks || [];
+
+  // New picks = top picks not already held in the Screener account
+  const heldSymbols = new Set((Array.isArray(sPos) ? sPos : []).map(p => p.symbol));
+  const newPicks    = allPicks.filter(p => !heldSymbols.has(p.ticker));
+  const heldPicks   = allPicks.filter(p =>  heldSymbols.has(p.ticker));
+
+  // Top picks summary line
+  const picksLine = allPicks.length
+    ? allPicks.map(p => `${heldSymbols.has(p.ticker) ? "✅" : "🆕"} **${p.ticker}** ${p.score}/100`).join("  ·  ")
+    : "_No picks today_";
+
+  // Buy buttons for new picks (max 5 per Discord row)
+  const buyButtons = newPicks.slice(0, 5).map(p => ({
+    type: 2, style: 1,
+    label: `🛒 Buy ${p.ticker}${p.conviction_ok ? " ✅" : ""}`,
+    custom_id: `ia|screener_buy|${p.ticker}|screener`,
+  }));
+
+  const components = buyButtons.length
+    ? [{ type: 1, components: buyButtons }]
+    : [];
 
   await postDiscordWebhook(webhookUrl, [{
     title:       `☀️ Morning Brief — ${today}`,
     color:       totalPnl >= 0 ? C_GREEN : C_RED,
     description: `**📊 Screener**\n${sc.lines}\n\n**🔧 Pipeline**\n${pc.lines}`,
     fields: [
-      { name: "Regime",              value: `${regLabel} (${regScore}/100)`,                                inline: true },
-      { name: "Screener P&L",        value: `${sc.pnl >= 0 ? "+" : ""}$${sc.pnl.toFixed(2)}`,             inline: true },
-      { name: "Pipeline P&L",        value: `${pc.pnl >= 0 ? "+" : ""}$${pc.pnl.toFixed(2)}`,             inline: true },
-      { name: "Screener value",      value: `$${sc.val.toFixed(2)}`,                                       inline: true },
-      { name: "Pipeline value",      value: `$${pc.val.toFixed(2)}`,                                       inline: true },
-      { name: "Screener buying pwr", value: `$${sBp.toFixed(2)}`,                                          inline: true },
-      { name: "Pipeline buying pwr", value: `$${pBp.toFixed(2)}`,                                          inline: true },
-      { name: "Top pick today",      value: topPick ? `**${topPick.ticker}** (score ${topPick.score}/100)` : "No picks today", inline: true },
+      { name: "Regime",              value: `${regLabel} (${regScore}/100)`,                     inline: true },
+      { name: "Screener P&L",        value: `${sc.pnl >= 0 ? "+" : ""}$${sc.pnl.toFixed(2)}`,  inline: true },
+      { name: "Pipeline P&L",        value: `${pc.pnl >= 0 ? "+" : ""}$${pc.pnl.toFixed(2)}`,  inline: true },
+      { name: "Screener value",      value: `$${sc.val.toFixed(2)}`,                             inline: true },
+      { name: "Pipeline value",      value: `$${pc.val.toFixed(2)}`,                             inline: true },
+      { name: "Screener buying pwr", value: `$${sBp.toFixed(2)}`,                                inline: true },
+      { name: "Pipeline buying pwr", value: `$${pBp.toFixed(2)}`,                                inline: true },
+      { name: `Today's picks (${newPicks.length} new · ${heldPicks.length} held)`,
+        value: picksLine, inline: false },
     ],
-    footer:    { text: "Paper trading · Market opens 9:30am ET · Use /screener for full picks" },
+    footer:    { text: newPicks.length ? "Click a 🛒 button to preview & confirm the buy · ✅ = high conviction" : "All top picks already held · Paper trading" },
     timestamp: new Date().toISOString(),
-  }]);
+  }], components);
 }
 
 async function runTakeProfitMonitor(env) {
@@ -1869,7 +1891,6 @@ async function runTakeProfitMonitor(env) {
     }
   }
 }
-
 
 export default {
   async fetch(request, env, ctx) {
