@@ -1097,7 +1097,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
             value: [
               "```",
               "/screener        -> see today's top 5 picks",
-              "/buy symbol:C    -> preview order:",
+              "/buy symbol:C portfolio:Screener -> preview order:",
               "                    Price / Shares / Total cost",
               "                    Stop loss  -5%  (Alpaca auto-manages)",
               "                    Take profit +12% (Alpaca auto-manages)",
@@ -1178,7 +1178,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
         fields: [
           {
             name: "\U0001f4ca Daily Screener",
-            value: "`/screener` Top 5 picks + conviction badges\n`/buy symbol:X` Preview & confirm bracket order\n`/sell symbol:X` See P&L then confirm close",
+            value: "`/screener` Top 5 picks + conviction badges\n`/buy symbol:X portfolio:Screener|Pipeline` Preview & confirm bracket order\n`/sell symbol:X portfolio:Screener|Pipeline` See P&L then confirm close",
             inline: false,
           },
           {
@@ -1218,7 +1218,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
           },
           {
             name: "\U0001f4a1 Morning routine",
-            value: "`/regime` check market · `/screener` see picks · `/buy symbol:X` trade\nMonthly (1st): `/pipeline mode:dry` review · `/pipeline mode:execute` rebalance",
+            value: "`/regime` check market · `/screener` see picks · `/buy symbol:X portfolio:Screener` trade\nMonthly (1st): `/pipeline mode:dry` review · `/pipeline mode:execute` rebalance",
             inline: false,
           },
         ],
