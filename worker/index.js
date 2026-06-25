@@ -565,19 +565,30 @@ async function buildBuyPreview(env, ticker, customQty = null, portfolio = "scree
     ? `⚠️ You already hold **${existingPos.qty} shares** of ${ticker} (P&L: ${parseFloat(existingPos.unrealized_pl || 0) >= 0 ? "+" : ""}$${parseFloat(existingPos.unrealized_pl || 0).toFixed(2)}). This will add to your position.`
     : null;
 
-  // ATR-based targets from screener KV
+  // ATR-based targets: check screener_summary top_picks first, then stock_buckets fallback
+  // stock_buckets covers ALL screened stocks; top_picks only covers top 5
   let stopPct = STOP_LOSS_PCT, tpAlpacaPct = TAKE_PROFIT_PCT, tpMonitorPct = TAKE_PROFIT_PCT * 0.8, atrPct = null;
   try {
-    const summaryRaw = await env.KV.get("screener_summary");
+    const [summaryRaw, bucketsRaw] = await Promise.all([
+      env.KV.get("screener_summary"),
+      env.KV.get("stock_buckets"),
+    ]);
+    let pick = null;
     if (summaryRaw) {
       const summary = JSON.parse(summaryRaw);
-      const pick = (summary.top_picks || []).find(p => p.ticker === ticker);
-      if (pick && pick.atr_pct) {
-        atrPct       = pick.atr_pct;
-        stopPct      = (pick.stop_pct       || STOP_LOSS_PCT * 100)   / 100;
-        tpAlpacaPct  = (pick.tp_alpaca_pct  || TAKE_PROFIT_PCT * 100) / 100;
-        tpMonitorPct = (pick.tp_monitor_pct || tpAlpacaPct * 80)      / 100;
-      }
+      pick = (summary.top_picks || []).find(p => p.ticker === ticker) || null;
+    }
+    // Fallback: stock_buckets has ATR data for every screened stock
+    if (!pick && bucketsRaw) {
+      const buckets = JSON.parse(bucketsRaw);
+      const b = buckets[ticker];
+      if (b && b.atr_pct) pick = b;
+    }
+    if (pick && pick.atr_pct) {
+      atrPct       = pick.atr_pct;
+      stopPct      = (pick.stop_pct       || STOP_LOSS_PCT * 100)   / 100;
+      tpAlpacaPct  = (pick.tp_alpaca_pct  || TAKE_PROFIT_PCT * 100) / 100;
+      tpMonitorPct = (pick.tp_monitor_pct || tpAlpacaPct * 80)      / 100;
     }
   } catch (e) { console.warn("buildBuyPreview KV error:", e.message); }
 

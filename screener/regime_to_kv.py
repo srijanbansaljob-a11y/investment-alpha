@@ -76,10 +76,15 @@ def parse_screener_output(output_file: Path) -> tuple:
         regime_ok = bucket in permitted or bucket == "defensive"
         near_earnings = stock.get("near_earnings", False)
         stock_buckets[ticker] = {
-            "bucket": bucket,
-            "score": score,
-            "regime_ok": regime_ok,
-            "near_earnings": near_earnings,
+            "bucket":         bucket,
+            "score":          score,
+            "regime_ok":      regime_ok,
+            "near_earnings":  near_earnings,
+            # ATR-based order targets — available for every stock, not just top 5
+            "atr_pct":        stock.get("atr_pct"),
+            "stop_pct":       stock.get("stop_pct"),
+            "tp_monitor_pct": stock.get("tp_monitor_pct"),
+            "tp_alpaca_pct":  stock.get("tp_alpaca_pct"),
         }
         if regime_ok and not near_earnings:
             top_picks.append({
