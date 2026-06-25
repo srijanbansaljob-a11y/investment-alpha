@@ -10,6 +10,12 @@ compatibility_date = "2026-01-01"
 binding = "KV"
 id = "3e0d7e6bb3e94d4a93670ba6a5da1ecf"
 
+# ── Scheduled triggers ─────────────────────────────────────────────────────
+# Runs every 2 minutes — price monitor checks TP targets, fires Discord alerts,
+# auto-executes sells after a 2-min window (regular hours only, 9:30am–4pm ET).
+[triggers]
+crons = ["*/2 * * * *", "25 13 * * 1-5"]
+
 # ── Worker secrets (never stored here — set via CLI) ───────────────────────
 # After `npx wrangler login`, run these commands once:
 #

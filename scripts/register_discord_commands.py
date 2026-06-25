@@ -90,18 +90,46 @@ COMMANDS = [
     {
         "name": "buy",
         "description": "Buy a stock — previews order (size, stop, target) and asks to confirm before executing",
-        "options": [{
-            "name": "symbol", "type": 3, "required": True,
-            "description": "Ticker to buy (e.g. AAPL, C, REGN)",
-        }],
+        "options": [
+            {
+                "name": "symbol", "type": 3, "required": True,
+                "description": "Ticker to buy (e.g. AAPL, C, REGN)",
+            },
+            {
+                "name": "portfolio", "type": 3, "required": True,
+                "description": "Which portfolio account to buy in",
+                "choices": [
+                    {"name": "Screener", "value": "screener"},
+                    {"name": "Pipeline", "value": "pipeline"},
+                ],
+            },
+        ],
     },
     {
         "name": "sell",
         "description": "Sell (close) an existing position — shows current P&L and asks to confirm",
-        "options": [{
-            "name": "symbol", "type": 3, "required": True,
-            "description": "Ticker to sell (e.g. AAPL, C, REGN)",
-        }],
+        "options": [
+            {
+                "name": "symbol", "type": 3, "required": True,
+                "description": "Ticker to sell (e.g. AAPL, C, REGN)",
+            },
+            {
+                "name": "portfolio", "type": 3, "required": True,
+                "description": "Which portfolio account to sell from",
+                "choices": [
+                    {"name": "Screener", "value": "screener"},
+                    {"name": "Pipeline", "value": "pipeline"},
+                ],
+            },
+        ],
+    },
+    {
+        "name": "pausetrading",
+        "description": "Pause auto-trading: disables webhook buys + take-profit auto-sells. Manual /buy /sell still work.",
+    },
+    {
+        "name": "resumetrading",
+        "description": "Resume auto-trading after /pausetrading — re-enables webhook buys and take-profit auto-sells.",
     },
 ]
 
@@ -112,9 +140,9 @@ resp = requests.put(
     timeout=15,
 )
 if resp.ok:
-    print(f"✅ Registered {len(resp.json())} slash commands:")
+    print(f"\u2705 Registered {len(resp.json())} slash commands:")
     for c in resp.json():
-        print(f"   /{c['name']} — {c['description']}")
+        print(f"   /{c['name']} \u2014 {c['description']}")
     print("\nGlobal commands can take up to ~1 hour to appear in your server.")
 else:
-    print(f"❌ Registration failed ({resp.status_code}): {resp.text}")
+    print(f"\u274c Registration failed ({resp.status_code}): {resp.text}")

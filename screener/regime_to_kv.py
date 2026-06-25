@@ -87,6 +87,11 @@ def parse_screener_output(output_file: Path) -> tuple:
                 "score":             score,
                 "bucket":            bucket,
                 "conviction_ok":     score >= 55,   # cleared the high-conviction bar
+                # Dynamic order targets — used by Worker when placing bracket orders
+                "atr_pct":           stock.get("atr_pct"),
+                "stop_pct":          stock.get("stop_pct"),
+                "tp_monitor_pct":    stock.get("tp_monitor_pct"),
+                "tp_alpaca_pct":     stock.get("tp_alpaca_pct"),
             })
 
     # Debug: show bucket breakdown

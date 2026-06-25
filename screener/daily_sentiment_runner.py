@@ -699,6 +699,19 @@ def get_alpaca_bars(tickers: list, days: int = 220) -> dict:
                 # 20-day avg volume
                 avg_vol_20 = int(sum(volumes[-20:]) / min(20, len(volumes[-20:]))) if volumes else None
 
+                # ATR-14 (Average True Range over last 14 bars)
+                # TR = max(H-L, |H-prev_C|, |L-prev_C|)
+                atr_14 = None
+                if len(bars) >= 15:
+                    trs = []
+                    for j in range(len(bars) - 14, len(bars)):
+                        h, l, c_prev = bars[j]["h"], bars[j]["l"], bars[j-1]["c"]
+                        trs.append(max(h - l, abs(h - c_prev), abs(l - c_prev)))
+                    atr_14 = sum(trs) / 14
+                # ATR as % of current price (for regime-based target calculation)
+                current_close = closes[-1] if closes else None
+                atr_pct = round((atr_14 / current_close) * 100, 3) if (atr_14 and current_close) else None
+
                 results[sym] = {
                     "ma50":          round(ma50, 4)  if ma50  else None,
                     "ma200":         round(ma200, 4) if ma200 else None,
@@ -706,6 +719,8 @@ def get_alpaca_bars(tickers: list, days: int = 220) -> dict:
                     "52w_low":       round(lo52, 4),
                     "week52_change": week52_chg,
                     "avg_volume":    avg_vol_20,
+                    "atr_14":        round(atr_14, 4) if atr_14 else None,
+                    "atr_pct":       atr_pct,
                 }
         except Exception as e:
             print(f"  ⚠  Alpaca bars batch {i//batch_size+1} failed: {e}")
@@ -971,6 +986,9 @@ def get_stock_quotes(tickers: list) -> dict:
                 "short_name":     fund.get("short_name", sym),
                 "earnings_date":  fund.get("earnings_date"),
                 "beta":           fund.get("beta"),
+                # ATR from bar history — used for dynamic bracket targets at buy time
+                "atr_14":         bars.get("atr_14"),
+                "atr_pct":        bars.get("atr_pct"),
             }
         else:
             # Yahoo fallback for everything
@@ -1395,6 +1413,34 @@ def score_stock(ticker: str, quote: dict, news: list, macro_score: dict) -> dict
     else:                   conviction = "❌ AVOID"
 
     classification = classify_stock(ticker, quote)
+
+    # ── Dynamic stop / take-profit targets (ATR-based, regime-adjusted) ──────
+    # These are stored in KV so the Worker can use them when placing bracket orders.
+    # Multipliers by regime:
+    #   Stop loss:       Strong Bull 2.0×, Mod Bull 1.5×, Neutral 1.25×, Bearish 1.0×
+    #   TP Alpaca ceil:  Strong Bull 4.0×, Mod Bull 3.0×, Neutral 2.0×,  Bearish 1.5×
+    #   TP monitor:      80% of Alpaca ceiling (fires BEFORE Alpaca, triggers 2-min window)
+    # Floor / cap applied after to keep values realistic.
+    regime_label = macro_score.get("label", "NEUTRAL")
+    atr_pct = quote.get("atr_pct")  # filled in by get_alpaca_bars()
+
+    _stop_mult  = {"STRONG BULL": 2.0, "MODERATE BULL": 1.5, "NEUTRAL": 1.25, "BEARISH": 1.0}
+    _ceil_mult  = {"STRONG BULL": 4.0, "MODERATE BULL": 3.0, "NEUTRAL": 2.0,  "BEARISH": 1.5}
+    stop_m = _stop_mult.get(regime_label, 1.5)
+    ceil_m = _ceil_mult.get(regime_label, 3.0)
+
+    if atr_pct:
+        raw_stop   = atr_pct * stop_m
+        raw_ceil   = atr_pct * ceil_m
+        stop_pct   = round(max(2.0, min(raw_stop, 8.0)), 2)   # floor 2%, cap 8%
+        tp_alpaca  = round(max(8.0, min(raw_ceil, 35.0)), 2)  # floor 8%, cap 35%
+        tp_monitor = round(max(6.0, min(raw_ceil * 0.8, 28.0)), 2)  # 80% of ceiling
+    else:
+        # Fallback to fixed values when ATR unavailable
+        stop_pct   = 5.0
+        tp_alpaca  = 12.0
+        tp_monitor = 9.0
+
     return {
         "ticker":           ticker,
         "name":             quote.get("short_name", ticker),
@@ -1414,6 +1460,11 @@ def score_stock(ticker: str, quote: dict, news: list, macro_score: dict) -> dict
         "near_earnings":    classification["near_earnings"],
         "days_to_earnings": classification.get("days_to_earnings"),
         "beta":             quote.get("beta"),
+        # ── Dynamic order targets ──────────────────────────────────────────
+        "atr_pct":          atr_pct,
+        "stop_pct":         stop_pct,    # ATR-based stop loss %
+        "tp_monitor_pct":   tp_monitor,  # monitor alert fires here (2-min window)
+        "tp_alpaca_pct":    tp_alpaca,   # Alpaca hard ceiling (bracket take_profit)
     }
 
 
