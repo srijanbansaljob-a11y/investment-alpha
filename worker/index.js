@@ -168,16 +168,25 @@ async function placeBracketOrder(env, symbol, customQty = null, portfolio = "scr
   let tpMonitorPct = tpAlpacaPct * 0.80; // fallback: 9.6%
   let atrPct = null;
   try {
-    const summaryRaw = await env.KV.get("screener_summary");
+    const [summaryRaw, bucketsRaw] = await Promise.all([
+      env.KV.get("screener_summary"),
+      env.KV.get("stock_buckets"),
+    ]);
+    let pick = null;
     if (summaryRaw) {
       const summary = JSON.parse(summaryRaw);
-      const pick = (summary.top_picks || []).find(p => p.ticker === symbol);
-      if (pick && pick.atr_pct) {
-        atrPct       = pick.atr_pct;
-        stopPct      = (pick.stop_pct      || STOP_LOSS_PCT * 100)   / 100;
-        tpAlpacaPct  = (pick.tp_alpaca_pct || TAKE_PROFIT_PCT * 100) / 100;
-        tpMonitorPct = (pick.tp_monitor_pct || tpAlpacaPct * 80)     / 100;
-      }
+      pick = (summary.top_picks || []).find(p => p.ticker === symbol) || null;
+    }
+    if (!pick && bucketsRaw) {
+      const buckets = JSON.parse(bucketsRaw);
+      const b = buckets[symbol];
+      if (b && b.atr_pct) pick = b;
+    }
+    if (pick && pick.atr_pct) {
+      atrPct       = pick.atr_pct;
+      stopPct      = (pick.stop_pct      || STOP_LOSS_PCT * 100)   / 100;
+      tpAlpacaPct  = (pick.tp_alpaca_pct || TAKE_PROFIT_PCT * 100) / 100;
+      tpMonitorPct = (pick.tp_monitor_pct || tpAlpacaPct * 80)     / 100;
     }
   } catch (e) { console.warn("ATR target read error:", e.message); }
 
@@ -215,7 +224,25 @@ async function placeBracketOrder(env, symbol, customQty = null, portfolio = "scr
     });
     const result = await r.json();
     if (!r.ok) return { error: result?.message || `HTTP ${r.status}`, price, qty, stopPrice, takePrice, monitorPrice, sizePct, atrPct };
-    orderResult = { order: result, price, qty, stopPrice, takePrice, monitorPrice, sizePct, atrPct };
+
+    // Poll fill status — market orders during market hours usually fill in <2s
+    let fillStatus = result.status || "submitted";
+    let fillQty    = result.filled_qty || "0";
+    let fillAvg    = result.filled_avg_price || null;
+    if (fillStatus !== "filled") {
+      try {
+        await new Promise(res => setTimeout(res, 2500));
+        const poll = await fetch(`https://paper-api.alpaca.markets/v2/orders/${result.id}`, { headers });
+        if (poll.ok) {
+          const polled = await poll.json();
+          fillStatus = polled.status || fillStatus;
+          fillQty    = polled.filled_qty || fillQty;
+          fillAvg    = polled.filled_avg_price || fillAvg;
+        }
+      } catch (e) { console.warn("Fill poll error:", e.message); }
+    }
+
+    orderResult = { order: result, price, qty, stopPrice, takePrice, monitorPrice, sizePct, atrPct, fillStatus, fillQty, fillAvg };
   } catch (e) {
     return { error: e.message, price, qty, stopPrice, takePrice, monitorPrice, sizePct, atrPct };
   }
@@ -760,12 +787,16 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       const ok = !!result.order;
       const embeds = i.message.embeds || [];
       if (embeds[0]) {
-        embeds[0].color = ok ? C_GREEN : C_RED;
+        const filled   = result.fillStatus === "filled";
+        const fillNote = filled
+          ? `✅ Filled ${result.fillQty} @ $${parseFloat(result.fillAvg || result.price).toFixed(2)}`
+          : `⏳ Status: ${result.fillStatus || "submitted"} — market orders typically fill within seconds`;
+        embeds[0].color = ok ? (filled ? C_GREEN : 0xF39C12) : C_RED;
         embeds[0].title = ok
-          ? `✅ BUY ${ticker} — Order Placed`
+          ? `✅ BUY ${ticker} — Order ${filled ? "Filled" : "Placed"}`
           : `❌ BUY ${ticker} — Order Failed`;
         embeds[0].footer = { text: ok
-          ? `Stop $${result.stopPrice} · Monitor $${result.monitorPrice} · Ceiling $${result.takePrice} · ATR ${result.atrPct ? result.atrPct.toFixed(2) + "%" : "default"}`
+          ? `${fillNote} · Stop $${result.stopPrice} · ATR ${result.atrPct ? result.atrPct.toFixed(2) + "%" : "default"}`
           : `Error: ${result.error}` };
       }
       return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: [] } });
