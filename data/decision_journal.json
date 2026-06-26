@@ -53,5 +53,14 @@
     "qty": 6.2158,
     "order_status": "OrderStatus.PENDING_NEW",
     "timestamp": "2026-06-25T08:50:15.967713+00:00"
+  },
+  {
+    "decision": "approve_buy",
+    "ticker": "AAPL",
+    "trigger": "mr",
+    "price_at_decision": 275.21,
+    "qty": 7.8652,
+    "order_status": "OrderStatus.PENDING_NEW",
+    "timestamp": "2026-06-26T08:44:08.962453+00:00"
   }
 ]
