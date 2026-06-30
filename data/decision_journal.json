@@ -62,5 +62,14 @@
     "qty": 7.8652,
     "order_status": "OrderStatus.PENDING_NEW",
     "timestamp": "2026-06-26T08:44:08.962453+00:00"
+  },
+  {
+    "decision": "approve_sell",
+    "ticker": "GOOGL",
+    "trigger": "mr_exit",
+    "price_at_decision": 354.1,
+    "order_status": "OrderStatus.PENDING_NEW",
+    "pnl_pct_at_decision": 3.96,
+    "timestamp": "2026-06-30T10:37:34.285754+00:00"
   }
 ]
