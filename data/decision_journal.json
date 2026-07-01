@@ -71,5 +71,14 @@
     "order_status": "OrderStatus.PENDING_NEW",
     "pnl_pct_at_decision": 3.96,
     "timestamp": "2026-06-30T10:37:34.285754+00:00"
+  },
+  {
+    "decision": "approve_buy",
+    "ticker": "GS",
+    "trigger": "mr",
+    "price_at_decision": 1011.33,
+    "qty": 2.1622,
+    "order_status": "OrderStatus.PENDING_NEW",
+    "timestamp": "2026-07-01T11:05:46.571918+00:00"
   }
 ]
