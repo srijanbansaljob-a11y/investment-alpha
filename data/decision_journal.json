@@ -80,5 +80,14 @@
     "qty": 2.1622,
     "order_status": "OrderStatus.PENDING_NEW",
     "timestamp": "2026-07-01T11:05:46.571918+00:00"
+  },
+  {
+    "decision": "approve_sell",
+    "ticker": "WMT",
+    "trigger": "stop_loss",
+    "price_at_decision": 108.365,
+    "order_status": "OrderStatus.PENDING_NEW",
+    "pnl_pct_at_decision": -9.25,
+    "timestamp": "2026-07-01T19:43:33.313061+00:00"
   }
 ]
