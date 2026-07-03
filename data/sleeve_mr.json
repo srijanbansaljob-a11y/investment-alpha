@@ -18,5 +18,10 @@
     "entry_price": 1011.33,
     "qty": 2.1622,
     "entry_date": "2026-07-01"
+  },
+  "QCOM": {
+    "entry_price": 176.125,
+    "qty": 12.5582,
+    "entry_date": "2026-07-03"
   }
 }

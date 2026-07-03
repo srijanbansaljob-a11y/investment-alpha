@@ -98,5 +98,14 @@
     "order_status": "OrderStatus.PENDING_NEW",
     "pnl_pct_at_decision": 7.92,
     "timestamp": "2026-07-02T08:43:34.351747+00:00"
+  },
+  {
+    "decision": "approve_buy",
+    "ticker": "QCOM",
+    "trigger": "mr",
+    "price_at_decision": 176.125,
+    "qty": 12.5582,
+    "order_status": "OrderStatus.ACCEPTED",
+    "timestamp": "2026-07-03T08:41:43.760781+00:00"
   }
 ]
