@@ -107,5 +107,14 @@
     "qty": 12.5582,
     "order_status": "OrderStatus.ACCEPTED",
     "timestamp": "2026-07-03T08:41:43.760781+00:00"
+  },
+  {
+    "decision": "approve_sell",
+    "ticker": "GS",
+    "trigger": "mr_exit",
+    "price_at_decision": 1021.0,
+    "order_status": "OrderStatus.ACCEPTED",
+    "pnl_pct_at_decision": 0.97,
+    "timestamp": "2026-07-04T10:22:54.578977+00:00"
   }
 ]
