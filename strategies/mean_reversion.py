@@ -118,12 +118,29 @@ def scan() -> dict:
 
     # Current holdings (core + sleeve) — never double-buy
     held_core = set()
+    alpaca_positions = {}
+    alpaca_ok = False
     try:
         from broker.alpaca_client import get_client, get_positions
-        held_core = set(get_positions(get_client()).keys())
+        alpaca_positions = get_positions(get_client())
+        held_core = set(alpaca_positions.keys())
+        alpaca_ok = True
     except Exception as exc:
         log.warning("Could not fetch Alpaca positions (%s) — proposals still posted", exc)
     sleeve = load_sleeve()
+
+    # ── Auto-reconcile: remove sleeve entries no longer held in Alpaca ────
+    # Catches positions closed manually (e.g. /sell) that bypassed the
+    # "Approve SELL" Discord button, so the strategy stops re-proposing exits.
+    if alpaca_ok:
+        ghost_tickers = [t for t in list(sleeve.keys()) if t not in alpaca_positions]
+        for ticker in ghost_tickers:
+            log.warning(
+                "Sleeve reconcile: %s found in sleeve_mr.json but NOT in Alpaca — "
+                "removing silently (likely sold outside MR flow).", ticker
+            )
+            remove_from_sleeve(ticker)
+            sleeve.pop(ticker, None)
 
     n_entries = n_exits = 0
 
