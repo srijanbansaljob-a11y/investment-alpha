@@ -40,6 +40,7 @@ from broker import market_data
 log = logging.getLogger(__name__)
 
 SLEEVE_FILE = config.DATA_DIR / "sleeve_mr.json"
+PEAK_FILE   = config.DATA_DIR / "portfolio_peak.json"  # tracks equity high-water mark for drawdown pause
 
 # Liquid, optionable mega/large caps — fast to scan daily
 DEFAULT_UNIVERSE = [
@@ -87,6 +88,102 @@ def remove_from_sleeve(ticker: str) -> None:
     if ticker.upper() in s:
         del s[ticker.upper()]
         _save_sleeve(s)
+
+
+# ── Cash management helpers ────────────────────────────────────────────────
+
+def _load_peak() -> dict:
+    """Load the stored equity high-water mark."""
+    if not PEAK_FILE.exists():
+        return {}
+    try:
+        raw = PEAK_FILE.read_bytes().rstrip(b"\x00")
+        return json.loads(raw) if raw else {}
+    except Exception:
+        return {}
+
+
+def _save_peak(data: dict) -> None:
+    PEAK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PEAK_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _get_regime_label() -> str:
+    """
+    Read current regime from screener output file (committed at 8 AM).
+    Returns uppercase label e.g. "STRONG BULL", "MOD BULL", "NEUTRAL", "BEARISH".
+    Falls back to empty string so callers use MAX_INVESTED_DEFAULT.
+    """
+    try:
+        candidate = Path(__file__).parent.parent / "screener" / "daily_sentiment_data.json"
+        if not candidate.exists():
+            return ""
+        data = json.loads(candidate.read_text(encoding="utf-8"))
+        label = (data.get("macro_score") or {}).get("label", "")
+        if not label:
+            label = data.get("regime_label", "")
+        return label.upper().strip()
+    except Exception:
+        return ""
+
+
+def _check_cash_management(equity: float, invested: float) -> tuple[bool, str]:
+    """
+    Returns (ok_to_buy, reason_string).
+    ok_to_buy = False means skip new entries this run.
+    """
+    if not getattr(config, "CASH_MGMT_ENABLED", True):
+        return True, ""
+
+    # ── Drawdown pause ────────────────────────────────────────────────────
+    pause_pct  = getattr(config, "DRAWDOWN_PAUSE_PCT",  0.08)
+    resume_pct = getattr(config, "DRAWDOWN_RESUME_PCT", 0.05)
+    peak_data  = _load_peak()
+    peak       = peak_data.get("peak_equity", equity)
+
+    # Update peak if we're at a new high
+    if equity > peak:
+        peak = equity
+        _save_peak({"peak_equity": round(peak, 2), "updated": datetime.now(timezone.utc).isoformat()})
+
+    drawdown = (peak - equity) / peak if peak > 0 else 0
+    in_pause  = peak_data.get("paused", False)
+
+    if in_pause and drawdown < resume_pct:
+        # Recovered enough — lift the pause
+        _save_peak({"peak_equity": round(peak, 2), "paused": False,
+                    "updated": datetime.now(timezone.utc).isoformat()})
+        in_pause = False
+        log.info("Drawdown recovered to %.1f%% — resuming new entries.", drawdown * 100)
+
+    if drawdown >= pause_pct and not in_pause:
+        _save_peak({"peak_equity": round(peak, 2), "paused": True,
+                    "updated": datetime.now(timezone.utc).isoformat()})
+        in_pause = True
+
+    if in_pause:
+        return False, (f"🛑 **Drawdown pause active** — portfolio is {drawdown*100:.1f}% below its "
+                       f"${peak:,.0f} peak. New buys paused until drawdown recovers below {resume_pct*100:.0f}%.")
+
+    # ── Regime-gated exposure limit ───────────────────────────────────────
+    regime_label = _get_regime_label()
+    pcts         = getattr(config, "MAX_INVESTED_PCTS", {})
+    default_pct  = getattr(config, "MAX_INVESTED_DEFAULT", 0.80)
+
+    # Normalise label to match config keys
+    label_map = {"STRONG BULL": "STRONG BULL", "MOD BULL": "MOD BULL",
+                 "NEUTRAL": "NEUTRAL", "BEARISH": "BEARISH",
+                 "BULL": "MOD BULL"}  # legacy label mapping
+    matched = label_map.get(regime_label, "")
+    max_pct = pcts.get(matched, default_pct)
+
+    invested_pct = invested / equity if equity > 0 else 0
+    if invested_pct >= max_pct:
+        return False, (f"💰 **Exposure limit reached** — {invested_pct*100:.0f}% of equity invested "
+                       f"(limit is {max_pct*100:.0f}% in **{regime_label or 'UNKNOWN'}** regime). "
+                       f"Holding cash until a position closes or regime improves.")
+
+    return True, ""
 
 
 # ── Indicators ─────────────────────────────────────────────────────────────
@@ -182,6 +279,30 @@ def scan() -> dict:
     if open_slots <= 0:
         log.info("Sleeve full (%d/%d) — no entry proposals", len(sleeve), max_pos)
         return {"entries": 0, "exits": n_exits}
+
+    # ── Cash management gate (Phase 1) ────────────────────────────────────
+    if alpaca_ok:
+        try:
+            from broker.alpaca_client import get_account_summary
+            acct     = get_account_summary(get_client())
+            equity   = acct.get("equity", 0)
+            invested = sum(
+                float(p.get("market_value", 0))
+                for p in alpaca_positions.values()
+            )
+            ok_to_buy, cash_reason = _check_cash_management(equity, invested)
+            if not ok_to_buy:
+                log.info("Cash management: skipping entries. %s", cash_reason)
+                if cash_reason:
+                    dn.post_message([{
+                        "title": "📊 MR Scan — Entries Skipped",
+                        "description": cash_reason,
+                        "color": 0xF39C12,
+                        "footer": {"text": "Investment Alpha — cash management"},
+                    }])
+                return {"entries": 0, "exits": n_exits}
+        except Exception as e:
+            log.warning("Cash management check failed (%s) — proceeding with entries", e)
 
     candidates = []
     for ticker in universe:

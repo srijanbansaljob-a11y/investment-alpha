@@ -101,6 +101,33 @@ FINNHUB_KEY       = os.getenv("FINNHUB_API_KEY", "").strip()
 FINNHUB_API       = "https://finnhub.io/api/v1"
 FINNHUB_AVAILABLE = bool(FINNHUB_KEY)
 
+# ── Phase 2: Alternative signal caches (loaded once per run) ──────────────────
+import pathlib as _pathlib
+
+_SCRIPT_DIR      = _pathlib.Path(__file__).parent
+_DATA_DIR        = _SCRIPT_DIR.parent / "data"
+_INSIDER_CACHE   = None   # populated by _load_signal_caches()
+_CONGRESS_CACHE  = None
+
+def _load_signal_caches() -> None:
+    """Load insider + congressional caches from data/ (first call only)."""
+    global _INSIDER_CACHE, _CONGRESS_CACHE
+    if _INSIDER_CACHE is not None:
+        return
+    try:
+        p = _DATA_DIR / "insider_cache.json"
+        _INSIDER_CACHE = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    except Exception as e:
+        print(f"  ⚠  Could not load insider_cache.json: {e}")
+        _INSIDER_CACHE = {}
+    try:
+        p = _DATA_DIR / "congressional_cache.json"
+        _CONGRESS_CACHE = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    except Exception as e:
+        print(f"  ⚠  Could not load congressional_cache.json: {e}")
+        _CONGRESS_CACHE = {}
+
+
 DEFAULT_TICKERS = [
     # ── Mega-Cap Tech ──────────────────────────────────────────────────────
     "AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA",
@@ -321,6 +348,12 @@ def get_spy_technical_indicators() -> dict:
     current        = closes[-1]
     pct_from_200ma = (current - ma200) / ma200 * 100
 
+    # 20-day return for RS vs SPY (Phase 3b)
+    spy_return_20d = None
+    if len(closes) >= 21:
+        c_20 = closes[-21]
+        spy_return_20d = round((current - c_20) / c_20 * 100, 2) if c_20 > 0 else None
+
     return {
         "adx":            adx_result.get("adx"),
         "plus_di":        adx_result.get("plus_di"),
@@ -329,6 +362,7 @@ def get_spy_technical_indicators() -> dict:
         "spy_price":      round(current, 2),
         "ma_200":         round(ma200, 2),
         "pct_from_200ma": round(pct_from_200ma, 2),
+        "return_20d":     spy_return_20d,
     }
 
 
@@ -712,6 +746,13 @@ def get_alpaca_bars(tickers: list, days: int = 220) -> dict:
                 current_close = closes[-1] if closes else None
                 atr_pct = round((atr_14 / current_close) * 100, 3) if (atr_14 and current_close) else None
 
+                # 20-day price return (for RS vs SPY, Phase 3b)
+                return_20d = None
+                if len(closes) >= 21:
+                    c_20 = closes[-21]
+                    c_now = closes[-1]
+                    return_20d = round((c_now - c_20) / c_20 * 100, 2) if c_20 > 0 else None
+
                 results[sym] = {
                     "ma50":          round(ma50, 4)  if ma50  else None,
                     "ma200":         round(ma200, 4) if ma200 else None,
@@ -721,6 +762,7 @@ def get_alpaca_bars(tickers: list, days: int = 220) -> dict:
                     "avg_volume":    avg_vol_20,
                     "atr_14":        round(atr_14, 4) if atr_14 else None,
                     "atr_pct":       atr_pct,
+                    "return_20d":    return_20d,
                 }
         except Exception as e:
             print(f"  ⚠  Alpaca bars batch {i//batch_size+1} failed: {e}")
@@ -833,6 +875,27 @@ def _get_finnhub_fundamentals(tickers: list) -> dict:
                             out["recommend"] = "hold"
         except Exception as e:
             print(f"  ⚠  Finnhub rec {ticker}: {e}")
+
+        time.sleep(0.15)
+
+        # Earnings surprise (Phase 2c) — most recent quarter vs estimate
+        try:
+            r = SESSION.get(
+                f"{FINNHUB_API}/stock/earnings",
+                params={"symbol": ticker, "limit": 4, "token": FINNHUB_KEY},
+                timeout=10,
+            )
+            if r.ok:
+                earns = r.json()
+                if earns:
+                    latest = earns[0]
+                    actual   = latest.get("actual")
+                    estimate = latest.get("estimate")
+                    if actual is not None and estimate and abs(estimate) > 0.01:
+                        surprise_pct = (actual - estimate) / abs(estimate) * 100
+                        out["earnings_surprise_pct"] = round(surprise_pct, 1)
+        except Exception as e:
+            print(f"  ⚠  Finnhub earnings {ticker}: {e}")
 
         time.sleep(0.15)
 
@@ -989,6 +1052,8 @@ def get_stock_quotes(tickers: list) -> dict:
                 # ATR from bar history — used for dynamic bracket targets at buy time
                 "atr_14":         bars.get("atr_14"),
                 "atr_pct":        bars.get("atr_pct"),
+                # 20-day return for RS vs SPY (Phase 3b)
+                "return_20d":     bars.get("return_20d"),
             }
         else:
             # Yahoo fallback for everything
@@ -1066,12 +1131,96 @@ def score_headline_sentiment(headlines: list) -> float:
     return max(-10, min(10, round(score, 1)))
 
 
+
+# ─── Phase 3a: YIELD CURVE (FRED T10Y2Y) ─────────────────────────────────────
+
+def _get_yield_curve() -> dict:
+    """
+    Fetch 10Y-2Y Treasury spread from FRED public CSV endpoint (no API key needed).
+    Returns {"spread": float, "status": str} or {} on failure.
+    Positive spread = normal (bullish), negative = inverted (bearish).
+    Feature flag: config.YIELD_CURVE_ENABLED
+    """
+    try:
+        import config as _cfg
+        if not getattr(_cfg, "YIELD_CURVE_ENABLED", True):
+            return {}
+    except ImportError:
+        pass
+
+    try:
+        r = SESSION.get(
+            "https://fred.stlouisfed.org/graph/fredgraph.csv",
+            params={"id": "T10Y2Y"},
+            timeout=12,
+        )
+        if not r.ok:
+            return {}
+        lines = [l for l in r.text.strip().splitlines() if l and not l.startswith("DATE")]
+        if not lines:
+            return {}
+        # Last non-null value
+        for line in reversed(lines):
+            parts = line.split(",")
+            if len(parts) == 2 and parts[1].strip() not in ("", "."):
+                spread = float(parts[1].strip())
+                status = (
+                    "steep_normal"   if spread > 1.0  else
+                    "normal"         if spread > 0.25 else
+                    "flat"           if spread > 0.0  else
+                    "mild_inversion" if spread > -0.5 else
+                    "deep_inversion"
+                )
+                return {"spread": round(spread, 3), "status": status, "date": parts[0]}
+    except Exception as e:
+        print(f"  ⚠  Yield curve (FRED): {e}")
+    return {}
+
+
+# ─── Phase 3c: EQUITY PUT/CALL RATIO (FRED CPCE) ─────────────────────────────
+
+def _get_putcall_ratio() -> dict:
+    """
+    Fetch CBOE equity put/call ratio from FRED (series CPCE, daily, no API key).
+    < 0.5 = call-heavy (bullish), > 1.2 = put-heavy (fearful/bearish).
+    Feature flag: config.PUTCALL_ENABLED
+    """
+    try:
+        import config as _cfg
+        if not getattr(_cfg, "PUTCALL_ENABLED", True):
+            return {}
+    except ImportError:
+        pass
+
+    try:
+        r = SESSION.get(
+            "https://fred.stlouisfed.org/graph/fredgraph.csv",
+            params={"id": "CPCE"},
+            timeout=12,
+        )
+        if not r.ok:
+            return {}
+        lines = [l for l in r.text.strip().splitlines() if l and not l.startswith("DATE")]
+        if not lines:
+            return {}
+        for line in reversed(lines):
+            parts = line.split(",")
+            if len(parts) == 2 and parts[1].strip() not in ("", "."):
+                ratio = float(parts[1].strip())
+                return {"ratio": round(ratio, 3), "date": parts[0]}
+    except Exception as e:
+        print(f"  ⚠  Put/call ratio (FRED CPCE): {e}")
+    return {}
+
+
 # ─── MACRO REGIME SCORE (6 components, 100 pts) ───────────────────────────────
 
 def compute_macro_score(market: dict, fear_greed: dict,
                         spy_tech: dict = None,
                         vix_term: dict = None,
-                        breadth:  dict = None) -> dict:
+                        breadth:  dict = None,
+                        yield_curve: dict = None,
+                        putcall: dict = None) -> dict:
     """
     6-component macro regime score.
     Also outputs permitted_strategies — the execution gate.
@@ -1175,6 +1324,58 @@ def compute_macro_score(market: dict, fear_greed: dict,
     else:
         scores["breadth"] = 7
 
+    # ── 7. Yield Curve 10Y-2Y (Phase 3a) ─────────────────────────────────
+    try:
+        import config as _cfg
+        _yc_max = getattr(_cfg, "YIELD_CURVE_MAX_SCORE", 10)
+    except ImportError:
+        _yc_max = 10
+
+    if yield_curve and yield_curve.get("spread") is not None and getattr(
+            __import__("builtins"), "__dict__", {}).get("__import__", __import__)("config" if False else "builtins"):
+        pass
+    # simpler inline check:
+    _yc_enabled = True
+    try:
+        import config as _c2
+        _yc_enabled = getattr(_c2, "YIELD_CURVE_ENABLED", True)
+    except ImportError:
+        pass
+    if _yc_enabled and yield_curve and yield_curve.get("spread") is not None:
+        sp = yield_curve["spread"]
+        scores["yield_curve"] = (
+            _yc_max       if sp > 1.0   else
+            int(_yc_max * 0.8) if sp > 0.25 else
+            int(_yc_max * 0.6) if sp > 0.0  else
+            int(_yc_max * 0.3) if sp > -0.5 else
+            0
+        )
+        details.update({"yield_curve_spread": sp, "yield_curve_status": yield_curve.get("status")})
+    elif _yc_enabled:
+        scores["yield_curve"] = int(_yc_max * 0.6)   # flat/unavailable → neutral
+
+    # ── 8. Equity Put/Call Ratio (Phase 3c) ────────────────────────────────
+    _pc_enabled = True
+    _pc_max = 5
+    try:
+        import config as _c3
+        _pc_enabled = getattr(_c3, "PUTCALL_ENABLED", True)
+        _pc_max     = getattr(_c3, "PUTCALL_MAX_SCORE", 5)
+    except ImportError:
+        pass
+    if _pc_enabled and putcall and putcall.get("ratio") is not None:
+        pc = putcall["ratio"]
+        scores["putcall"] = (
+            _pc_max       if pc < 0.5  else
+            int(_pc_max * 0.8) if pc < 0.7  else
+            int(_pc_max * 0.6) if pc < 0.9  else
+            int(_pc_max * 0.4) if pc < 1.2  else
+            0
+        )
+        details.update({"putcall_ratio": pc, "putcall_date": putcall.get("date")})
+    elif _pc_enabled:
+        scores["putcall"] = int(_pc_max * 0.6)   # unavailable → neutral
+
     total = sum(scores.values())
 
     if   total >= 75: label = "🟢 STRONG BULL";   permitted = ["momentum", "breakout", "mean_reversion", "catalyst"]
@@ -1191,6 +1392,7 @@ def compute_macro_score(market: dict, fear_greed: dict,
         "vix_value":            vix,
         "fg_value":             fg,
         "tnx_value":            market.get("TNX", {}).get("price"),
+        "spy_return_20d":       (spy_tech or {}).get("return_20d"),
     }
 
 
@@ -1405,6 +1607,66 @@ def score_stock(ticker: str, quote: dict, news: list, macro_score: dict) -> dict
         else:              val_raw = 0.15
     breakdown["valuation"] = round(val_raw * W["valuation"])
 
+    # ── Phase 2: Alternative signals (additive bonuses, feature-flagged) ──────
+    try:
+        import config as _cfg
+    except ImportError:
+        _cfg = None
+
+    _load_signal_caches()
+
+    # Phase 2a — Insider buying bonus
+    if getattr(_cfg, "INSIDER_SIGNAL_ENABLED", True):
+        _insider = (_INSIDER_CACHE or {}).get(ticker, {})
+        if isinstance(_insider, dict) and _insider.get("signal", 0) >= 1:
+            _bonus = getattr(_cfg, "INSIDER_SINGLE_BUY_BONUS", 5)
+            breakdown["insider_buy"] = _bonus
+            signals.append(f"🔍 Insider buying signal (+{_bonus}pts)")
+
+    # Phase 2b — Congressional trading bonus
+    if getattr(_cfg, "CONGRESS_SIGNAL_ENABLED", True):
+        _congress = (_CONGRESS_CACHE or {}).get(ticker, {})
+        _buys = _congress.get("recent_buys", 0) if isinstance(_congress, dict) else 0
+        if _buys > 0:
+            _bonus = min(_buys * getattr(_cfg, "CONGRESS_BUY_BONUS", 5), 10)
+            breakdown["congress_buy"] = _bonus
+            s = "s" if _buys > 1 else ""
+            signals.append(f"🏛️ Congressional buy ({_buys} member{s}, +{_bonus}pts)")
+
+    # Phase 2c — Post-earnings momentum bonus
+    if getattr(_cfg, "EARNINGS_SIGNAL_ENABLED", True):
+        _surprise = quote.get("earnings_surprise_pct")
+        _threshold = getattr(_cfg, "EARNINGS_BEAT_THRESHOLD_PCT", 10)
+        if _surprise is not None and _surprise > _threshold:
+            _bonus = getattr(_cfg, "EARNINGS_BEAT_BONUS", 8)
+            breakdown["earnings_beat"] = _bonus
+            signals.append(f"📈 Earnings beat +{_surprise:.0f}% vs estimate (+{_bonus}pts)")
+
+    # Phase 3b — Relative strength vs SPY (20-day momentum comparison)
+    if getattr(_cfg, "RS_SPY_ENABLED", True):
+        _stock_ret = quote.get("return_20d")
+        _spy_ret   = macro_score.get("spy_return_20d")
+        if _stock_ret is not None and _spy_ret is not None:
+            _rs = _stock_ret - _spy_ret
+            _max_bonus  = getattr(_cfg, "RS_SPY_MAX_BONUS", 8)
+            _max_penalty = getattr(_cfg, "RS_SPY_MAX_PENALTY", -5)
+            if _rs > 10:
+                _score = _max_bonus
+                signals.append(f"🚀 Strong RS vs SPY: +{_rs:.1f}% outperformance (+{_score}pts)")
+            elif _rs > 5:
+                _score = int(_max_bonus * 0.7)
+                signals.append(f"📊 RS vs SPY: +{_rs:.1f}% outperformance (+{_score}pts)")
+            elif _rs > 0:
+                _score = int(_max_bonus * 0.3)
+            elif _rs > -5:
+                _score = int(_max_penalty * 0.5)
+                signals.append(f"📉 Lagging SPY by {abs(_rs):.1f}% ({_score}pts)")
+            else:
+                _score = _max_penalty
+                signals.append(f"🔻 Significant underperformance vs SPY: {_rs:.1f}% ({_score}pts)")
+            if _score != 0:
+                breakdown["rs_vs_spy"] = _score
+
     total_score = sum(breakdown.values())
     if   total_score >= 75: conviction = "🔥 STRONG BUY"
     elif total_score >= 60: conviction = "✅ BUY"
@@ -1589,7 +1851,20 @@ def run_daily_analysis(tickers: list = None, quick: bool = False) -> dict:
     else:
         print("\n⚡ Quick mode — technicals skipped")
 
-    macro = compute_macro_score(market, fear_greed, spy_tech, vix_term, breadth)
+    print("\n📐 STEP 5b — Yield Curve + Put/Call")
+    _yield_curve = _get_yield_curve() if not quick else {}
+    _putcall     = _get_putcall_ratio() if not quick else {}
+    if _yield_curve:
+        print(f"  10Y-2Y Spread: {_yield_curve['spread']:+.3f}% ({_yield_curve['status']})")
+    else:
+        print("  Yield curve unavailable — neutral score applied")
+    if _putcall:
+        print(f"  Equity P/C Ratio: {_putcall['ratio']} ({_putcall.get('date', 'latest')})")
+    else:
+        print("  Put/call ratio unavailable — neutral score applied")
+
+    macro = compute_macro_score(market, fear_greed, spy_tech, vix_term, breadth,
+                                yield_curve=_yield_curve, putcall=_putcall)
     print(f"\n🎯 REGIME: {macro['label']}  ({macro['total']}/100)")
     print(f"   Active strategies: {', '.join(macro['permitted_strategies'])}")
 
@@ -1617,6 +1892,11 @@ def run_daily_analysis(tickers: list = None, quick: bool = False) -> dict:
     logged = log_signals(scored_stocks, macro)
     print(f"\n📝 {logged} new BUY+ signals logged — trade_log.csv")
 
+    # Phase 4 — VIX spike opportunity fund check
+    _vix_spot = market.get("VIX", {}).get("price") or 0
+    print(f"\n🔍 Phase 4 — VIX check ({_vix_spot:.1f})")
+    _maybe_post_vix_panic(_vix_spot, scored_stocks)
+
     results = {
         "date": today_str, "generated_at": datetime.now().strftime("%H:%M:%S ET"),
         "market": market, "fear_greed": fear_greed, "macro_score": macro,
@@ -1633,6 +1913,120 @@ def run_daily_analysis(tickers: list = None, quick: bool = False) -> dict:
     print(f"✅ JSON saved — {JSON_OUTPUT}")
     print_summary(results)
     return results
+
+
+
+# ─── Phase 4: VIX SPIKE OPPORTUNITY FUND ─────────────────────────────────────
+
+_VIX_PANIC_FILE = _DATA_DIR / "vix_panic_state.json"  # _DATA_DIR defined in Phase 2 block
+
+def _load_vix_panic_state() -> dict:
+    try:
+        if _VIX_PANIC_FILE.exists():
+            return json.loads(_VIX_PANIC_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {"in_panic": False}
+
+
+def _save_vix_panic_state(state: dict) -> None:
+    try:
+        _VIX_PANIC_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _VIX_PANIC_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"  ⚠  Could not save VIX panic state: {e}")
+
+
+def _post_vix_discord(embeds: list) -> None:
+    """Post embeds to Discord via webhook (uses DISCORD_WEBHOOK_URL env var)."""
+    webhook = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+    if not webhook:
+        print("  ⚠  DISCORD_WEBHOOK_URL not set — skipping VIX panic Discord post")
+        return
+    try:
+        r = SESSION.post(webhook, json={"embeds": embeds}, timeout=10)
+        if r.ok:
+            print(f"  ✓ VIX alert posted to Discord")
+        else:
+            print(f"  ⚠  Discord post failed: {r.status_code}")
+    except Exception as e:
+        print(f"  ⚠  Discord post error: {e}")
+
+
+def _maybe_post_vix_panic(vix: float, scored_stocks: list) -> None:
+    """
+    Phase 4 — VIX Spike Opportunity Fund.
+    When VIX spikes above VIX_PANIC_THRESHOLD (default 30), post a Discord alert
+    with the top picks from the screener — these are the dip-buying opportunities.
+    When VIX recovers below VIX_ALLCLEAR_THRESHOLD (default 20), post all-clear.
+    Tracks state in data/vix_panic_state.json to avoid repeated alerts.
+    """
+    try:
+        import config as _cfg
+        if not getattr(_cfg, "VIX_PANIC_ENABLED", True):
+            return
+        panic_threshold  = getattr(_cfg, "VIX_PANIC_THRESHOLD", 30)
+        allclear_threshold = getattr(_cfg, "VIX_ALLCLEAR_THRESHOLD", 20)
+        top_n            = getattr(_cfg, "VIX_PANIC_TOP_N", 3)
+    except ImportError:
+        panic_threshold, allclear_threshold, top_n = 30, 20, 3
+
+    state = _load_vix_panic_state()
+
+    if vix >= panic_threshold and not state.get("in_panic"):
+        # ── New panic spike → post buy opportunity alert ──────────────────
+        print(f"\n🚨 VIX SPIKE DETECTED ({vix:.1f} >= {panic_threshold}) -- posting opportunity alert...")
+        top_picks = [s for s in scored_stocks if s.get("total_score", 0) >= 50][:top_n]
+
+        fields = []
+        for s in top_picks:
+            fields.append({
+                "name": f"{s['ticker']} — {s.get('conviction', '')}",
+                "value": (
+                    f"Score: **{s.get('total_score', 0)}** | "
+                    f"Price: ${s.get('price', 0):.2f} | "
+                    f"Upside: {s.get('upside_pct', 0):+.0f}%\n"
+                    f"Bucket: {s.get('strategy_bucket', 'N/A')}"
+                ),
+                "inline": False,
+            })
+
+        embeds = [{
+            "title": f"🚨 VIX SPIKE — Opportunity Fund Alert (VIX = {vix:.1f})",
+            "description": (
+                f"VIX has spiked to **{vix:.1f}** (threshold: {panic_threshold}).\n"
+                f"This is a potential **buying opportunity** for quality stocks at a discount.\n"
+                f"Consider deploying reserved cash into the top screener picks below."
+            ),
+            "color": 0xE74C3C,
+            "fields": fields if fields else [{"name": "No high-conviction picks today", "value": "Run a fresh screener for latest data", "inline": False}],
+            "footer": {"text": "Investment Alpha — Phase 4 VIX Opportunity Fund | Paper trading only"},
+            "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        }]
+        _post_vix_discord(embeds)
+        _save_vix_panic_state({"in_panic": True, "panic_vix": round(vix, 2),
+                               "panic_at": datetime.now().isoformat()})
+
+    elif vix < allclear_threshold and state.get("in_panic"):
+        # ── VIX recovered → post all-clear ───────────────────────────────
+        print(f"\n✅ VIX recovered ({vix:.1f} < {allclear_threshold}) -- posting all-clear...")
+        embeds = [{
+            "title": f"✅ VIX All-Clear (VIX = {vix:.1f})",
+            "description": (
+                f"VIX has recovered to **{vix:.1f}** (all-clear: < {allclear_threshold}).\n"
+                f"Market stress is easing. Positions opened during the spike ({state.get('panic_vix', '?')}) "
+                f"should be showing gains. Consider reviewing your stop-losses."
+            ),
+            "color": 0x2ECC71,
+            "footer": {"text": "Investment Alpha — Phase 4 VIX Opportunity Fund"},
+            "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        }]
+        _post_vix_discord(embeds)
+        _save_vix_panic_state({"in_panic": False, "recovered_vix": round(vix, 2),
+                               "recovered_at": datetime.now().isoformat()})
+
+    else:
+        print(f"  VIX = {vix:.1f} — {'in panic mode (alert already sent)' if state.get('in_panic') else 'normal range'}")
 
 
 # ─── SUMMARY ──────────────────────────────────────────────────────────────────────────────────────

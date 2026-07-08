@@ -363,67 +363,58 @@ MR_RSI_ENTRY     = 10      # RSI(2) below this = oversold dip in an uptrend
 MR_MAX_HOLD_DAYS = 10      # time stop (trading days)
 # MR_UNIVERSE   = [...]    # optional override; defaults to liquid mega-caps
 
+# ── Phase 1: Cash Management ────────────────────────────────────────────────
+# Regime-gated exposure: caps how much of equity can be invested at each level.
+# When the market is weak, the system holds back cash rather than fully deploying.
+CASH_MGMT_ENABLED = True
+
+MAX_INVESTED_PCTS = {
+    "STRONG BULL": 0.80,   # up to 80% invested — strong uptrend, high confidence
+    "MOD BULL":    0.60,   # up to 60% invested — moderate trend, be selective
+    "NEUTRAL":     0.40,   # up to 40% invested — uncertain, preserve dry powder
+    "BEARISH":     0.20,   # up to 20% invested — defensive, mostly cash
+}
+MAX_INVESTED_DEFAULT = 0.80  # fallback when regime is unknown (fail-safe = allow)
+
+# Drawdown pause: if portfolio equity drops this far from its recent peak,
+# stop opening new positions until it recovers. Prevents doubling down into
+# a falling market.
+DRAWDOWN_PAUSE_PCT  = 0.08   # 8% peak-to-trough triggers pause
+DRAWDOWN_RESUME_PCT = 0.05   # resume when drawdown recovers to below 5%
+
+# ── Phase 2: Alternative Signal Weights ─────────────────────────────────────
+INSIDER_SIGNAL_ENABLED      = True
+INSIDER_BUY_LOOKBACK_DAYS   = 30    # only count insider buys within this window
+INSIDER_SINGLE_BUY_BONUS    = 5     # pts added if 1 insider bought recently
+INSIDER_MULTI_BUY_BONUS     = 10    # pts added if 2+ insiders bought recently
+
+CONGRESS_SIGNAL_ENABLED     = True
+CONGRESS_BUY_LOOKBACK_DAYS  = 60    # congressional buys within this window
+CONGRESS_BUY_BONUS          = 5     # pts added per congressional buy
+
+EARNINGS_SIGNAL_ENABLED     = True
+EARNINGS_BEAT_THRESHOLD_PCT = 10    # earnings beat by this % = momentum bonus
+EARNINGS_BEAT_BONUS         = 8     # pts added for strong earnings beat
+
+# ── Phase 3: Additional Regime Components ────────────────────────────────────
+YIELD_CURVE_ENABLED         = True   # use 2Y/10Y spread as regime component #7
+YIELD_CURVE_MAX_SCORE       = 10     # max pts from yield curve (positive = normal)
+
+RS_SPY_ENABLED              = True   # relative strength vs SPY in stock scoring
+RS_SPY_LOOKBACK_DAYS        = 20     # 20-day RS window
+RS_SPY_MAX_BONUS            = 8      # max pts for outperforming SPY
+RS_SPY_MAX_PENALTY          = -5     # max pts penalised for underperforming SPY
+
+PUTCALL_ENABLED             = True   # equity put/call ratio as regime input
+PUTCALL_MAX_SCORE           = 5      # max pts from put/call (low fear = positive)
+
+# ── Phase 4: VIX Spike Opportunity Fund ──────────────────────────────────────
+VIX_PANIC_ENABLED           = True
+VIX_PANIC_THRESHOLD         = 30     # VIX above this = panic, post buy alert
+VIX_ALLCLEAR_THRESHOLD      = 20     # VIX back below this = all clear
+VIX_PANIC_TOP_N             = 3      # number of top picks to show in panic alert
+
 # ── Dual momentum compass (strategies/dual_momentum.py) ────────────────────
 DM_ENABLED = True          # monthly advisory card (never trades)
 
-# ── Stop-loss post-mortem (pipeline/postmortem.py) ─────────────────────────
-STOP_TUNING_AUTO = False   # suggestions only; you change multipliers manually
-
-# ── Output ─────────────────────────────────────────────────────────────────
-OUTPUT_JSON_FILE  = OUTPUT_DIR / "trading_output.json"
-OUTPUT_HTML_FILE  = OUTPUT_DIR / "trading_output.html"
-OUTPUT_EXCEL_FILE = OUTPUT_DIR / "trading_output.xlsx"
-
-# ── Debug / Dry-run ────────────────────────────────────────────────────────
-DRY_RUN    = True   # set False to execute real (paper) trades
-DEBUG_MODE = False
-LOG_LEVEL  = "DEBUG" if DEBUG_MODE else "INFO"
-
-# ── Technical Indicator Parameters ────────────────────────────────────────
-# Used by pipeline/features.py
-SMA_SHORT        = 50
-SMA_LONG         = 200
-RSI_PERIOD       = 14
-MACD_FAST        = 12
-MACD_SLOW        = 26
-MACD_SIGNAL      = 9
-MIN_HISTORY_DAYS = 252   # minimum days of price history required
-
-# Momentum lookback windows (in calendar days)
-MOMENTUM_3M  = 63
-MOMENTUM_6M  = 126
-MOMENTUM_12M = 252
-
-# ---- Cache ----------------------------------------------------------------
-CACHE_MAX_AGE_HOURS = 4   # refresh cache if older than this
-# Backward compat alias: PRICE_HISTORY_DAYS was previously HISTORY_DAYS
-HISTORY_DAYS = PRICE_HISTORY_DAYS
-
-# ---- Scoring Thresholds (for signal labelling in portfolio.py) ------------
-# MOMENTUM_STRONG_THRESHOLD / TREND_BULLISH_THRESHOLD are defined once above
-# (Signal Label Thresholds). Duplicates removed 2026-06 to stop silent overrides.
-
-# ---- Executor -------------------------------------------------------------
-EQUAL_WEIGHT = 1.0 / TOP_N_STOCKS   # 10% per position in equal-weight mode
-
-
-# ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    print("=== Investment Alpha Config v2.0 ===")
-    print(f"Universe size      : {len(ALL_TICKERS)} tickers")
-    print(f"Top-N stocks       : {TOP_N_STOCKS}")
-    print(f"Allocation mode    : {ALLOCATION_MODE}")
-    print(f"Skip-month momentum: {SKIP_MONTH_MOMENTUM}")
-    print(f"Sector cap         : {SECTOR_CAP_ENABLED} (max {SECTOR_MAX_STOCKS}/sector)")
-    print(f"Regime detection   : {REGIME_ENABLED}")
-    print(f"  VIX thresholds   : neutral>{REGIME_VIX_NEUTRAL}, bear>{REGIME_VIX_BEAR}")
-    print(f"  Top-N by regime  : {REGIME_TOP_N}")
-    print(f"Stop-loss          : {STOP_LOSS_ENABLED}")
-    print(f"  Thresholds       : {STOP_LOSS_PCT}")
-    print(f"Sentiment (Phase2) : {SENTIMENT_ENABLED}")
-    print(f"  Finnhub key set  : {bool(FINNHUB_API_KEY)}")
-    print(f"Meme filter (Ph2)  : {MEME_FILTER_ENABLED}")
-    print(f"Insider filter(Ph2): {INSIDER_ENABLED}")
-    print(f"Alpaca key set     : {bool(ALPACA_API_KEY)}")
-    print(f"Dry run            : {DRY_RUN}")
-    print(f"Output dir         : {OUTPUT_DIR}")
+# ── Stop-loss post-mortem (pipeline/postmortem.py) ────────�
