@@ -1,7 +1,7 @@
 """
 scripts/register_discord_commands.py — one-time slash command registration
 
-Registers /status /regime /monitor /stoploss /pipeline /help with Discord.
+Registers /status /regime /monitor /stoploss /pipeline /help /rebalance with Discord.
 Run once after creating the bot (and again only if commands change):
 
     python scripts/register_discord_commands.py
@@ -172,6 +172,20 @@ COMMANDS = [
             "choices": [
                 {"name": "cached — instant from KV (default)", "value": "cached"},
                 {"name": "fresh — re-run screener then show picks (~5 min)", "value": "fresh"},
+            ],
+        }],
+    },
+    {
+        "name": "rebalance",
+        "description": "Check exposure vs regime limit; suggest 50% partial trims on winning positions (winners only, no force-selling).",
+        "options": [{
+            "name": "portfolio",
+            "type": 3,
+            "required": False,
+            "description": "Which account to review (default: pipeline)",
+            "choices": [
+                {"name": "Pipeline (default)", "value": "pipeline"},
+                {"name": "Screener",           "value": "screener"},
             ],
         }],
     },

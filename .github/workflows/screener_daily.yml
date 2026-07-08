@@ -57,6 +57,13 @@ jobs:
         run: |
           pip install requests pandas python-dotenv
 
+      - name: Fetch congressional trades (Phase 2b)
+        if: steps.tz.outputs.go == 'true'
+        env:
+          QUIVER_API_KEY: ${{ secrets.QUIVER_API_KEY }}
+        run: |
+          python scripts/fetch_congressional_trades.py 2>&1 || echo "Congressional fetch failed (non-fatal)"
+
       - name: Run daily screener
         if: steps.tz.outputs.go == 'true'
         env:
@@ -91,7 +98,7 @@ jobs:
           fi
           git config user.name "investment-alpha-bot"
           git config user.email "actions@github.com"
-          git add screener/daily_sentiment_data.json screener/sentiment_history.csv screener/trade_log.csv || true
+          git add screener/daily_sentiment_data.json screener/sentiment_history.csv screener/trade_log.csv data/congressional_cache.json || true
           if ! git diff --cached --quiet; then
             git commit -m "chore: daily screener output $(date -u +%Y-%m-%d) [skip ci]"
             git pull --rebase origin main || true

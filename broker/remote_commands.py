@@ -705,6 +705,25 @@ def cmd_reject_rebalance(payload):
     _journal({"decision": "reject_rebalance", "reason": "manual reject via Discord"})
 
 
+# ── Rebalance delegation ───────────────────────────────────────────────────
+
+def _delegate_rebalance(payload: dict) -> None:
+    """Delegate rebalance_suggest / trim_half to scripts/rebalance_check.py."""
+    import importlib.util, sys as _sys
+    spec = importlib.util.spec_from_file_location(
+        "rebalance_check",
+        Path(__file__).parent.parent / "scripts" / "rebalance_check.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    cmd = payload.get("command", "rebalance_suggest")
+    handler = mod.HANDLERS.get(cmd)
+    if handler:
+        handler(payload)
+    else:
+        log.warning("Unknown rebalance command: %s", cmd)
+
+
 # ── Entry point ────────────────────────────────────────────────────────────
 
 COMMANDS = {
@@ -722,6 +741,9 @@ COMMANDS = {
     "reject":              cmd_reject,
     "approve_rebalance":   cmd_approve_rebalance,
     "reject_rebalance":    cmd_reject_rebalance,
+    # Phase rebalance commands (delegated to scripts/rebalance_check.py)
+    "rebalance_suggest":   lambda p: _delegate_rebalance(p),
+    "trim_half":           lambda p: _delegate_rebalance(p),
 }
 
 

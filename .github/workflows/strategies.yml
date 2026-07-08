@@ -8,6 +8,8 @@ on:
   schedule:
     - cron: "30 21 * * 1-5"   # 21:30 UTC = 4:30 PM EST / 5:30 PM EDT
   workflow_dispatch:
+  repository_dispatch:
+    types: [rebalance-check]  # triggered by /rebalance Discord command
 
 permissions:
   contents: write   # commit sleeve/journal state back to the repo
@@ -34,6 +36,19 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Rebalance check (/rebalance command)
+        if: github.event_name == 'repository_dispatch' && github.event.action == 'rebalance-check'
+        env:
+          ALPACA_API_KEY:      ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:   ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL:     ${{ secrets.ALPACA_BASE_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_BOT_TOKEN:   ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:  ${{ secrets.DISCORD_CHANNEL_ID }}
+          COMMAND_PAYLOAD:     ${{ toJson(github.event.client_payload) }}
+        run: |
+          python broker/remote_commands.py --payload "$COMMAND_PAYLOAD"
 
       - name: Mean-reversion scan
         env:

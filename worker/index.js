@@ -76,7 +76,7 @@ async function verifyDiscordSignature(request, bodyText, publicKey) {
 }
 
 // ── GitHub dispatch ────────────────────────────────────────────────────────
-async function dispatchToGitHub(env, payload) {
+async function dispatchToGitHub(env, payload, eventType = "discord-command") {
   let r;
   try {
     r = await fetch(`https://api.github.com/repos/${env.GH_REPO}/dispatches`, {
@@ -87,7 +87,7 @@ async function dispatchToGitHub(env, payload) {
         "Content-Type": "application/json",
         "User-Agent":   "investment-alpha-worker",
       },
-      body: JSON.stringify({ event_type: "discord-command", client_payload: payload }),
+      body: JSON.stringify({ event_type: eventType, client_payload: payload }),
     });
   } catch (e) { return `fetch error: ${e.message}`; }
   if (r.status === 204) return null;
@@ -1110,6 +1110,26 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       return json({ type: R_DEFERRED_UPDATE });
     }
 
+    if (action === "trim_half") {
+      // User tapped "Trim 50%" from /rebalance suggestions — dispatch to strategies workflow
+      const err = await dispatchToGitHub(env, {
+        command: "trim_half", ticker, portfolio,
+        message_id: i.message.id, ...common,
+      }, "rebalance-check");
+      const embeds = i.message.embeds || [];
+      if (embeds[0]) embeds[0].footer = { text: err
+        ? `❌ Trim NOT executed — ${err}`
+        : `⏳ Trimming 50% of ${ticker} — fills in ~1 min…` };
+      return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: err ? i.message.components : [] } });
+    }
+
+    if (action === "reject") {
+      // User tapped "Skip — keep full position" on a /rebalance suggestion
+      const embeds = i.message.embeds || [];
+      if (embeds[0]) embeds[0].footer = { text: `⏭️ Skipped — ${ticker} position unchanged` };
+      return json({ type: R_UPDATE_MESSAGE, data: { embeds, components: [] } });
+    }
+
     if (action === "cancel") {
       return json({ type: R_UPDATE_MESSAGE, data: { content: "🚫 Cancelled.", components: [] } });
     }
@@ -1148,7 +1168,8 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
           "```",
           "        REGIME ENGINE  (auto, 3x daily)",
           "  Reads: VIX / Fear&Greed / SPY / Breadth / ADX",
-          "  Score: 0-100 -> STRONG BULL / MOD BULL / NEUTRAL / BEARISH",
+          "         Yield Curve / Put-Call Ratio",
+          "  Score: 0-115 -> STRONG BULL / MOD BULL / NEUTRAL / BEARISH",
           "                    |",
           "          +---------+---------+",
           "          v                   v",
@@ -1169,7 +1190,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
         description: "Runs automatically 3x per day (8 AM / 11 AM / 3:30 PM ET on weekdays). Score stored in Cloudflare KV — every command reads from it.",
         fields: [
           {
-            name: "Scoring (100 pts total)",
+            name: "Scoring (8 components, 115 pts max)",
             value: [
               "```",
               "VIX Level          20pt  Low VIX = calm market",
@@ -1178,6 +1199,8 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
               "ADX on SPY         20pt  Trend strength of S&P 500",
               "SPY vs 200MA       20pt  S&P above long-term average?",
               "Sector Breadth     15pt  % of 11 sectors above 200MA",
+              "Yield Curve        10pt  10Y-2Y spread (inverted = bearish)",
+              "Put/Call Ratio      5pt  Equity options sentiment",
               "```",
             ].join("\n"),
             inline: false,
@@ -1192,6 +1215,19 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
               "<40   BEARISH       defensive only",
               "```",
               "Position size: **5%** (Strong Bull) · **3%** (Mod Bull/Neutral) · **1.5%** (Bearish) of buying power",
+            ].join("\n"),
+            inline: false,
+          },
+          {
+            name: "Alternative signals (screener scoring bonuses)",
+            value: [
+              "```",
+              "Insider buying     +5pt   C-suite/director net purchase",
+              "Congressional buy  +5pt   Congress stock purchase (Quiver Quant)",
+              "Earnings beat      +8pt   Surprise >10% via Finnhub",
+              "RS vs SPY (20d)    +8/-5  Outperforming/lagging S&P 500",
+              "```",
+              "VIX ≥ 30 → 🚨 panic alert with top oversold picks for mean-reversion trades.",
             ].join("\n"),
             inline: false,
           },
@@ -1351,13 +1387,26 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
             inline: false,
           },
           {
+            name: "⚖️ Cash Management",
+            value: [
+              "Regime sets a max-invested limit per account:",
+              "```",
+              "STRONG BULL  80%   MOD BULL  60%",
+              "NEUTRAL      40%   BEARISH   20%",
+              "```",
+              "When over the limit: new buys are **blocked** (not force-sold). Positions close naturally via stops/time-stops.",
+              "`/rebalance [portfolio:pipeline]` — see winners up >5%; tap **Trim 50%** to free cash.\nDrawdown >8%: buys paused automatically until recovery to <5%.",
+            ].join("\n"),
+            inline: false,
+          },
+          {
             name: "ℹ️ Info",
-            value: "`/strategy` Factor weights, universe, sleeve details\n`/help` This guide (5 messages)",
+            value: "`/brief` On-demand morning brief (positions + today's picks)\n`/strategy` Factor weights, universe, sleeve details\n`/help` This guide (5 messages)",
             inline: false,
           },
           {
             name: "\U0001f4a1 Morning routine",
-            value: "`/regime` check market · `/screener` see picks · `/buy symbol:X portfolio:Screener` trade\nMonthly (1st): `/pipeline mode:dry` review · `/pipeline mode:execute` rebalance",
+            value: "`/brief` → `/regime` → `/screener` → `/buy symbol:X portfolio:Screener`\nMonthly (1st): `/pipeline mode:dry` review · `/pipeline mode:execute` rebalance\nOver-invested? `/rebalance` to trim winners manually.",
             inline: false,
           },
         ],
@@ -1553,6 +1602,20 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       } catch (e) {
         return ephemeral(`Error building brief: ${e.message}`);
       }
+    }
+
+    // /rebalance — check exposure vs regime limit, suggest 50% trims on winners
+    if (name === "rebalance") {
+      const portfolio = (opts.portfolio || "pipeline").toLowerCase();
+      const err = await dispatchToGitHub(env, {
+        command: "rebalance_suggest", portfolio, ...common,
+      }, "rebalance-check");
+      return json({ type: R_CHANNEL_MESSAGE, data: {
+        flags: EPHEMERAL,
+        content: err
+          ? `❌ Could not trigger rebalance check — ${err}`
+          : `⚖️ Rebalance check running on **${portfolio}** account — suggestions appear in ~1 min.`,
+      }});
     }
 
         // /regime — served directly from KV (updated 3x daily by screener)

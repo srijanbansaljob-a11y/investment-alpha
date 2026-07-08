@@ -296,7 +296,11 @@ def scan() -> dict:
                 if cash_reason:
                     dn.post_message([{
                         "title": "📊 MR Scan — Entries Skipped",
-                        "description": cash_reason,
+                        "description": (
+                            cash_reason + "\n\n"
+                            "Cash will free up naturally as positions hit stops or time-outs.\n"
+                            "Use **`/rebalance`** anytime to manually review winners and trim 50% of chosen positions."
+                        ),
                         "color": 0xF39C12,
                         "footer": {"text": "Investment Alpha — cash management"},
                     }])
