@@ -116,5 +116,14 @@
     "order_status": "OrderStatus.ACCEPTED",
     "pnl_pct_at_decision": 0.97,
     "timestamp": "2026-07-04T10:22:54.578977+00:00"
+  },
+  {
+    "decision": "approve_buy",
+    "ticker": "MU",
+    "trigger": "mr",
+    "price_at_decision": 903.13,
+    "qty": 2.4467,
+    "order_status": "OrderStatus.PENDING_NEW",
+    "timestamp": "2026-07-08T12:29:09.087666+00:00"
   }
 ]
