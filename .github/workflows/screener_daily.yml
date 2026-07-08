@@ -78,7 +78,21 @@ jobs:
           python screener/daily_sentiment_runner.py 2>&1
           echo "Exit code: $?"
 
-      - name: Push regime to Cloudflare KV
+      - name: Run pipeline screener (3x daily — pipeline credentials)
+        if: steps.tz.outputs.go == 'true'
+        env:
+          ALPACA_API_KEY:       ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:    ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL:      ${{ secrets.ALPACA_BASE_URL }}
+          DISCORD_WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_BOT_TOKEN:    ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:   ${{ secrets.DISCORD_CHANNEL_ID }}
+          FINNHUB_API_KEY:      ${{ secrets.FINNHUB_API_KEY }}
+          SCREENER_OUTPUT_FILE: screener/pipeline_sentiment_data.json
+        run: |
+          python screener/daily_sentiment_runner.py 2>&1 || echo "Pipeline screener failed (non-fatal)"
+
+      - name: Push screener regime to Cloudflare KV
         if: steps.tz.outputs.go == 'true'
         env:
           CF_ACCOUNT_ID:   ${{ secrets.CF_ACCOUNT_ID }}
@@ -87,6 +101,51 @@ jobs:
         run: |
           python screener/regime_to_kv.py \
             --regime-file screener/daily_sentiment_data.json
+
+      - name: Push pipeline regime to Cloudflare KV
+        if: steps.tz.outputs.go == 'true'
+        env:
+          CF_ACCOUNT_ID:   ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE: ${{ secrets.CF_KV_NAMESPACE }}
+          CF_API_TOKEN:    ${{ secrets.CF_API_TOKEN }}
+        run: |
+          if [ -f screener/pipeline_sentiment_data.json ]; then
+            python screener/regime_to_kv.py \
+              --regime-file screener/pipeline_sentiment_data.json \
+              --kv-prefix pipeline_
+          else
+            echo "No pipeline output — skipping KV push"
+          fi
+
+      - name: Daily performance tracker (8AM only)
+        if: steps.tz.outputs.go == 'true'
+        env:
+          ALPACA_API_KEY:             ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:          ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_API_KEY_SCREENER:    ${{ secrets.ALPACA_API_KEY_SCREENER }}
+          ALPACA_SECRET_KEY_SCREENER: ${{ secrets.ALPACA_SECRET_KEY_SCREENER }}
+          DISCORD_BOT_TOKEN:          ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:         ${{ secrets.DISCORD_CHANNEL_ID }}
+          CF_ACCOUNT_ID:              ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE:            ${{ secrets.CF_KV_NAMESPACE }}
+          CF_API_TOKEN:               ${{ secrets.CF_API_TOKEN }}
+        run: |
+          HOUR=$(TZ=America/New_York date +%H)
+          if [ "$HOUR" = "08" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python scripts/daily_performance.py 2>&1 || echo "Performance tracker failed (non-fatal)"
+          else
+            echo "Not 8AM — skipping performance tracker"
+          fi
+
+      - name: Snapshot positions (every run)
+        if: steps.tz.outputs.go == 'true'
+        env:
+          ALPACA_API_KEY:             ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:          ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_API_KEY_SCREENER:    ${{ secrets.ALPACA_API_KEY_SCREENER }}
+          ALPACA_SECRET_KEY_SCREENER: ${{ secrets.ALPACA_SECRET_KEY_SCREENER }}
+        run: |
+          python scripts/snapshot_positions.py 2>&1 || echo "Snapshot failed (non-fatal)"
 
       - name: Commit screener outputs (8AM only)
         if: steps.tz.outputs.go == 'true'
@@ -98,7 +157,7 @@ jobs:
           fi
           git config user.name "investment-alpha-bot"
           git config user.email "actions@github.com"
-          git add screener/daily_sentiment_data.json screener/sentiment_history.csv screener/trade_log.csv data/congressional_cache.json || true
+          git add screener/daily_sentiment_data.json screener/pipeline_sentiment_data.json screener/sentiment_history.csv screener/trade_log.csv data/congressional_cache.json data/performance_snapshot.json data/position_snapshots/ || true
           if ! git diff --cached --quiet; then
             git commit -m "chore: daily screener output $(date -u +%Y-%m-%d) [skip ci]"
             git pull --rebase origin main || true

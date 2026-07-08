@@ -1,0 +1,60 @@
+name: Weekly Report
+
+# Runs every Saturday at 9 AM ET.
+# Posts factor analysis (win rate by signal/regime/bucket) to Discord.
+
+on:
+  schedule:
+    - cron: "0 13 * * 6"    # 9 AM EST (winter)
+    - cron: "0 14 * * 6"    # 9 AM EDT (summer)  — GitHub dedupes same-minute runs
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run factor analysis
+        env:
+          DISCORD_BOT_TOKEN:  ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+        run: |
+          python scripts/factor_analysis.py 2>&1
+
+      - name: Commit factor analysis output
+        run: |
+          git config user.name "investment-alpha-bot"
+          git config user.email "actions@github.com"
+          git add data/factor_analysis_latest.json || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: weekly factor analysis $(date -u +%Y-%m-%d) [skip ci]"
+            git pull --rebase origin main || true
+            git push
+          else
+            echo "No changes to commit"
+          fi
+
+      - name: Alert Discord on failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"❌ Weekly Report Failed\",\"description\":\"Factor analysis did not complete.\\n[View run]($RUN_URL)\",\"color\":15158332}]}"

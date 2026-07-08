@@ -63,7 +63,10 @@ except ImportError:
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 
 OUTPUT_DIR  = os.path.dirname(os.path.abspath(__file__))
-JSON_OUTPUT = os.path.join(OUTPUT_DIR, "daily_sentiment_data.json")
+JSON_OUTPUT = os.environ.get(
+    "SCREENER_OUTPUT_FILE",
+    os.path.join(OUTPUT_DIR, "daily_sentiment_data.json"),
+)
 LOG_FILE    = os.path.join(OUTPUT_DIR, "sentiment_history.csv")
 TRADE_LOG   = os.path.join(OUTPUT_DIR, "trade_log.csv")
 

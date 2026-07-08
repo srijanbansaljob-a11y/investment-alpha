@@ -151,12 +151,13 @@ def run(args):
     log.info("Stock bucket map     : %d tickers", len(stock_buckets))
     log.info("Top picks today      : %d", len(screener_summary["top_picks"]))
 
-    ok1 = kv_put(account_id, namespace_id, token, "regime_signal", json.dumps(regime_data))
-    ok2 = kv_put(account_id, namespace_id, token, "stock_buckets", json.dumps(stock_buckets))
-    ok3 = kv_put(account_id, namespace_id, token, "screener_summary", json.dumps(screener_summary))
+    prefix = getattr(args, "kv_prefix", "")
+    ok1 = kv_put(account_id, namespace_id, token, f"{prefix}regime_signal",   json.dumps(regime_data))
+    ok2 = kv_put(account_id, namespace_id, token, f"{prefix}stock_buckets",   json.dumps(stock_buckets))
+    ok3 = kv_put(account_id, namespace_id, token, f"{prefix}screener_summary", json.dumps(screener_summary))
 
     if ok1 and ok2 and ok3:
-        log.info("All 3 KV keys updated — Worker ready to gate today's orders")
+        log.info("All 3 KV keys updated (prefix=%r) — Worker ready", prefix)
     else:
         log.error("Some KV writes failed — Worker may use stale data")
         sys.exit(1)
@@ -168,5 +169,9 @@ if __name__ == "__main__":
         "--regime-file",
         default="screener/outputs/daily_sentiment_data.json",
         help="Path to daily_sentiment_runner.py JSON output",
+    )
+    parser.add_argument(
+        "--kv-prefix", default="",
+        help="Prefix for KV keys (e.g. 'pipeline_' for pipeline account)",
     )
     run(parser.parse_args())

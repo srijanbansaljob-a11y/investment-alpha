@@ -1517,21 +1517,25 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       // cached mode — build brief inline from KV + live Alpaca positions
       try {
         const alpacaBase = "https://paper-api.alpaca.markets";
-        let sPos = [], pPos = [], sAcct = null, pAcct = null, regime = null, summary = null;
-        const [spR, saR, ppR, paR, rr, sr] = await Promise.all([
+        let sPos = [], pPos = [], sAcct = null, pAcct = null, regime = null, summary = null, perfSnap = null, pSummary = null;
+        const [spR, saR, ppR, paR, rr, sr, perfR, psR] = await Promise.all([
           fetch(`${alpacaBase}/v2/positions`, { headers: portfolioHeaders(env, "screener") }),
           fetch(`${alpacaBase}/v2/account`,   { headers: portfolioHeaders(env, "screener") }),
           fetch(`${alpacaBase}/v2/positions`, { headers: portfolioHeaders(env, "pipeline") }),
           fetch(`${alpacaBase}/v2/account`,   { headers: portfolioHeaders(env, "pipeline") }),
           env.KV.get("regime_signal"),
           env.KV.get("screener_summary"),
+          env.KV.get("performance_snapshot"),
+          env.KV.get("pipeline_screener_summary"),
         ]);
-        if (spR.ok) sPos  = await spR.json();
-        if (saR.ok) sAcct = await saR.json();
-        if (ppR.ok) pPos  = await ppR.json();
-        if (paR.ok) pAcct = await paR.json();
-        if (rr) regime  = JSON.parse(rr);
-        if (sr) summary = JSON.parse(sr);
+        if (spR.ok) sPos     = await spR.json();
+        if (saR.ok) sAcct    = await saR.json();
+        if (ppR.ok) pPos     = await ppR.json();
+        if (paR.ok) pAcct    = await paR.json();
+        if (rr)     regime   = JSON.parse(rr);
+        if (sr)     summary  = JSON.parse(sr);
+        if (perfR)  perfSnap = JSON.parse(perfR);
+        if (psR)    pSummary = JSON.parse(psR);
 
         const fmtPos = (positions) => {
           const pnl = positions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
@@ -1564,7 +1568,46 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
           ? allPicks.map(p => `${heldSymbols.has(p.ticker) ? "✅" : "🆕"} **${p.ticker}** ${p.score}/100`).join("  ·  ")
           : "_No picks today — use mode:fresh to re-run the screener_";
 
+        // Pipeline picks (from pipeline_screener_summary KV, populated by pipeline 3x daily run)
+        const pAllPicks = pSummary?.top_picks || [];
+        const pPicksLine = pAllPicks.length
+          ? pAllPicks.map(p => `${p.conviction_ok ? "✅" : "⚠️"} **${p.ticker}** ${p.score}/100`).join("  ·  ")
+          : "_No pipeline picks yet_";
+
         const dataAge = summary?.date ? `Screener data from ${summary.date}` : "Screener data age unknown";
+
+        // Performance snapshot from KV (written by daily_performance.py at 8AM)
+        const perf    = perfSnap || {};
+        const perfSc  = perf.screener || {};
+        const perfPc  = perf.pipeline || {};
+        const spy     = perf.spy_daily;
+        const win     = perf.win_stats || {};
+        const perfDate = perf.date || null;
+
+        const fmtDailyPnl = (p) => {
+          if (!p || p.error) return "—";
+          const sign = p.daily_pl >= 0 ? "+" : "";
+          return `${sign}$${Math.abs(p.daily_pl).toFixed(0)} (${sign}${(p.daily_pl_pct || 0).toFixed(1)}%)`;
+        };
+
+        const perfFields = perfDate ? [
+          { name: "📈 Screener — Today",   value: fmtDailyPnl(perfSc), inline: true },
+          { name: "📈 Pipeline — Today",   value: fmtDailyPnl(perfPc), inline: true },
+          { name: spy != null ? `📊 SPY ${spy >= 0 ? "+" : ""}${spy?.toFixed(2)}%` : "📊 SPY",
+            value: (() => {
+              const parts = [];
+              if (perfSc.daily_pl_pct != null && spy != null) parts.push(`Screener α ${(perfSc.daily_pl_pct - spy).toFixed(1)}pp`);
+              if (perfPc.daily_pl_pct != null && spy != null) parts.push(`Pipeline α ${(perfPc.daily_pl_pct - spy).toFixed(1)}pp`);
+              return parts.join("  ·  ") || "—";
+            })(),
+            inline: true },
+        ] : [];
+
+        const winField = win.total > 0 ? [{
+          name:   `🎯 Win Rate — ${win.wins}/${win.total} trades`,
+          value:  `**${win.win_rate?.toFixed(0)}%** · avg win ${win.avg_win >= 0 ? "+" : ""}${win.avg_win?.toFixed(1)}% · avg loss ${win.avg_loss?.toFixed(1)}% · E[P&L] ${win.expectancy >= 0 ? "+" : ""}${win.expectancy?.toFixed(1)}%`,
+          inline: false,
+        }] : [];
 
         // Up to 4 buy buttons (leave room for Refresh in a second row)
         const buyBtns = newPicks.slice(0, 4).map(p => ({
@@ -1584,17 +1627,21 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
           embeds: [{
             title: `☀️ Morning Brief — ${today}`,
             color: totalPnl >= 0 ? C_GREEN : C_RED,
-            description: `**📊 Screener**\n${sc.lines}\n\n**🔧 Pipeline**\n${pc.lines}`,
+            description: `**📊 Screener positions**\n${sc.lines}\n\n**🔄 Pipeline positions**\n${pc.lines}`,
             fields: [
               { name: "Regime",              value: `${regLabel} (${regScore}/100)`,                    inline: true },
-              { name: "Screener P&L",        value: `${sc.pnl >= 0 ? "+" : ""}$${sc.pnl.toFixed(2)}`, inline: true },
-              { name: "Pipeline P&L",        value: `${pc.pnl >= 0 ? "+" : ""}$${pc.pnl.toFixed(2)}`, inline: true },
-              { name: "Screener buying pwr", value: `$${sBp.toFixed(2)}`,                               inline: true },
-              { name: "Pipeline buying pwr", value: `$${pBp.toFixed(2)}`,                               inline: true },
-              { name: `Today\'s picks (${newPicks.length} new · ${heldPicks.length} held)`,
+              { name: "Screener open P&L",   value: `${sc.pnl >= 0 ? "+" : ""}$${sc.pnl.toFixed(0)}`, inline: true },
+              { name: "Pipeline open P&L",   value: `${pc.pnl >= 0 ? "+" : ""}$${pc.pnl.toFixed(0)}`, inline: true },
+              { name: "Screener buying pwr", value: `$${sBp.toFixed(0)}`,                               inline: true },
+              { name: "Pipeline buying pwr", value: `$${pBp.toFixed(0)}`,                               inline: true },
+              { name: "​",              value: "​",                                            inline: true },
+              ...perfFields,
+              ...winField,
+              { name: `📊 Screener picks (${newPicks.length} new · ${heldPicks.length} held)`,
                 value: picksLine, inline: false },
+              { name: "🔄 Pipeline picks", value: pPicksLine, inline: false },
             ],
-            footer: { text: `${dataAge} · 🛒 = preview & confirm buy · ✅ = high conviction · 🔄 = trigger fresh run` },
+            footer: { text: `${dataAge} · 🛒 = preview & confirm buy · ✅ ≥55 = high conviction · 🔄 = trigger fresh run` },
             timestamp: new Date().toISOString(),
           }],
           components,

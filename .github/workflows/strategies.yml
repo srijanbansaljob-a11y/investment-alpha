@@ -50,6 +50,19 @@ jobs:
         run: |
           python broker/remote_commands.py --payload "$COMMAND_PAYLOAD"
 
+      - name: Snapshot positions + log trade outcomes (after close)
+        if: github.event_name != 'repository_dispatch'
+        env:
+          ALPACA_API_KEY:             ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:          ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_API_KEY_SCREENER:    ${{ secrets.ALPACA_API_KEY_SCREENER }}
+          ALPACA_SECRET_KEY_SCREENER: ${{ secrets.ALPACA_SECRET_KEY_SCREENER }}
+          DISCORD_BOT_TOKEN:          ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:         ${{ secrets.DISCORD_CHANNEL_ID }}
+        run: |
+          python scripts/snapshot_positions.py 2>&1 || echo "Snapshot failed (non-fatal)"
+          python scripts/trade_outcome_logger.py 2>&1 || echo "Outcome logger failed (non-fatal)"
+
       - name: Mean-reversion scan
         env:
           ALPACA_API_KEY:      ${{ secrets.ALPACA_API_KEY }}
@@ -80,7 +93,7 @@ jobs:
         run: |
           git config user.name "investment-alpha-bot"
           git config user.email "actions@github.com"
-          git add data/*.json || true
+          git add data/*.json data/position_snapshots/ || true
           if ! git diff --cached --quiet; then
             git commit -m "chore: strategy state update [skip ci]"
             git pull --rebase origin main || true
