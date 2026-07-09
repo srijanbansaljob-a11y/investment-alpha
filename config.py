@@ -417,4 +417,64 @@ VIX_PANIC_TOP_N             = 3      # number of top picks to show in panic aler
 # ── Dual momentum compass (strategies/dual_momentum.py) ────────────────────
 DM_ENABLED = True          # monthly advisory card (never trades)
 
-# ── Stop-loss post-mortem (pipeline/postmortem.py) ────────�
+# ── Stop-loss post-mortem (pipeline/postmortem.py) ─────────────────────────
+STOP_TUNING_AUTO = False   # suggestions only; you change multipliers manually
+
+# ── Output ─────────────────────────────────────────────────────────────────
+OUTPUT_JSON_FILE  = OUTPUT_DIR / "trading_output.json"
+OUTPUT_HTML_FILE  = OUTPUT_DIR / "trading_output.html"
+OUTPUT_EXCEL_FILE = OUTPUT_DIR / "trading_output.xlsx"
+
+# ── Debug / Dry-run ────────────────────────────────────────────────────────
+DRY_RUN    = True   # set False to execute real (paper) trades
+DEBUG_MODE = False
+LOG_LEVEL  = "DEBUG" if DEBUG_MODE else "INFO"
+
+# ── Technical Indicator Parameters ────────────────────────────────────────
+# Used by pipeline/features.py
+SMA_SHORT        = 50
+SMA_LONG         = 200
+RSI_PERIOD       = 14
+MACD_FAST        = 12
+MACD_SLOW        = 26
+MACD_SIGNAL      = 9
+MIN_HISTORY_DAYS = 252   # minimum days of price history required
+
+# Momentum lookback windows (in calendar days)
+MOMENTUM_3M  = 63
+MOMENTUM_6M  = 126
+MOMENTUM_12M = 252
+
+# ---- Cache ----------------------------------------------------------------
+CACHE_MAX_AGE_HOURS = 4   # refresh cache if older than this
+# Backward compat alias: PRICE_HISTORY_DAYS was previously HISTORY_DAYS
+HISTORY_DAYS = PRICE_HISTORY_DAYS
+
+# ---- Scoring Thresholds (for signal labelling in portfolio.py) ------------
+# MOMENTUM_STRONG_THRESHOLD / TREND_BULLISH_THRESHOLD are defined once above
+# (Signal Label Thresholds). Duplicates removed 2026-06 to stop silent overrides.
+
+# ---- Executor -------------------------------------------------------------
+EQUAL_WEIGHT = 1.0 / TOP_N_STOCKS   # 10% per position in equal-weight mode
+
+
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    print("=== Investment Alpha Config v2.0 ===")
+    print(f"Universe size      : {len(ALL_TICKERS)} tickers")
+    print(f"Top-N stocks       : {TOP_N_STOCKS}")
+    print(f"Allocation mode    : {ALLOCATION_MODE}")
+    print(f"Skip-month momentum: {SKIP_MONTH_MOMENTUM}")
+    print(f"Sector cap         : {SECTOR_CAP_ENABLED} (max {SECTOR_MAX_STOCKS}/sector)")
+    print(f"Regime detection   : {REGIME_ENABLED}")
+    print(f"  VIX thresholds   : neutral>{REGIME_VIX_NEUTRAL}, bear>{REGIME_VIX_BEAR}")
+    print(f"  Top-N by regime  : {REGIME_TOP_N}")
+    print(f"Stop-loss          : {STOP_LOSS_ENABLED}")
+    print(f"  Thresholds       : {STOP_LOSS_PCT}")
+    print(f"Sentiment (Phase2) : {SENTIMENT_ENABLED}")
+    print(f"  Finnhub key set  : {bool(FINNHUB_API_KEY)}")
+    print(f"Meme filter (Ph2)  : {MEME_FILTER_ENABLED}")
+    print(f"Insider filter(Ph2): {INSIDER_ENABLED}")
+    print(f"Alpaca key set     : {bool(ALPACA_API_KEY)}")
+    print(f"Dry run            : {DRY_RUN}")
+    print(f"Output dir         : {OUTPUT_DIR}")

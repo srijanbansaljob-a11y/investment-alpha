@@ -177,7 +177,7 @@ COMMANDS = [
     },
     {
         "name": "rebalance",
-        "description": "Check exposure vs regime limit; suggest 50% partial trims on winning positions (winners only, no force-selling).",
+        "description": "Check exposure vs regime limit; suggest 50% trims on winners to free cash. Nothing auto-sells.",
         "options": [{
             "name": "portfolio",
             "type": 3,
