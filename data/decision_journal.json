@@ -134,5 +134,14 @@
     "order_status": "OrderStatus.PENDING_NEW",
     "pnl_pct_at_decision": 0.36,
     "timestamp": "2026-07-08T15:22:05.649131+00:00"
+  },
+  {
+    "decision": "approve_sell",
+    "ticker": "COP",
+    "trigger": "mr_exit",
+    "price_at_decision": 110.16,
+    "order_status": "OrderStatus.PENDING_NEW",
+    "pnl_pct_at_decision": 0.55,
+    "timestamp": "2026-07-09T07:55:26.714709+00:00"
   }
 ]
