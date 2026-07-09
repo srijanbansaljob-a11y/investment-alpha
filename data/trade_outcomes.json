@@ -1,0 +1,27 @@
+{
+  "outcomes": [
+    {
+      "ticker": "COP",
+      "portfolio": "pipeline",
+      "exit_date": "2026-07-09",
+      "entry_date": null,
+      "duration_days": 0,
+      "exit_type": "full",
+      "entry_price": 109.5609,
+      "exit_price": 110.72,
+      "pnl_pct": 1.06,
+      "pnl_dollars": 22.15,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    }
+  ],
+  "last_updated": "2026-07-09T22:49:59.625257+00:00"
+}
