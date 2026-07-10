@@ -152,5 +152,14 @@
     "order_status": "OrderStatus.PENDING_NEW",
     "pnl_pct_at_decision": 5.86,
     "timestamp": "2026-07-10T11:03:28.886733+00:00"
+  },
+  {
+    "decision": "approve_buy",
+    "ticker": "ABBV",
+    "trigger": "mr",
+    "price_at_decision": 247.965,
+    "qty": 8.8188,
+    "order_status": "OrderStatus.ACCEPTED",
+    "timestamp": "2026-07-10T22:36:16.190759+00:00"
   }
 ]
