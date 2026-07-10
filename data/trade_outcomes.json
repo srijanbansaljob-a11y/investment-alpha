@@ -21,7 +21,29 @@
         "rs_vs_spy": 0
       },
       "win": true
+    },
+    {
+      "ticker": "MU",
+      "portfolio": "pipeline",
+      "exit_date": "2026-07-10",
+      "entry_date": null,
+      "duration_days": 0,
+      "exit_type": "full",
+      "entry_price": 927.15,
+      "exit_price": 999.9376,
+      "pnl_pct": 7.85,
+      "pnl_dollars": 178.09,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
     }
   ],
-  "last_updated": "2026-07-09T22:49:59.625257+00:00"
+  "last_updated": "2026-07-10T22:32:25.824004+00:00"
 }
