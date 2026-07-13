@@ -9,6 +9,9 @@ on:
     - cron: "0 14 * * 6"    # 9 AM EDT (summer)  — GitHub dedupes same-minute runs
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   report:
     runs-on: ubuntu-latest
