@@ -161,5 +161,14 @@
     "qty": 8.8188,
     "order_status": "OrderStatus.ACCEPTED",
     "timestamp": "2026-07-10T22:36:16.190759+00:00"
+  },
+  {
+    "decision": "approve_sell",
+    "ticker": "MATX",
+    "trigger": "profit_target",
+    "price_at_decision": 223.55,
+    "order_status": "OrderStatus.PENDING_NEW",
+    "pnl_pct_at_decision": 18.85,
+    "timestamp": "2026-07-17T09:12:31.724373+00:00"
   }
 ]
