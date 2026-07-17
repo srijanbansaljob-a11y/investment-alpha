@@ -1568,11 +1568,16 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
           ? allPicks.map(p => `${heldSymbols.has(p.ticker) ? "✅" : "🆕"} **${p.ticker}** ${p.score}/100`).join("  ·  ")
           : "_No picks today — use mode:fresh to re-run the screener_";
 
-        // Pipeline picks (from pipeline_screener_summary KV, populated by pipeline 3x daily run)
+        // NOTE: this is NOT the pipeline engine's own scoring (pipeline/scoring.py).
+        // It's the screener algorithm run 3x/day against the pipeline account's
+        // credentials purely for display (pipeline_screener_summary KV). The
+        // pipeline engine's actual picks come from its weekly rebalance proposal
+        // (data/proposed_rebalance.json via /rebalance or the Monday Discord post),
+        // not from here. Labelled explicitly below so it isn't mistaken for that.
         const pAllPicks = pSummary?.top_picks || [];
         const pPicksLine = pAllPicks.length
           ? pAllPicks.map(p => `${p.conviction_ok ? "✅" : "⚠️"} **${p.ticker}** ${p.score}/100`).join("  ·  ")
-          : "_No pipeline picks yet_";
+          : "_No signal yet_";
 
         const dataAge = summary?.date ? `Screener data from ${summary.date}` : "Screener data age unknown";
 
@@ -1639,9 +1644,9 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
               ...winField,
               { name: `📊 Screener picks (${newPicks.length} new · ${heldPicks.length} held)`,
                 value: picksLine, inline: false },
-              { name: "🔄 Pipeline picks", value: pPicksLine, inline: false },
+              { name: "📡 Screener signal (on Pipeline acct, informational)", value: pPicksLine, inline: false },
             ],
-            footer: { text: `${dataAge} · 🛒 = preview & confirm buy · ✅ ≥55 = high conviction · 🔄 = trigger fresh run` },
+            footer: { text: `${dataAge} · 🛒 = preview & confirm buy · ✅ ≥55 = high conviction · 🔄 = trigger fresh run · Pipeline's own picks: /rebalance or Monday's weekly proposal` },
             timestamp: new Date().toISOString(),
           }],
           components,

@@ -68,7 +68,7 @@ import yfinance as yf
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
 from broker.alpaca_client import get_client, get_positions, is_market_open
-from broker.stop_loss import _compute_atr, _load_portfolio_state
+from broker.stop_loss import _compute_atr, _load_portfolio_state, compute_stop_price
 from broker import discord_notify as dn
 
 log = logging.getLogger(__name__)
@@ -224,12 +224,15 @@ def override_ticker(ticker: str) -> None:
         print(f"ℹ️  No active pending action found for {t}")
 
 
-# ── Stop Price (mirrors stop_loss.py logic) ────────────────────────────────
+# ── Stop Price ───────────────────────────────────────────────────────────
+#
+# Delegates to broker.stop_loss.compute_stop_price() — the single shared
+# implementation also used by the weekly batch checker, so the two can't
+# drift apart.
 
 def _get_stop_price(ticker: str, entry_price: float) -> float | None:
     """
-    Compute the ATR-based stop price for a ticker.
-    Falls back to fixed-percentage stop if ATR is unavailable.
+    Compute the stop price for a ticker (ATR-based, falls back to fixed-pct).
     Returns None if stop-loss is disabled.
     """
     if not getattr(config, "STOP_LOSS_ENABLED", True):
@@ -242,21 +245,8 @@ def _get_stop_price(ticker: str, entry_price: float) -> float | None:
     except Exception:
         regime = "bull"
 
-    use_atr = getattr(config, "USE_ATR_STOP_LOSS", True)
-    atr_mults = getattr(config, "ATR_STOP_MULTIPLIER", {"bull": 2.5, "neutral": 2.0, "bear": 1.5})
-    atr_period = getattr(config, "ATR_PERIOD", 14)
-    atr_mult = atr_mults.get(regime, 2.0)
-
-    if use_atr:
-        # Real-time-capable ATR (Alpaca bars → yfinance fallback)
-        from broker import market_data
-        atr = market_data.compute_atr(ticker, period=atr_period)
-        if atr and atr > 0:
-            return entry_price - (atr_mult * atr)
-
-    # Fallback to fixed percentage
-    stop_pct = config.STOP_LOSS_PCT.get(regime, 0.85)
-    return entry_price * stop_pct
+    stop_price, _method, _atr = compute_stop_price(ticker, entry_price, regime)
+    return stop_price
 
 
 # ── Intraday Open Prices ───────────────────────────────────────────────────

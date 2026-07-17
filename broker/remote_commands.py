@@ -40,7 +40,7 @@ from broker.alpaca_client import (
     get_client, get_positions, get_account_summary, is_market_open,
     close_position,
 )
-from broker.stop_loss import _compute_atr
+from broker.stop_loss import compute_stop_price
 from broker import discord_notify as dn
 
 log = logging.getLogger(__name__)
@@ -74,16 +74,14 @@ def _reply(payload: dict, embeds: list):
 
 
 # ── Stop level (Alpaca-sourced, no local files) ────────────────────────────
+# Delegates to broker.stop_loss.compute_stop_price() — the single shared
+# implementation also used by the weekly batch checker and intraday monitor,
+# so all three surfaces (this command dispatcher, stop_loss.py, monitor.py)
+# can't drift apart.
 
 def _stop_price(ticker: str, entry: float, regime: str) -> tuple[float, str]:
-    atr_mults = getattr(config, "ATR_STOP_MULTIPLIER", {"bull": 2.5, "neutral": 2.0, "bear": 1.5})
-    mult = atr_mults.get(regime, 2.0)
-    if getattr(config, "USE_ATR_STOP_LOSS", True):
-        atr = _compute_atr(ticker, period=getattr(config, "ATR_PERIOD", 14))
-        if atr and atr > 0:
-            return entry - mult * atr, f"ATR×{mult}"
-    pct = config.STOP_LOSS_PCT.get(regime, 0.85)
-    return entry * pct, f"fixed {pct:.0%}"
+    stop_price, method, _atr = compute_stop_price(ticker, entry, regime)
+    return stop_price, method
 
 
 def _full_regime() -> dict:

@@ -15,8 +15,14 @@ Signal scoring (float in [-1, +1]):
    0.0 : no trades, or buys and sells cancel out
   -0.5 : net selling
 
-Cache: data/congressional_cache.json (24-hour TTL, same pattern as insider.py)
+Cache: data/congressional_cache_pipeline.json (24-hour TTL, same pattern as insider.py)
 Enable via: config.CONGRESSIONAL_ENABLED = True
+
+NOTE: this used to share data/congressional_cache.json with the screener's
+scripts/fetch_congressional_trades.py — same filename, incompatible schemas
+({signal: float} here vs {recent_buys, last_buy_date, buyers} there). Whichever
+ran last would silently clobber the other. Renamed to keep pipeline self-
+contained regardless of whether the screener's fetcher runs.
 """
 
 import json
@@ -38,7 +44,7 @@ _HEADERS      = {
     "User-Agent": "InvestmentAlpha/3.0 srijanbansal@gmail.com",
     "Accept":     "application/json",
 }
-CACHE_FILE    = Path(getattr(config, "DATA_DIR", "data")) / "congressional_cache.json"
+CACHE_FILE    = Path(getattr(config, "DATA_DIR", "data")) / "congressional_cache_pipeline.json"
 CACHE_HOURS   = getattr(config, "CONGRESSIONAL_CACHE_HOURS", 24)
 LOOKBACK_DAYS = getattr(config, "CONGRESSIONAL_LOOKBACK_DAYS", 90)
 MIN_TRADE_USD = getattr(config, "CONGRESSIONAL_MIN_TRADE_USD", 50_000)

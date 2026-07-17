@@ -108,22 +108,33 @@ def _save_peak(data: dict) -> None:
     PEAK_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
+_PIPELINE_REGIME_MAP = {
+    # pipeline/regime.py returns a 3-tier lowercase label (bull/neutral/bear).
+    # MAX_INVESTED_PCTS below uses the screener's 4-tier convention. Pipeline
+    # doesn't distinguish strong vs. moderate bull, so "bull" maps to the more
+    # conservative MOD BULL tier rather than assuming maximum conviction.
+    "bull":    "MOD BULL",
+    "neutral": "NEUTRAL",
+    "bear":    "BEARISH",
+}
+
+
 def _get_regime_label() -> str:
     """
-    Read current regime from screener output file (committed at 8 AM).
-    Returns uppercase label e.g. "STRONG BULL", "MOD BULL", "NEUTRAL", "BEARISH".
+    Get current regime from the pipeline's own regime engine (pipeline/regime.py)
+    — the sleeve trades the pipeline account, so it gates exposure using pipeline's
+    regime, not the screener's. This calls regime.run() live (2 quick yfinance
+    pulls: SPX + VIX) rather than reading a cached file, so it can't go stale.
+    Returns uppercase label e.g. "MOD BULL", "NEUTRAL", "BEARISH".
     Falls back to empty string so callers use MAX_INVESTED_DEFAULT.
     """
     try:
-        candidate = Path(__file__).parent.parent / "screener" / "daily_sentiment_data.json"
-        if not candidate.exists():
-            return ""
-        data = json.loads(candidate.read_text(encoding="utf-8"))
-        label = (data.get("macro_score") or {}).get("label", "")
-        if not label:
-            label = data.get("regime_label", "")
-        return label.upper().strip()
-    except Exception:
+        from pipeline import regime as regime_module
+        result = regime_module.run()
+        pipeline_label = (result.get("regime") or "").lower().strip()
+        return _PIPELINE_REGIME_MAP.get(pipeline_label, "")
+    except Exception as exc:
+        log.warning("Could not fetch pipeline regime (%s) — using MAX_INVESTED_DEFAULT", exc)
         return ""
 
 

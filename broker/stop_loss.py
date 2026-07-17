@@ -146,6 +146,39 @@ def _load_alpaca_holdings() -> dict:
         return {}
 
 
+# ── Shared stop-price calculation ───────────────────────────────────────────
+#
+# Single source of truth for stop-loss price math. Both this module's weekly
+# batch checker and broker/monitor.py's 15-min intraday check call this —
+# previously each reimplemented the same ATR/fixed-pct logic independently,
+# which meant an edit to one could silently drift from the other.
+
+def compute_stop_price(ticker: str, entry_price: float, regime: str = "bull") -> tuple[float, str, float | None]:
+    """
+    Compute the stop-loss price for a position.
+
+    Returns (stop_price, stop_method, atr_value). atr_value is None when the
+    fixed-percentage fallback was used (ATR disabled or unavailable).
+    """
+    regime = (regime or "bull").lower()
+    if regime not in config.STOP_LOSS_PCT:
+        regime = "bull"
+
+    use_atr = getattr(config, "USE_ATR_STOP_LOSS", False)
+    atr_multipliers = getattr(config, "ATR_STOP_MULTIPLIER", {"bull": 2.5, "neutral": 2.0, "bear": 1.5})
+    atr_period = getattr(config, "ATR_PERIOD", 14)
+    atr_mult = atr_multipliers.get(regime, 2.0)
+
+    if use_atr:
+        atr_value = _compute_atr(ticker, period=atr_period)
+        if atr_value is not None and atr_value > 0:
+            return entry_price - (atr_mult * atr_value), f"ATR({atr_period})×{atr_mult}", atr_value
+        logger.warning("%s: ATR unavailable, falling back to fixed %% stop", ticker)
+
+    stop_multiplier = config.STOP_LOSS_PCT.get(regime, 0.85)
+    return entry_price * stop_multiplier, "fixed_pct", None
+
+
 # ── Core Logic ─────────────────────────────────────────────────────────────
 
 def check_and_execute(regime: str = None, dry_run: bool = True) -> dict:
@@ -180,11 +213,10 @@ def check_and_execute(regime: str = None, dry_run: bool = True) -> dict:
         logger.warning("Unknown regime '%s', defaulting to bull", regime)
         regime = "bull"
 
-    stop_multiplier = config.STOP_LOSS_PCT[regime]
     use_atr = getattr(config, "USE_ATR_STOP_LOSS", False)
-    atr_multipliers = getattr(config, "ATR_STOP_MULTIPLIER", {"bull": 2.5, "neutral": 2.0, "bear": 1.5})
-    atr_period      = getattr(config, "ATR_PERIOD", 14)
-    atr_mult        = atr_multipliers.get(regime, 2.0)
+    atr_period = getattr(config, "ATR_PERIOD", 14)
+    atr_mult   = getattr(config, "ATR_STOP_MULTIPLIER", {"bull": 2.5, "neutral": 2.0, "bear": 1.5}).get(regime, 2.0)
+    stop_multiplier = config.STOP_LOSS_PCT[regime]
     logger.info(
         "Stop-loss check | regime=%s | mode=%s | dry_run=%s",
         regime.upper(), f"ATR({atr_period})×{atr_mult}" if use_atr else f"fixed {stop_multiplier:.0%}", dry_run,
@@ -241,20 +273,8 @@ def check_and_execute(regime: str = None, dry_run: bool = True) -> dict:
             skipped.append(ticker)
             continue
 
-        # ── Stop price: ATR-based or fixed % ─────────────────────────────
-        atr_value  = None
-        stop_method = "fixed_pct"
-        if use_atr:
-            atr_value = _compute_atr(ticker, period=atr_period)
-            if atr_value is not None and atr_value > 0:
-                stop_price  = entry_price - (atr_mult * atr_value)
-                stop_method = f"ATR({atr_period})×{atr_mult}"
-            else:
-                # Fallback to fixed % if ATR unavailable
-                logger.warning("%s: ATR unavailable, falling back to fixed %% stop", ticker)
-                stop_price = entry_price * stop_multiplier
-        else:
-            stop_price = entry_price * stop_multiplier
+        # ── Stop price: shared calc (see compute_stop_price) ─────────────
+        stop_price, stop_method, atr_value = compute_stop_price(ticker, entry_price, regime)
 
         loss_pct = (current_price - entry_price) / entry_price * 100
         breached  = current_price < stop_price
