@@ -1,0 +1,76 @@
+{
+  "total": 4,
+  "wins": 4,
+  "win_rate": 100.0,
+  "avg_pl": 7.43,
+  "avg_duration": 0.0,
+  "signals": {
+    "insider_buy": {
+      "with_n": 0,
+      "without_n": 4,
+      "with_wr": 0,
+      "without_wr": 100.0,
+      "with_avg_pl": 0,
+      "edge": -100.0
+    },
+    "congress_buy": {
+      "with_n": 0,
+      "without_n": 4,
+      "with_wr": 0,
+      "without_wr": 100.0,
+      "with_avg_pl": 0,
+      "edge": -100.0
+    },
+    "earnings_beat": {
+      "with_n": 0,
+      "without_n": 4,
+      "with_wr": 0,
+      "without_wr": 100.0,
+      "with_avg_pl": 0,
+      "edge": -100.0
+    }
+  },
+  "rs_vs_spy": {
+    "positive_n": 0,
+    "positive_wr": 0,
+    "negative_n": 0,
+    "negative_wr": 0
+  },
+  "by_regime": [
+    {
+      "label": "UNKNOWN",
+      "trades": 4,
+      "wins": 4,
+      "win_rate": 100.0,
+      "avg_pl": 7.43
+    }
+  ],
+  "by_bucket": [
+    {
+      "label": "unknown",
+      "trades": 4,
+      "wins": 4,
+      "win_rate": 100.0,
+      "avg_pl": 7.43
+    }
+  ],
+  "by_portfolio": [
+    {
+      "label": "pipeline",
+      "trades": 4,
+      "wins": 4,
+      "win_rate": 100.0,
+      "avg_pl": 7.43
+    }
+  ],
+  "by_exit_type": [
+    {
+      "label": "full",
+      "trades": 4,
+      "wins": 4,
+      "win_rate": 100.0,
+      "avg_pl": 7.43
+    }
+  ],
+  "generated_at": "2026-07-18T14:20:37.255728+00:00"
+}
