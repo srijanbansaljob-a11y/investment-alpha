@@ -1,0 +1,152 @@
+{
+  "date": "2026-07-24",
+  "timestamp": "2026-07-24T22:34:38.497446+00:00",
+  "screener": {
+    "AAPL": {
+      "qty": 30.0,
+      "avg_entry_price": 278.574653,
+      "market_value": 10006.41,
+      "current_price": 333.547,
+      "unrealized_pl": 1649.17041,
+      "unrealized_plpc": 0.19733,
+      "cost_basis": 8357.23959
+    },
+    "ABBV": {
+      "qty": 75.0,
+      "avg_entry_price": 242.02,
+      "market_value": 19452.0,
+      "current_price": 259.36,
+      "unrealized_pl": 1300.5,
+      "unrealized_plpc": 0.07165,
+      "cost_basis": 18151.5
+    },
+    "ABT": {
+      "qty": 173.0,
+      "avg_entry_price": 93.21,
+      "market_value": 17829.38,
+      "current_price": 103.06,
+      "unrealized_pl": 1704.05,
+      "unrealized_plpc": 0.10568,
+      "cost_basis": 16125.33
+    },
+    "BAC": {
+      "qty": 261.0,
+      "avg_entry_price": 58.05,
+      "market_value": 16182.9396,
+      "current_price": 62.0036,
+      "unrealized_pl": 1031.8896,
+      "unrealized_plpc": 0.06811,
+      "cost_basis": 15151.05
+    },
+    "MSFT": {
+      "qty": 2.0,
+      "avg_entry_price": 356.22,
+      "market_value": 763.5602,
+      "current_price": 381.7801,
+      "unrealized_pl": 51.1202,
+      "unrealized_plpc": 0.07175,
+      "cost_basis": 712.44
+    },
+    "REGN": {
+      "qty": 27.0,
+      "avg_entry_price": 626.02,
+      "market_value": 17712.27,
+      "current_price": 656.01,
+      "unrealized_pl": 809.73,
+      "unrealized_plpc": 0.04791,
+      "cost_basis": 16902.54
+    },
+    "TMO": {
+      "qty": 38.0,
+      "avg_entry_price": 508.43,
+      "market_value": 21593.88,
+      "current_price": 568.26,
+      "unrealized_pl": 2273.54,
+      "unrealized_plpc": 0.11768,
+      "cost_basis": 19320.34
+    },
+    "VRTX": {
+      "qty": 29.0,
+      "avg_entry_price": 482.03,
+      "market_value": 13890.42,
+      "current_price": 478.98,
+      "unrealized_pl": -88.45,
+      "unrealized_plpc": -0.00633,
+      "cost_basis": 13978.87
+    }
+  },
+  "pipeline": {
+    "BIIB": {
+      "qty": 40.7623,
+      "avg_entry_price": 198.8,
+      "market_value": 8241.729437,
+      "current_price": 202.19,
+      "unrealized_pl": 138.184197,
+      "unrealized_plpc": 0.01705,
+      "cost_basis": 8103.54524
+    },
+    "BMY": {
+      "qty": 217.9933,
+      "avg_entry_price": 56.351794,
+      "market_value": 13535.203997,
+      "current_price": 62.09,
+      "unrealized_pl": 1250.890462,
+      "unrealized_plpc": 0.10183,
+      "cost_basis": 12284.313535
+    },
+    "DE": {
+      "qty": 3.7261,
+      "avg_entry_price": 588.161879,
+      "market_value": 2340.586976,
+      "current_price": 628.16,
+      "unrealized_pl": 149.036999,
+      "unrealized_plpc": 0.06801,
+      "cost_basis": 2191.549977
+    },
+    "EIX": {
+      "qty": 234.3397,
+      "avg_entry_price": 70.44094,
+      "market_value": 18688.591075,
+      "current_price": 79.75,
+      "unrealized_pl": 2181.482328,
+      "unrealized_plpc": 0.13215,
+      "cost_basis": 16507.108747
+    },
+    "HST": {
+      "qty": 487.4131,
+      "avg_entry_price": 22.307135,
+      "market_value": 11941.62095,
+      "current_price": 24.5,
+      "unrealized_pl": 1068.831128,
+      "unrealized_plpc": 0.0983,
+      "cost_basis": 10872.789822
+    },
+    "MRK": {
+      "qty": 61.6446,
+      "avg_entry_price": 113.803596,
+      "market_value": 8079.757722,
+      "current_price": 131.07,
+      "unrealized_pl": 1064.380568,
+      "unrealized_plpc": 0.15172,
+      "cost_basis": 7015.377154
+    },
+    "MTCH": {
+      "qty": 246.7415,
+      "avg_entry_price": 35.052593,
+      "market_value": 9353.970265,
+      "current_price": 37.91,
+      "unrealized_pl": 705.040889,
+      "unrealized_plpc": 0.08152,
+      "cost_basis": 8648.929376
+    },
+    "VTRS": {
+      "qty": 534.4149,
+      "avg_entry_price": 15.92,
+      "market_value": 9218.657025,
+      "current_price": 17.25,
+      "unrealized_pl": 710.771817,
+      "unrealized_plpc": 0.08354,
+      "cost_basis": 8507.885208
+    }
+  }
+}
