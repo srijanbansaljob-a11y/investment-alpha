@@ -18,6 +18,29 @@ Sub-score construction:
   - Quality    : avg percentile rank of roe, earnings_growth, gross_margin, inv(debt_to_equity)
   - Volatility : percentile rank of vol_60d (higher vol = subtracted from score)
   - Sentiment  : avg of normalized sentiment_score + normalized reddit_mentions (Phase 2)
+
+SECTOR-RELATIVE RANKING (2026-07, config.SECTOR_RELATIVE_QUALITY):
+Quality LEVEL metrics (ROE, ROA, gross/operating margin, D/E, FCF yield) are
+percentile-ranked WITHIN sector; everything else stays universe-wide. Sector
+level differences are structural, not quality signals — measured 2026-07-17,
+ROA runs 1.0% for financials vs 19.2% for tech purely from leverage
+arithmetic. Effect on the quality sub-score across a 24-name test universe:
+
+    sector       before   after
+    Biotech       0.687   0.597
+    Tech          0.542   0.549
+    Energy        0.434   0.565
+    Financials    0.420   0.567
+    spread        0.267   0.049      <- 5.4x less structural bias
+
+Within-sector dispersion is unchanged, so stock-level discrimination is kept.
+
+Momentum, trend and volatility remain universe-wide ON PURPOSE: that is how a
+sector downturn is meant to reach the score. A sector-level gate was
+considered and rejected — sector explains only 17.3% of 12m return variance
+(82.7% is stock-specific), so gating on it would have excluded GOOGL (+67.5%,
+in a sector below its 200MA) while retaining ORCL (-49.8%, in a strong one).
+See _pct_rank_by_sector for details.
 """
 
 import logging
@@ -42,6 +65,66 @@ def _pct_rank(series: pd.Series, ascending: bool = True) -> pd.Series:
     """
     ranked = series.rank(pct=True, na_option="keep", ascending=ascending)
     return ranked.fillna(0.5)
+
+
+def _pct_rank_by_sector(
+    series: pd.Series,
+    sectors: pd.Series,
+    ascending: bool = True,
+    min_sector_size: int = None,
+) -> pd.Series:
+    """
+    Percentile rank a series WITHIN each sector rather than across the universe.
+
+    WHY (measured 2026-07-17 across 35 large caps):
+    Level-type fundamentals differ by sector for structural reasons that have
+    nothing to do with company quality:
+
+        metric          low sector          high sector         spread
+        gross margin    Energy   20.4%      Biotech  80.8%       4.0x
+        debt/equity     Biotech  17.5%      Indust. 183.4%      10.5x
+        ROA             Fin'ls    1.0%      Tech     19.2%        19x
+
+    Ranked universe-wide, an energy company can essentially never score well on
+    gross margin however good it is versus its peers, and a bank's 1.0% ROA
+    reads as "poor quality" when it is simply leverage arithmetic. Ranking
+    within sector compares like with like.
+
+    ONLY applied to LEVEL metrics. Growth/change metrics (earnings growth,
+    asset growth, op-margin change, accruals) stay universe-wide because a
+    change is already normalised against the company's own history and so
+    does not inherit the sector's level. Momentum, trend and volatility also
+    stay universe-wide DELIBERATELY — that is the channel through which a
+    sector downturn is meant to reach the score.
+
+    Sectors smaller than `min_sector_size` fall back to the universe-wide
+    rank: a percentile over 3 names yields only 0.33/0.67/1.00, which is noise
+    dressed up as signal. "Unknown" sector always falls back for the same
+    reason.
+    """
+    if min_sector_size is None:
+        min_sector_size = getattr(config, "SECTOR_RELATIVE_MIN_SIZE", 5)
+
+    universe_rank = _pct_rank(series, ascending=ascending)
+    if sectors is None or sectors.isna().all():
+        return universe_rank
+
+    out = universe_rank.copy()
+    sec = sectors.fillna("Unknown").astype(str)
+
+    for sector_name, idx in sec.groupby(sec).groups.items():
+        if sector_name in ("Unknown", "", "nan"):
+            continue                      # keep universe rank
+        if len(idx) < min_sector_size:
+            continue                      # too few peers to rank meaningfully
+        subset = series.loc[idx]
+        if subset.notna().sum() < 2:
+            continue                      # nothing to differentiate
+        out.loc[idx] = (
+            subset.rank(pct=True, na_option="keep", ascending=ascending).fillna(0.5)
+        )
+
+    return out
 
 
 def compute_sub_scores(features: pd.DataFrame) -> pd.DataFrame:
@@ -87,17 +170,33 @@ def compute_sub_scores(features: pd.DataFrame) -> pd.DataFrame:
     # ── Quality Sub-score ────────────────────────────────────────────
     # Phase 4: ROE, earnings growth, FCF yield, gross margin, low D/E,
     #          ROA (ROIC proxy), accruals, asset growth, margin expansion
-    q_roe  = _pct_rank(df["roe"])
-    q_eg   = _pct_rank(df["earnings_growth"])
-    q_de   = _pct_rank(df["debt_to_equity"], ascending=False)
+    #
+    # SECTOR-RELATIVE (2026-07): level metrics (ROE, ROA, margins, D/E, FCF
+    # yield) rank within sector; growth/change metrics stay universe-wide.
+    # See _pct_rank_by_sector for the measured rationale.
+    sector_relative = getattr(config, "SECTOR_RELATIVE_QUALITY", True)
+    sectors = df["sector"] if "sector" in df.columns else None
+    if sector_relative and sectors is None:
+        log.warning("  Quality: SECTOR_RELATIVE_QUALITY on but no 'sector' column — using universe ranks")
+        sector_relative = False
+
+    def _rank_level(col, ascending=True):
+        """Level metric — sector-relative when enabled."""
+        if sector_relative:
+            return _pct_rank_by_sector(df[col], sectors, ascending=ascending)
+        return _pct_rank(df[col], ascending=ascending)
+
+    q_roe  = _rank_level("roe")
+    q_eg   = _pct_rank(df["earnings_growth"])            # growth → universe-wide
+    q_de   = _rank_level("debt_to_equity", ascending=False)
     quality_components = [q_roe, q_eg, q_de]
     if "gross_margin" in df.columns and df["gross_margin"].notna().sum() > 0:
-        quality_components.append(_pct_rank(df["gross_margin"]))
+        quality_components.append(_rank_level("gross_margin"))
     if "fcf_yield" in df.columns and df["fcf_yield"].notna().sum() > 0:
-        quality_components.append(_pct_rank(df["fcf_yield"]))
+        quality_components.append(_rank_level("fcf_yield"))
     # Phase 4 additions
     if "roa" in df.columns and df["roa"].notna().sum() > 1:
-        quality_components.append(_pct_rank(df["roa"]))
+        quality_components.append(_rank_level("roa"))
         log.info("  Quality: ROA (ROIC proxy) active")
     if "accruals_ratio" in df.columns and df["accruals_ratio"].notna().sum() > 1:
         quality_components.append(_pct_rank(df["accruals_ratio"], ascending=False))  # lower = better
@@ -109,6 +208,17 @@ def compute_sub_scores(features: pd.DataFrame) -> pd.DataFrame:
         quality_components.append(_pct_rank(df["op_margin_change"]))                 # expanding = better
         log.info("  Quality: Op margin change active")
     df["score_quality"] = (sum(quality_components) / len(quality_components)).round(4)
+
+    if sector_relative:
+        n_sec = sectors.nunique()
+        min_sz = getattr(config, "SECTOR_RELATIVE_MIN_SIZE", 5)
+        big = sectors.value_counts()
+        n_ranked = int((big >= min_sz).sum())
+        log.info(
+            "  Quality: sector-relative ranking ON for level metrics "
+            "(%d/%d sectors have >=%d names; smaller ones use universe rank)",
+            n_ranked, n_sec, min_sz,
+        )
 
     # ── Earnings Surprise Sub-score (Phase 4 — PEAD) ─────────────────
     has_earnings_surprise = (

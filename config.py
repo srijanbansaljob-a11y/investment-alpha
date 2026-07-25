@@ -152,6 +152,23 @@ SENTIMENT_CACHE_HOURS  = 6
 MEME_FILTER_ENABLED     = False
 REDDIT_MENTION_THRESHOLD = 500   # exclude if mentions > this
 
+# ── Sector-relative quality ranking (2026-07) ─────────────────────────────
+# Rank LEVEL fundamentals (ROE, ROA, margins, D/E, FCF yield) within sector
+# instead of across the whole universe. Structural sector differences measured
+# 2026-07-17: gross margin 4.0x spread (Energy 20.4% .. Biotech 80.8%),
+# debt/equity 10.5x (Biotech 17.5% .. Industrials 183.4%), ROA 19x
+# (Financials 1.0% .. Tech 19.2%). Ranked universe-wide those levels swamp
+# genuine quality differences.
+#
+# Growth/change metrics (earnings growth, asset growth, op-margin change,
+# accruals) stay universe-wide — already normalised to the company's own
+# history. Momentum/trend/volatility stay universe-wide DELIBERATELY: that is
+# how a sector downturn is meant to reach the score. Measured 2026-07-17,
+# sector explains only 17.3% of 12m return variance vs 82.7% stock-specific,
+# so sector is a poor gate but a fair comparison group.
+SECTOR_RELATIVE_QUALITY  = True
+SECTOR_RELATIVE_MIN_SIZE = 5   # below this, fall back to universe rank
+
 # ── FRED (Federal Reserve Economic Data) ──────────────────────────────────
 # Free API key: https://fred.stlouisfed.org/docs/api/api_key.html (2-min signup).
 # Used by pipeline/regime.py for treasury yields (authoritative source, replaces
