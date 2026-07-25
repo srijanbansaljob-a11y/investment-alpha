@@ -141,8 +141,10 @@ def _get_yield_curve_signal():
 def _get_credit_spread_signal():
     """HYG/LQD 20-day momentum as credit spread proxy. Negative = widening = risk-off."""
     try:
-        hyg = yf.download("HYG", period="30d", progress=False, auto_adjust=True)["Close"].squeeze()
-        lqd = yf.download("LQD", period="30d", progress=False, auto_adjust=True)["Close"].squeeze()
+        # .dropna() for the same reason as SPX above — a trailing incomplete
+        # bar would otherwise make the ratio endpoints NaN.
+        hyg = yf.download("HYG", period="30d", progress=False, auto_adjust=True)["Close"].squeeze().dropna()
+        lqd = yf.download("LQD", period="30d", progress=False, auto_adjust=True)["Close"].squeeze().dropna()
         if hyg.empty or lqd.empty or len(hyg) < 5:
             return None
         ratio = (hyg / lqd).dropna()
@@ -188,13 +190,29 @@ def run():
         return _safe_fallback("REGIME_ENABLED=False")
 
     # Fetch SPX
+    #
+    # BUG FIX 2026-07-25: a SINGLE trailing NaN — yfinance returns one for the
+    # current, still-forming bar — propagated through .rolling(200).mean() and
+    # made spx_200ma NaN. That made `above_200ma = NaN > 0` evaluate False, so
+    # the classifier silently fell through to NEUTRAL on days when SPX was
+    # comfortably above its 200MA (measured that day: +5.8%, clearly BULL).
+    # Effect: top_n 8 instead of 10, exposure cap 40% instead of 60%, and
+    # tighter stops — on essentially every run. `period` also widened from
+    # 300d to 420d so that 200 *trading* days survive dropna with margin
+    # (300 calendar days is only ~205 trading days before any gaps).
     try:
-        spx_raw = yf.download(config.SPX_TICKER, period="300d", auto_adjust=True, progress=False)
-        if spx_raw.empty or len(spx_raw) < SPX_MA_DAYS:
-            return _safe_fallback("Insufficient SPX data")
-        spx_close = spx_raw["Close"].squeeze()
+        spx_raw = yf.download(config.SPX_TICKER, period="420d", auto_adjust=True, progress=False)
+        if spx_raw.empty:
+            return _safe_fallback("No SPX data returned")
+        spx_close = spx_raw["Close"].squeeze().dropna()
+        if len(spx_close) < SPX_MA_DAYS:
+            return _safe_fallback(
+                f"Insufficient SPX data ({len(spx_close)} usable bars < {SPX_MA_DAYS})"
+            )
         spx_price = float(spx_close.iloc[-1])
         spx_200ma = float(spx_close.rolling(SPX_MA_DAYS).mean().iloc[-1])
+        if spx_200ma != spx_200ma or spx_200ma <= 0:      # NaN-safe check
+            return _safe_fallback("SPX 200MA computed as NaN")
         spx_vs_200ma_pct = (spx_price - spx_200ma) / spx_200ma
     except Exception as exc:
         return _safe_fallback("SPX fetch error: " + str(exc))

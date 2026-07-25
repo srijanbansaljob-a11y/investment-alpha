@@ -1489,8 +1489,18 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
             inline: false,
           },
           {
+            name: "🩺 System health",
+            value:
+              "`/health` Run the QA checker on demand (`portfolio:` both/pipeline/screener)\n" +
+              "Also runs automatically **8:30 AM ET each weekday**.\n" +
+              "Checks: negative cash / margin use · exposure vs regime cap · every position has a valid stop · " +
+              "broker vs local reconciliation · data freshness · factor sanity bounds · trade-log integrity.\n" +
+              "🚨 **RED** = can lose money (also fails the workflow + alerts) · ⚠️ **AMBER** = degraded but safe · ✅ **GREEN** = clear.",
+            inline: false,
+          },
+          {
             name: "\U0001f4a1 Morning routine",
-            value: "`/brief` → `/regime` → `/screener` → `/buy symbol:X portfolio:Screener`\nMonthly (1st): `/pipeline mode:dry` review · `/pipeline mode:execute` rebalance\nOver-invested? `/rebalance` to trim winners manually.",
+            value: "`/brief` → `/health` → `/regime` → `/screener` → `/buy symbol:X portfolio:Screener`\nMonthly (1st): `/pipeline mode:dry` review · `/pipeline mode:execute` rebalance\nOver-invested? `/rebalance` to trim winners manually.",
             inline: false,
           },
         ],
@@ -1758,6 +1768,24 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
         content: err
           ? `❌ Could not trigger rebalance check — ${err}`
           : `⚖️ Rebalance check running on **${portfolio}** account — suggestions appear in ~1 min.`,
+      }});
+    }
+
+    // /health — run the daily QA checker on demand
+    // Dispatches to health_check.yml (repository_dispatch: health-check), which
+    // runs the SAME scripts/health_check.py as the scheduled 8:30 AM job, so an
+    // on-demand result can never disagree with the scheduled one.
+    if (name === "health") {
+      const portfolio = (opts.portfolio || "both").toLowerCase();
+      const err = await dispatchToGitHub(env, {
+        command: "health", portfolio, ...common,
+      }, "health-check");
+      return json({ type: R_CHANNEL_MESSAGE, data: {
+        flags: EPHEMERAL,
+        content: err
+          ? `❌ Could not trigger health check — ${err}`
+          : `🩺 Health check running on **${portfolio}** — results in ~1-2 min.\n` +
+            `Checks: margin/exposure · stop levels · broker reconciliation · data freshness · factor sanity · trade log.`,
       }});
     }
 

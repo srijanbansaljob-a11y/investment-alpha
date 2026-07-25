@@ -182,6 +182,77 @@ def cmd_regime(payload):
     )])
 
 
+def cmd_health(payload):
+    """
+    /health — run the daily QA checker on demand.
+
+    Reuses scripts/health_check.py rather than reimplementing the checks, so
+    the on-demand result can never drift from the scheduled 8:30 AM one.
+    That script posts its own rich card to Discord; here we just reply with a
+    compact summary so the slash command gets an in-line answer too.
+    """
+    import subprocess
+
+    repo_root = str(Path(__file__).parent.parent)
+    portfolio = (payload.get("portfolio") or "both").lower()
+
+    try:
+        proc = subprocess.run(
+            [sys.executable, "scripts/health_check.py", "--portfolio", portfolio],
+            cwd=repo_root, capture_output=True, text=True, timeout=600,
+        )
+    except subprocess.TimeoutExpired:
+        _reply(payload, [_embed("⏱️ Health Check Timed Out",
+                                "The checker ran past 10 minutes and was stopped. "
+                                "Check GitHub Actions logs.", _RED)])
+        return
+    except Exception as exc:
+        _reply(payload, [_embed("❌ Health Check Failed to Start", str(exc)[:500], _RED)])
+        return
+
+    # health_check.py exits 1 on RED, 0 otherwise; it also writes a JSON result.
+    status, findings = "UNKNOWN", []
+    try:
+        result_path = Path(repo_root) / "data" / "health_check_latest.json"
+        if result_path.exists():
+            data = json.loads(result_path.read_text(encoding="utf-8"))
+            status = data.get("status", "UNKNOWN")
+            findings = data.get("findings", [])
+    except Exception:
+        pass
+
+    reds   = [f for f in findings if f.get("severity") == "RED"]
+    ambers = [f for f in findings if f.get("severity") == "AMBER"]
+    greens = [f for f in findings if f.get("severity") == "GREEN"]
+
+    colour = {"GREEN": _GREEN, "AMBER": _ORANGE, "RED": _RED}.get(status, _GREY)
+    emoji  = {"GREEN": "✅", "AMBER": "⚠️", "RED": "🚨"}.get(status, "❔")
+
+    fields = []
+    if reds:
+        fields.append({"name": f"🚨 Critical ({len(reds)})",
+                       "value": "\n".join(f"**{f['check']}** — {f['message']}" for f in reds)[:1020],
+                       "inline": False})
+    if ambers:
+        fields.append({"name": f"⚠️ Warnings ({len(ambers)})",
+                       "value": "\n".join(f"**{f['check']}** — {f['message']}" for f in ambers)[:1020],
+                       "inline": False})
+    fields.append({"name": "Checks",
+                   "value": f"{len(greens)} passed · {len(ambers)} warned · {len(reds)} failed",
+                   "inline": False})
+
+    headline = {"GREEN": "All systems healthy",
+                "AMBER": "Running with warnings",
+                "RED":   "ACTION NEEDED — critical issue"}.get(status, "Result unclear")
+
+    _reply(payload, [_embed(
+        f"{emoji} Health Check — {headline}",
+        ("Ran the same checks as the scheduled 8:30 AM run.\n"
+         "**RED** = can lose money · **AMBER** = degraded but safe."),
+        colour, fields, footer=f"Investment Alpha · on-demand health check · exit={proc.returncode}",
+    )])
+
+
 def cmd_monitor_check(payload):
     from broker.monitor import check_positions
     portfolio  = (payload.get("portfolio") or "pipeline").lower()
@@ -727,6 +798,7 @@ def _delegate_rebalance(payload: dict) -> None:
 COMMANDS = {
     "status":              cmd_status,
     "regime":              cmd_regime,
+    "health":              cmd_health,
     "strategy":            cmd_strategy,
     "chart":               cmd_chart,
     "monitor_check":       cmd_monitor_check,

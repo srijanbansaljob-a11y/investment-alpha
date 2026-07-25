@@ -146,16 +146,35 @@ def _find_entry_date(ticker: str, portfolio: str) -> str | None:
     """
     Walk back through snapshots to find the first date the ticker appeared.
     Returns ISO date string or None.
+
+    BUG FIX 2026-07-25: this previously broke out of the loop on the very
+    first snapshot. Snapshots are iterated newest-first, and the newest one is
+    by definition the snapshot in which the ticker has ALREADY disappeared —
+    that absence is how the exit was detected in the first place. So the
+    `else: break` fired immediately and the function returned None every time,
+    making entry_date None and duration_days 0 for all four logged trades.
+
+    Correct walk has two phases:
+      1. Skip the trailing snapshots where the ticker is absent (post-exit).
+      2. Once found, keep walking back while it is still held, recording the
+         earliest date seen. Stop at the first gap — that is the entry.
     """
     try:
         snaps = sorted(_SNAP_DIR.glob("positions_*.json"), reverse=True)
         first_seen = None
+        seen_yet = False
         for snap_path in snaps:
-            snap = json.loads(snap_path.read_text(encoding="utf-8"))
-            if ticker in snap.get(portfolio, {}):
-                first_seen = snap["date"]
-            else:
-                break   # ticker absent in earlier snap = this was entry date
+            try:
+                snap = json.loads(snap_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue                     # skip unreadable snapshot, keep walking
+            held = ticker in (snap.get(portfolio) or {})
+            if held:
+                seen_yet = True
+                first_seen = snap.get("date") or first_seen
+            elif seen_yet:
+                break                        # gap after the holding period = entry boundary
+            # not held and not seen yet -> still in the post-exit tail, keep going
         return first_seen
     except Exception:
         return None

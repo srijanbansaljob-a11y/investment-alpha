@@ -4,8 +4,8 @@
       "ticker": "COP",
       "portfolio": "pipeline",
       "exit_date": "2026-07-09",
-      "entry_date": null,
-      "duration_days": 0,
+      "entry_date": "2026-07-08",
+      "duration_days": 1,
       "exit_type": "full",
       "entry_price": 109.5609,
       "exit_price": 110.72,
@@ -20,14 +20,16 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "entry_date_backfilled": true,
+      "entry_date_is_floor": true
     },
     {
       "ticker": "MU",
       "portfolio": "pipeline",
       "exit_date": "2026-07-10",
-      "entry_date": null,
-      "duration_days": 0,
+      "entry_date": "2026-07-08",
+      "duration_days": 2,
       "exit_type": "full",
       "entry_price": 927.15,
       "exit_price": 999.9376,
@@ -42,14 +44,16 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "entry_date_backfilled": true,
+      "entry_date_is_floor": true
     },
     {
       "ticker": "ABBV",
       "portfolio": "pipeline",
       "exit_date": "2026-07-17",
-      "entry_date": null,
-      "duration_days": 0,
+      "entry_date": "2026-07-13",
+      "duration_days": 4,
       "exit_type": "full",
       "entry_price": 247.915,
       "exit_price": 252.7227,
@@ -64,14 +68,16 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "entry_date_backfilled": true,
+      "entry_date_is_floor": false
     },
     {
       "ticker": "MATX",
       "portfolio": "pipeline",
       "exit_date": "2026-07-17",
-      "entry_date": null,
-      "duration_days": 0,
+      "entry_date": "2026-07-08",
+      "duration_days": 9,
       "exit_type": "full",
       "entry_price": 188.0987,
       "exit_price": 223.55,
@@ -86,8 +92,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "entry_date_backfilled": true,
+      "entry_date_is_floor": true
     }
   ],
-  "last_updated": "2026-07-24T22:34:38.619392+00:00"
+  "last_updated": "2026-07-25T14:59:57.762297+00:00"
 }

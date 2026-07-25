@@ -1,0 +1,119 @@
+name: Daily Health Check
+
+# Runs every weekday morning BEFORE the market opens, so problems are visible
+# while there is still time to act on them.
+#
+# Purpose: GitHub Actions already alerts when a job crashes. It does not alert
+# when a job succeeds while producing wrong output. Every serious bug found on
+# 2026-07-25 was of that second kind — silent. This job asserts the invariants
+# and fails loudly when one is violated.
+#
+# A RED finding makes health_check.py exit non-zero, which fails this job and
+# fires the Discord failure alert below on top of the health card it posts.
+
+on:
+  schedule:
+    - cron: "30 12 * * 1-5"   # 8:30 AM EDT (summer)
+    - cron: "30 13 * * 1-5"   # 8:30 AM EST (winter)
+  workflow_dispatch:
+  repository_dispatch:
+    types: [health-check]     # fired by the /health Discord command
+
+permissions:
+  contents: write   # commit health_check_latest.json
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Guard — only run at ET 08 (avoid double-fire on the two crons)
+        id: tz
+        run: |
+          HOUR=$(TZ=America/New_York date +%H)
+          echo "NY hour: $HOUR"
+          # Manual runs and /health Discord triggers always proceed; scheduled
+          # runs only at ET 08 so the EST/EDT cron pair fires once, not twice.
+          if [ "$HOUR" = "08" ] \
+             || [ "${{ github.event_name }}" = "workflow_dispatch" ] \
+             || [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "go=true" >> $GITHUB_OUTPUT
+          else
+            echo "go=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout code
+        if: steps.tz.outputs.go == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        if: steps.tz.outputs.go == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        if: steps.tz.outputs.go == 'true'
+        run: pip install -r requirements.txt
+
+      # /health Discord command → dispatcher replies to the interaction itself.
+      # Does not propagate the RED exit code, because the user already gets the
+      # result in Discord; failing the job too would double-alert.
+      - name: Health check (/health Discord command)
+        if: steps.tz.outputs.go == 'true' && github.event_name == 'repository_dispatch'
+        env:
+          ALPACA_API_KEY:             ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:          ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_API_KEY_SCREENER:    ${{ secrets.ALPACA_API_KEY_SCREENER }}
+          ALPACA_SECRET_KEY_SCREENER: ${{ secrets.ALPACA_SECRET_KEY_SCREENER }}
+          ALPACA_BASE_URL:            ${{ secrets.ALPACA_BASE_URL }}
+          DISCORD_WEBHOOK_URL:        ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_BOT_TOKEN:          ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:         ${{ secrets.DISCORD_CHANNEL_ID }}
+          FINNHUB_API_KEY:            ${{ secrets.FINNHUB_API_KEY }}
+          FRED_API_KEY:               ${{ secrets.FRED_API_KEY }}
+          COMMAND_PAYLOAD:            ${{ toJson(github.event.client_payload) }}
+        run: python broker/remote_commands.py --payload "$COMMAND_PAYLOAD"
+
+      - name: Run health check
+        if: steps.tz.outputs.go == 'true' && github.event_name != 'repository_dispatch'
+        env:
+          ALPACA_API_KEY:             ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:          ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_API_KEY_SCREENER:    ${{ secrets.ALPACA_API_KEY_SCREENER }}
+          ALPACA_SECRET_KEY_SCREENER: ${{ secrets.ALPACA_SECRET_KEY_SCREENER }}
+          ALPACA_BASE_URL:            ${{ secrets.ALPACA_BASE_URL }}
+          DISCORD_BOT_TOKEN:          ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:         ${{ secrets.DISCORD_CHANNEL_ID }}
+          FINNHUB_API_KEY:            ${{ secrets.FINNHUB_API_KEY }}
+          FRED_API_KEY:               ${{ secrets.FRED_API_KEY }}
+        run: python scripts/health_check.py
+
+      # Runs even when the check fails, so the RED result is still recorded.
+      - name: Commit health result
+        if: always() && steps.tz.outputs.go == 'true'
+        run: |
+          git config user.name "investment-alpha-bot"
+          git config user.email "actions@github.com"
+          git add data/health_check_latest.json || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: health check $(date -u +%Y-%m-%d) [skip ci]"
+            git pull --rebase origin main || true
+            git push
+          else
+            echo "No health result change to commit"
+          fi
+
+      - name: Alert Discord on failure
+        if: failure() && steps.tz.outputs.go == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"🚨 Health Check FAILED\",\"description\":\"A critical (RED) invariant was violated — see the health card posted above for detail.\\n[View run]($RUN_URL)\",\"color\":15158332}]}"

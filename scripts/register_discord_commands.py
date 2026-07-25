@@ -176,6 +176,21 @@ COMMANDS = [
         }],
     },
     {
+        "name": "health",
+        "description": "Run system QA now: margin, stops, reconciliation, data freshness, trade log integrity.",
+        "options": [{
+            "name": "portfolio",
+            "type": 3,
+            "required": False,
+            "description": "Which account to check (default: both)",
+            "choices": [
+                {"name": "Both (default)", "value": "both"},
+                {"name": "Pipeline",       "value": "pipeline"},
+                {"name": "Screener",       "value": "screener"},
+            ],
+        }],
+    },
+    {
         "name": "rebalance",
         "description": "Check exposure vs regime limit; suggest 50% trims on winners to free cash. Nothing auto-sells.",
         "options": [{
