@@ -152,6 +152,13 @@ SENTIMENT_CACHE_HOURS  = 6
 MEME_FILTER_ENABLED     = False
 REDDIT_MENTION_THRESHOLD = 500   # exclude if mentions > this
 
+# ── FRED (Federal Reserve Economic Data) ──────────────────────────────────
+# Free API key: https://fred.stlouisfed.org/docs/api/api_key.html (2-min signup).
+# Used by pipeline/regime.py for treasury yields (authoritative source, replaces
+# yfinance's ^TNX/^IRX index tickers). Falls back to FRED's unauthenticated CSV
+# endpoint if no key is set, then to yfinance if FRED is unreachable entirely.
+FRED_API_KEY = os.getenv("FRED_API_KEY", "")
+
 # ── Extended Fundamentals (Phase 4) ──────────────────────────────────────
 # Fetches balance_sheet + income_stmt for: asset growth, ROIC, op-margin change
 # First run adds ~60-90s; results cached for CACHE_MAX_AGE_HOURS

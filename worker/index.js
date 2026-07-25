@@ -37,11 +37,38 @@ const R_PONG = 1, R_CHANNEL_MESSAGE = 4, R_DEFERRED_MESSAGE = 5,
 const EPHEMERAL = 64;
 const MODAL_SUBMIT = 5, R_MODAL = 9, MAX_POSITIONS = 8;
 
-// ── Order sizing (% of buying power per trade, by regime) ─────────────────
+// ── Order sizing (% of EQUITY per trade, by regime) ───────────────────────
 // Regime score ≥60 = bull (5%), 30–59 = neutral (3%), <30 = bear (1.5%)
 const POSITION_SIZE_BY_REGIME = { bull: 0.05, neutral: 0.03, bear: 0.015 };
 const STOP_LOSS_PCT            = 0.05;   // 5% below entry
 const TAKE_PROFIT_PCT          = 0.12;   // 12% above entry
+
+// ── Safe position sizing — equity-based, cash-capped, never margin ────────
+//
+// BUG HISTORY (fixed 2026-07): sizing used `buying_power`, which Alpaca
+// reports at 2–4x equity on margin-enabled accounts. Observed 2026-07-17:
+//   screener equity $108,614 but buying_power $293,602 (2.70x)
+// So "5% per position" actually bought 5% of $293,602 = $14,680 — i.e.
+// 13.5% of real equity. Eight of those = $117,441 = 108% of equity, which
+// is exactly where the screener account ended up (−$8,766 cash, on margin).
+//
+// Two guards now:
+//   1. Size off EQUITY (true portfolio value), not buying_power.
+//   2. Hard-cap the spend at settled CASH, so an order can never draw margin
+//      even if equity-based sizing would otherwise allow it.
+// Returns qty 0 when there isn't enough cash — callers must handle that
+// rather than silently flooring to 1 share (the old Math.max(1, …) hid this).
+function computeSafeQty(acct, price, sizePct) {
+  const equity = parseFloat(acct?.equity || 0);
+  const cash   = parseFloat(acct?.cash   || 0);
+  const target    = equity * sizePct;                    // what we'd like to buy
+  const spendable = Math.max(0, Math.min(target, cash)); // what cash allows
+  const qty       = price > 0 ? Math.floor(spendable / price) : 0;
+  return {
+    qty, equity, cash, target, spendable,
+    cashLimited: target > cash,   // true when cash, not sizing, was the binding constraint
+  };
+}
 
 // ── Discord colours ────────────────────────────────────────────────────────
 const C_GREEN = 0x2ECC71, C_RED = 0xE74C3C, C_ORANGE = 0xE67E22,
@@ -190,8 +217,8 @@ async function placeBracketOrder(env, symbol, customQty = null, portfolio = "scr
     }
   } catch (e) { console.warn("ATR target read error:", e.message); }
 
-  // Size from buying power + regime
-  let qty = 1, sizePct = POSITION_SIZE_BY_REGIME.neutral;
+  // Size from EQUITY + regime, hard-capped at cash (see computeSafeQty)
+  let qty = 0, sizePct = POSITION_SIZE_BY_REGIME.neutral, sizing = null;
   try {
     const raw = await env.KV.get("regime_signal");
     if (raw) {
@@ -202,9 +229,28 @@ async function placeBracketOrder(env, symbol, customQty = null, portfolio = "scr
     }
     const acctR = await fetch(`${alpacaBase}/v2/account`, { headers });
     const acct  = await acctR.json();
-    const bp    = parseFloat(acct.buying_power || acct.cash || 0);
-    qty = (customQty && customQty > 0) ? customQty : Math.max(1, Math.floor((bp * sizePct) / price));
+    sizing = computeSafeQty(acct, price, sizePct);
+    qty = (customQty && customQty > 0) ? customQty : sizing.qty;
+    console.log(
+      `Sizing ${symbol}: equity $${sizing.equity.toFixed(0)} x ${(sizePct*100).toFixed(1)}% ` +
+      `= $${sizing.target.toFixed(0)} | cash $${sizing.cash.toFixed(0)} ` +
+      `| spend $${sizing.spendable.toFixed(0)} -> ${qty} sh` +
+      (sizing.cashLimited ? " [CASH-CAPPED]" : "")
+    );
   } catch (e) { console.warn("Sizing error:", e.message); }
+
+  // Refuse rather than place a margin order when cash can't cover it
+  if (!qty || qty < 1) {
+    const detail = sizing
+      ? `Equity $${sizing.equity.toFixed(0)} · available cash $${sizing.cash.toFixed(0)} · ` +
+        `${(sizePct*100).toFixed(1)}% target $${sizing.target.toFixed(0)}`
+      : "Could not read account.";
+    return {
+      error: `🚫 Not enough cash to buy ${symbol} without using margin.\n${detail}\n` +
+             `This system sizes off equity and never borrows. Close a position ` +
+             `or use /rebalance to free cash.`,
+    };
+  }
 
   const stopPrice      = parseFloat((price * (1 - stopPct)).toFixed(2));
   const takePrice      = parseFloat((price * (1 + tpAlpacaPct)).toFixed(2));
@@ -416,20 +462,39 @@ async function handleTradingViewWebhook(request, env) {
     "Content-Type":        "application/json",
   };
 
-  // Determine qty from buying power — scaled by regime
+  // Determine qty from EQUITY (cash-capped, never margin) — scaled by regime
   const regimeKey = regimeScore >= 60 ? "bull" : regimeScore >= 30 ? "neutral" : "bear";
   const positionSizePct = POSITION_SIZE_BY_REGIME[regimeKey];
-  let qty = 1;
+  let qty = 0, tvSizing = null;
   try {
     const acctResp = await fetch(`${alpacaBase}/v2/account`, { headers: alpacaHeaders });
     const acct = await acctResp.json();
-    const buyingPower = parseFloat(acct.buying_power || acct.cash || 0);
     const entryPrice = price || 100;  // fallback if price not sent
-    const dollarAlloc = buyingPower * positionSizePct;
-    qty = Math.max(1, Math.floor(dollarAlloc / entryPrice));
-    console.log(`Regime ${regimeKey} (score ${regimeScore}) → sizing ${positionSizePct*100}% → $${dollarAlloc.toFixed(0)} → ${qty} shares`);
+    tvSizing = computeSafeQty(acct, entryPrice, positionSizePct);
+    qty = tvSizing.qty;
+    console.log(
+      `Regime ${regimeKey} (score ${regimeScore}) -> ${(positionSizePct*100).toFixed(1)}% of ` +
+      `equity $${tvSizing.equity.toFixed(0)} = $${tvSizing.target.toFixed(0)} | ` +
+      `cash $${tvSizing.cash.toFixed(0)} | spend $${tvSizing.spendable.toFixed(0)} -> ${qty} shares` +
+      (tvSizing.cashLimited ? " [CASH-CAPPED]" : "")
+    );
   } catch (e) {
-    console.warn("Could not fetch Alpaca buying power:", e.message);
+    console.warn("Could not size order from Alpaca account:", e.message);
+  }
+
+  // No cash → skip the trade entirely rather than buying on margin
+  if (action.toLowerCase() === "buy" && (!qty || qty < 1)) {
+    console.warn(`TradingView buy for ${ticker} skipped — insufficient cash (no margin allowed)`);
+    return new Response(
+      JSON.stringify({
+        status: "skipped",
+        reason: "insufficient_cash",
+        detail: tvSizing
+          ? `equity ${tvSizing.equity.toFixed(0)}, cash ${tvSizing.cash.toFixed(0)}, target ${tvSizing.target.toFixed(0)}`
+          : "account read failed",
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   let orderResult = null;
@@ -563,14 +628,13 @@ async function buildBuyPreview(env, ticker, customQty = null, portfolio = "scree
   const headers    = portfolioHeaders(env, portfolio);
 
   // Parallel fetch: price + account + all positions
-  let price = null, buyingPower = 0, openPositions = [], existingPos = null;
+  let price = null, acctSnapshot = null, openPositions = [], existingPos = null;
   try {
     const [acctR, posR] = await Promise.all([
       fetch(`${alpacaBase}/v2/account`,   { headers }),
       fetch(`${alpacaBase}/v2/positions`, { headers }),
     ]);
-    const acct = await acctR.json();
-    buyingPower   = parseFloat(acct.buying_power || acct.cash || 0);
+    acctSnapshot  = await acctR.json();   // full account: equity + cash used for sizing
     const posData = await posR.json();
     if (Array.isArray(posData)) {
       openPositions = posData;
@@ -627,8 +691,24 @@ async function buildBuyPreview(env, ticker, customQty = null, portfolio = "scree
   } catch (e) {}
 
   const sizePct      = POSITION_SIZE_BY_REGIME[regimeKey];
-  const suggestedQty = Math.max(1, Math.floor((buyingPower * sizePct) / price));
+  const sizing       = computeSafeQty(acctSnapshot, price, sizePct);
+  const suggestedQty = sizing.qty;
   const qty          = (customQty && customQty > 0) ? customQty : suggestedQty;
+
+  // Block the preview outright when cash can't fund even one share — better to
+  // explain why than to render a buy button that will fail or draw margin.
+  if (!qty || qty < 1) {
+    return {
+      error:
+        `🚫 **Not enough cash to buy ${ticker}** without using margin.\n\n` +
+        `• Equity: **$${sizing.equity.toLocaleString(undefined, {maximumFractionDigits: 0})}**\n` +
+        `• Available cash: **$${sizing.cash.toLocaleString(undefined, {maximumFractionDigits: 0})}**\n` +
+        `• ${(sizePct * 100).toFixed(1)}% target size: **$${sizing.target.toLocaleString(undefined, {maximumFractionDigits: 0})}**\n` +
+        `• ${ticker} price: **$${price.toFixed(2)}**\n\n` +
+        `Positions are sized off equity and capped at cash — this system never borrows. ` +
+        `Close a position or run \`/rebalance\` to free up cash.`,
+    };
+  }
 
   // Dollar calculations
   const totalCost    = qty * price;
@@ -654,10 +734,14 @@ async function buildBuyPreview(env, ticker, customQty = null, portfolio = "scree
       { name: "Monitor gain",      value: `+$${monitorGain.toFixed(2)}`,                                inline: true },
       { name: "Risk / reward",     value: `1 : ${rr}`,                                                 inline: true },
       { name: "ATR",               value: atrPct ? `${atrPct.toFixed(2)}%` : "default",                inline: true },
-      { name: "Buying power left", value: `$${(buyingPower - totalCost).toFixed(2)}`,                   inline: true },
+      { name: "Cash left after",   value: `$${(sizing.cash - totalCost).toFixed(2)}`,                   inline: true },
       { name: "Positions",         value: `${openPositions.length} / ${MAX_POSITIONS} open`,            inline: true },
+      { name: "Sizing",
+        value: `${(sizePct*100).toFixed(1)}% of $${sizing.equity.toLocaleString(undefined,{maximumFractionDigits:0})} equity` +
+               (sizing.cashLimited ? " — **capped by cash**" : ""),
+        inline: false },
     ],
-    footer: { text: `[${portfolio === "screener" ? "Screener" : "Pipeline"}] Bracket order · Stop + ceiling auto-managed by Alpaca · Paper trading` },
+    footer: { text: `[${portfolio === "screener" ? "Screener" : "Pipeline"}] Sized off equity, capped at cash (no margin) · Bracket order · Paper trading` },
   };
 
   // qty encoded in confirm custom_id so placeBracketOrder uses it
@@ -1553,8 +1637,15 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
         const sc = fmtPos(Array.isArray(sPos) ? sPos : []);
         const pc = fmtPos(Array.isArray(pPos) ? pPos : []);
         const totalPnl = sc.pnl + pc.pnl;
-        const sBp      = parseFloat(sAcct?.buying_power || 0);
-        const pBp      = parseFloat(pAcct?.buying_power || 0);
+        // Show CASH, not buying_power — buying_power is margin-inflated (2-4x
+        // equity) and made the account look far richer than it is. Sizing uses
+        // cash/equity now, so the brief should report the same number.
+        const sBp      = parseFloat(sAcct?.cash || 0);
+        const pBp      = parseFloat(pAcct?.cash || 0);
+        const sEq      = parseFloat(sAcct?.equity || 0);
+        const pEq      = parseFloat(pAcct?.equity || 0);
+        const sInvPct  = sEq > 0 ? (sc.val / sEq * 100) : 0;
+        const pInvPct  = pEq > 0 ? (pc.val / pEq * 100) : 0;
         const regLabel = regime?.label || "UNKNOWN";
         const regScore = regime?.total  || 0;
         const today    = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -1637,8 +1728,8 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
               { name: "Regime",              value: `${regLabel} (${regScore}/100)`,                    inline: true },
               { name: "Screener open P&L",   value: `${sc.pnl >= 0 ? "+" : ""}$${sc.pnl.toFixed(0)}`, inline: true },
               { name: "Pipeline open P&L",   value: `${pc.pnl >= 0 ? "+" : ""}$${pc.pnl.toFixed(0)}`, inline: true },
-              { name: "Screener buying pwr", value: `$${sBp.toFixed(0)}`,                               inline: true },
-              { name: "Pipeline buying pwr", value: `$${pBp.toFixed(0)}`,                               inline: true },
+              { name: "Screener cash",       value: `$${sBp.toFixed(0)} · ${sInvPct.toFixed(0)}% invested`, inline: true },
+              { name: "Pipeline cash",       value: `$${pBp.toFixed(0)} · ${pInvPct.toFixed(0)}% invested`, inline: true },
               { name: "​",              value: "​",                                            inline: true },
               ...perfFields,
               ...winField,
@@ -1907,8 +1998,13 @@ async function runMorningBrief(env) {
   const sc = fmtPositions(Array.isArray(sPos) ? sPos : [], "Screener");
   const pc = fmtPositions(Array.isArray(pPos) ? pPos : [], "Pipeline");
   const totalPnl = sc.pnl + pc.pnl;
-  const sBp      = parseFloat(sAcct?.buying_power || 0);
-  const pBp      = parseFloat(pAcct?.buying_power || 0);
+  // Cash, not buying_power — see note in the /brief handler above.
+  const sBp      = parseFloat(sAcct?.cash || 0);
+  const pBp      = parseFloat(pAcct?.cash || 0);
+  const sEq2     = parseFloat(sAcct?.equity || 0);
+  const pEq2     = parseFloat(pAcct?.equity || 0);
+  const sInv2    = sEq2 > 0 ? (sc.val / sEq2 * 100) : 0;
+  const pInv2    = pEq2 > 0 ? (pc.val / pEq2 * 100) : 0;
   const regLabel = regime?.label || "UNKNOWN";
   const regScore = regime?.total  || 0;
   const today     = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -1945,8 +2041,8 @@ async function runMorningBrief(env) {
       { name: "Pipeline P&L",        value: `${pc.pnl >= 0 ? "+" : ""}$${pc.pnl.toFixed(2)}`,  inline: true },
       { name: "Screener value",      value: `$${sc.val.toFixed(2)}`,                             inline: true },
       { name: "Pipeline value",      value: `$${pc.val.toFixed(2)}`,                             inline: true },
-      { name: "Screener buying pwr", value: `$${sBp.toFixed(2)}`,                                inline: true },
-      { name: "Pipeline buying pwr", value: `$${pBp.toFixed(2)}`,                                inline: true },
+      { name: "Screener cash",       value: `$${sBp.toFixed(0)} · ${sInv2.toFixed(0)}% invested`, inline: true },
+      { name: "Pipeline cash",       value: `$${pBp.toFixed(0)} · ${pInv2.toFixed(0)}% invested`, inline: true },
       { name: `Today's picks (${newPicks.length} new · ${heldPicks.length} held)`,
         value: picksLine, inline: false },
     ],

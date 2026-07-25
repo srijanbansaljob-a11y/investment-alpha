@@ -1,8 +1,12 @@
 """
 pipeline/regime.py - Market Regime Classifier
 
-Fetches SPX and VIX data via yfinance and classifies the current market
-regime as BULL, NEUTRAL, or BEAR.
+Classifies the current market regime as BULL, NEUTRAL, or BEAR from SPX
+(yfinance — 200-day MA computed in-code), VIX (CBOE's own daily-prices CSV,
+the authoritative primary source since VIX is CBOE's index; yfinance
+fallback), and the 10Y-3M treasury spread (FRED's DGS10/DGS3MO
+constant-maturity series, the authoritative source for treasury yields;
+yfinance ^TNX/^IRX fallback). See _get_vix_current / _get_fred_yield.
 
 Rules:
   BULL    : SPX > 200-day MA  AND  VIX < REGIME_VIX_NEUTRAL
@@ -19,6 +23,7 @@ import logging
 from pathlib import Path
 from datetime import datetime, timezone
 
+import requests
 import yfinance as yf
 import numpy as np
 
@@ -30,19 +35,106 @@ logger = logging.getLogger(__name__)
 SPX_MA_DAYS = 200
 SPX_BEAR_THRESHOLD = -0.05
 
+_CBOE_VIX_CSV = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"
+_FRED_REST_URL = "https://api.stlouisfed.org/fred/series/observations"
+_FRED_CSV_URL  = "https://fred.stlouisfed.org/graph/fredgraph.csv"
+
+
+def _get_vix_current():
+    """
+    Latest VIX close. CBOE's own daily-prices CSV is the authoritative primary
+    source (VIX is CBOE's index — no one else "computes" it, they just relay
+    it), so it's tried first. Falls back to yfinance if CBOE is unreachable.
+    """
+    try:
+        r = requests.get(_CBOE_VIX_CSV, timeout=10)
+        r.raise_for_status()
+        lines = [ln for ln in r.text.strip().splitlines() if ln.strip()]
+        last_row = lines[-1].split(",")  # DATE,OPEN,HIGH,LOW,CLOSE
+        vix = float(last_row[4])
+        logger.debug("VIX from CBOE: %.2f (as of %s)", vix, last_row[0])
+        return vix
+    except Exception as exc:
+        logger.debug("CBOE VIX fetch failed (%s) — falling back to yfinance", exc)
+
+    try:
+        vix_raw = yf.download(config.VIX_TICKER, period="5d", auto_adjust=True, progress=False)
+        if not vix_raw.empty:
+            vix = float(vix_raw["Close"].squeeze().iloc[-1])
+            logger.debug("VIX from yfinance fallback: %.2f", vix)
+            return vix
+    except Exception as exc:
+        logger.debug("yfinance VIX fetch also failed: %s", exc)
+    return None
+
+
+def _get_fred_yield(series_id: str) -> float | None:
+    """
+    Latest value for a FRED constant-maturity treasury series (e.g. DGS10,
+    DGS3MO) — the authoritative source for treasury yields. Tries the official
+    REST API first (needs config.FRED_API_KEY, free 2-min signup at
+    fred.stlouisfed.org/docs/api/api_key.html); falls back to FRED's
+    unauthenticated CSV endpoint (no key needed, same data) if no key is set
+    or the API call fails.
+    """
+    api_key = getattr(config, "FRED_API_KEY", "")
+    if api_key:
+        try:
+            r = requests.get(
+                _FRED_REST_URL,
+                params={
+                    "series_id": series_id, "api_key": api_key, "file_type": "json",
+                    "sort_order": "desc", "limit": 5,
+                },
+                timeout=10,
+            )
+            r.raise_for_status()
+            for obs in r.json().get("observations", []):
+                val = obs.get("value")
+                if val not in (None, ".", ""):
+                    return float(val)
+        except Exception as exc:
+            logger.debug("FRED REST API failed for %s (%s) — trying CSV fallback", series_id, exc)
+
+    try:
+        r = requests.get(_FRED_CSV_URL, params={"id": series_id}, timeout=10)
+        r.raise_for_status()
+        lines = [ln for ln in r.text.strip().splitlines() if ln.strip()]
+        for line in reversed(lines[1:]):  # skip header, walk back to last non-missing value
+            _, _, val = line.partition(",")
+            val = val.strip()
+            if val and val != ".":
+                return float(val)
+    except Exception as exc:
+        logger.debug("FRED CSV fetch failed for %s: %s", series_id, exc)
+    return None
+
 
 def _get_yield_curve_signal():
-    """10Y - 3M Treasury spread. Negative = inverted = recession warning."""
+    """
+    10Y - 3M Treasury spread. Negative = inverted = recession warning.
+    FRED's DGS10/DGS3MO constant-maturity series are the primary source (see
+    _get_fred_yield); falls back to yfinance's ^TNX/^IRX index tickers only if
+    FRED is unreachable entirely.
+    """
+    t10 = _get_fred_yield("DGS10")
+    t3m = _get_fred_yield("DGS3MO")
+    if t10 is not None and t3m is not None:
+        spread = round(t10 - t3m, 4)
+        logger.debug("Yield curve spread (10Y-3M, FRED): %.4f", spread)
+        return spread
+
+    logger.debug("FRED yield data unavailable — falling back to yfinance ^TNX/^IRX")
     try:
-        t10 = yf.download("^TNX", period="5d", progress=False, auto_adjust=True)
-        t3m = yf.download("^IRX", period="5d", progress=False, auto_adjust=True)
-        if t10.empty or t3m.empty:
+        t10_yf = yf.download("^TNX", period="5d", progress=False, auto_adjust=True)
+        t3m_yf = yf.download("^IRX", period="5d", progress=False, auto_adjust=True)
+        if t10_yf.empty or t3m_yf.empty:
             return None
-        spread = float(t10["Close"].squeeze().iloc[-1]) - float(t3m["Close"].squeeze().iloc[-1])
-        logger.debug("Yield curve spread (10Y-3M): %.4f", spread)
+        spread = float(t10_yf["Close"].squeeze().iloc[-1]) - float(t3m_yf["Close"].squeeze().iloc[-1])
+        logger.debug("Yield curve spread (10Y-3M, yfinance fallback): %.4f", spread)
         return round(spread, 4)
     except Exception as exc:
-        logger.debug("Yield curve fetch error: %s", exc)
+        logger.debug("Yield curve fetch error (all sources failed): %s", exc)
         return None
 
 
@@ -107,14 +199,10 @@ def run():
     except Exception as exc:
         return _safe_fallback("SPX fetch error: " + str(exc))
 
-    # Fetch VIX
-    try:
-        vix_raw = yf.download(config.VIX_TICKER, period="5d", auto_adjust=True, progress=False)
-        if vix_raw.empty:
-            return _safe_fallback("No VIX data returned")
-        vix_current = float(vix_raw["Close"].squeeze().iloc[-1])
-    except Exception as exc:
-        return _safe_fallback("VIX fetch error: " + str(exc))
+    # Fetch VIX (CBOE official CSV primary, yfinance fallback — see _get_vix_current)
+    vix_current = _get_vix_current()
+    if vix_current is None:
+        return _safe_fallback("No VIX data returned (CBOE + yfinance both failed)")
 
     # Primary classification: VIX + SPX 200MA
     above_200ma = spx_vs_200ma_pct > 0
