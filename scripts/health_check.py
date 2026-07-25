@@ -158,7 +158,14 @@ def check_account(f: Findings, portfolio: str, regime_label: str, cap: float):
 
     # Exposure vs regime cap: over the cap is not dangerous by itself (it blocks
     # new buys rather than forcing sales), so AMBER not RED.
-    if inv_pct > cap:
+    #
+    # Suppressed when already >100% invested — the margin check above has
+    # reported that as RED, and repeating it as AMBER is two alerts for one
+    # problem. A checker that fires redundant warnings trains you to skim past
+    # the real ones.
+    if inv_pct > 1.0:
+        pass                                   # already covered by :margin RED
+    elif inv_pct > cap:
         f.add(AMBER, f"{portfolio}:exposure",
               f"{inv_pct*100:.0f}% invested vs {cap*100:.0f}% cap ({regime_label}) — "
               f"new entries blocked until positions close or regime improves.")
@@ -211,25 +218,54 @@ def check_stops(f: Findings, portfolio: str, positions: dict):
 
 
 def check_reconciliation(f: Findings, portfolio: str, positions: dict):
-    """Broker truth vs today's local snapshot."""
-    today = datetime.now(timezone.utc).date().isoformat()
-    snap = _load_json(_SNAP_DIR / f"positions_{today}.json")
-    if snap is None:
-        f.add(AMBER, f"{portfolio}:reconcile",
-              f"No snapshot for {today} yet (written after close) — cannot reconcile")
+    """
+    Broker truth vs the most recent local snapshot.
+
+    FIX 2026-07-25: this used to demand a snapshot dated TODAY. Snapshots are
+    written after the close, so the 8:30 AM scheduled run never found one and
+    emitted AMBER every single day — a permanent false alarm that would train
+    you to ignore the whole card. It now reconciles against the newest snapshot
+    available and reports its age, only warning when the holdings genuinely
+    disagree (or when the snapshot is old enough to suggest the job stopped).
+    """
+    snaps = sorted(_SNAP_DIR.glob("positions_*.json")) if _SNAP_DIR.exists() else []
+    if not snaps:
+        f.add(AMBER, f"{portfolio}:reconcile", "No snapshots exist yet — cannot reconcile")
         return
+
+    newest_path = snaps[-1]
+    snap_date = newest_path.stem.replace("positions_", "")
+    snap = _load_json(newest_path)
+    if snap is None:
+        f.add(AMBER, f"{portfolio}:reconcile", f"Newest snapshot {snap_date} is unreadable")
+        return
+
+    try:
+        age_days = (datetime.now(timezone.utc).date()
+                    - datetime.fromisoformat(snap_date).date()).days
+    except Exception:
+        age_days = 0
+
     local = set((snap.get(portfolio) or {}).keys())
     broker = set(positions.keys())
     only_broker, only_local = broker - local, local - broker
+
+    # Intraday trades legitimately create drift against an end-of-day snapshot,
+    # so a 0-1 day old snapshot differing is informational, not alarming.
     if only_broker or only_local:
         parts = []
         if only_broker:
-            parts.append(f"in broker not local: {', '.join(sorted(only_broker))}")
+            parts.append(f"in broker not snapshot: {', '.join(sorted(only_broker))}")
         if only_local:
-            parts.append(f"in local not broker: {', '.join(sorted(only_local))}")
-        f.add(AMBER, f"{portfolio}:reconcile", " · ".join(parts))
+            parts.append(f"in snapshot not broker: {', '.join(sorted(only_local))}")
+        detail = " · ".join(parts) + f" (snapshot {snap_date}, {age_days}d old)"
+        if age_days <= 1:
+            f.add(GREEN, f"{portfolio}:reconcile", "Drift vs EOD snapshot — " + detail)
+        else:
+            f.add(AMBER, f"{portfolio}:reconcile", detail)
     else:
-        f.add(GREEN, f"{portfolio}:reconcile", f"{len(broker)} positions match snapshot")
+        f.add(GREEN, f"{portfolio}:reconcile",
+              f"{len(broker)} positions match snapshot {snap_date}")
 
 
 def check_freshness(f: Findings):
@@ -323,7 +359,11 @@ def check_factor_sanity(f: Findings):
     issues = []
     n = len(df)
     if n == 0:
-        f.add(RED, "factors:cache", "Fundamentals cache is empty")
+        # AMBER not RED: an empty cache means the pipeline has not run yet
+        # (or the cache expired), which blocks new scoring but risks nothing.
+        # RED is reserved for states that can lose money.
+        f.add(AMBER, "factors:cache",
+              "Fundamentals cache is empty — pipeline has not run since last expiry")
         return
 
     for col, lo, hi in [("roe", -5.0, 5.0), ("roa", -2.0, 2.0),
