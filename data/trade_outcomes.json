@@ -95,7 +95,205 @@
       "win": true,
       "entry_date_backfilled": true,
       "entry_date_is_floor": true
+    },
+    {
+      "ticker": "AAPL",
+      "portfolio": "screener",
+      "exit_date": "2026-07-27",
+      "entry_date": "2026-07-08",
+      "duration_days": 19,
+      "exit_type": "full",
+      "entry_price": 278.5747,
+      "exit_price": 333.547,
+      "pnl_pct": 19.73,
+      "pnl_dollars": 1649.17,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "ABBV",
+      "portfolio": "screener",
+      "exit_date": "2026-07-27",
+      "entry_date": "2026-07-08",
+      "duration_days": 19,
+      "exit_type": "full",
+      "entry_price": 242.02,
+      "exit_price": 259.36,
+      "pnl_pct": 7.17,
+      "pnl_dollars": 1300.5,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "ABT",
+      "portfolio": "screener",
+      "exit_date": "2026-07-27",
+      "entry_date": "2026-07-08",
+      "duration_days": 19,
+      "exit_type": "full",
+      "entry_price": 93.21,
+      "exit_price": 103.06,
+      "pnl_pct": 10.57,
+      "pnl_dollars": 1704.05,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "BAC",
+      "portfolio": "screener",
+      "exit_date": "2026-07-27",
+      "entry_date": "2026-07-08",
+      "duration_days": 19,
+      "exit_type": "full",
+      "entry_price": 58.05,
+      "exit_price": 62.0036,
+      "pnl_pct": 6.81,
+      "pnl_dollars": 1031.89,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "MSFT",
+      "portfolio": "screener",
+      "exit_date": "2026-07-27",
+      "entry_date": "2026-07-08",
+      "duration_days": 19,
+      "exit_type": "full",
+      "entry_price": 356.22,
+      "exit_price": 381.7801,
+      "pnl_pct": 7.17,
+      "pnl_dollars": 51.12,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "REGN",
+      "portfolio": "screener",
+      "exit_date": "2026-07-27",
+      "entry_date": "2026-07-08",
+      "duration_days": 19,
+      "exit_type": "full",
+      "entry_price": 626.02,
+      "exit_price": 656.01,
+      "pnl_pct": 4.79,
+      "pnl_dollars": 809.73,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "TMO",
+      "portfolio": "screener",
+      "exit_date": "2026-07-27",
+      "entry_date": "2026-07-08",
+      "duration_days": 19,
+      "exit_type": "full",
+      "entry_price": 508.43,
+      "exit_price": 568.26,
+      "pnl_pct": 11.77,
+      "pnl_dollars": 2273.54,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "VRTX",
+      "portfolio": "screener",
+      "exit_date": "2026-07-27",
+      "entry_date": "2026-07-08",
+      "duration_days": 19,
+      "exit_type": "full",
+      "entry_price": 482.03,
+      "exit_price": 478.98,
+      "pnl_pct": -0.63,
+      "pnl_dollars": -88.45,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": false
+    },
+    {
+      "ticker": "EIX",
+      "portfolio": "pipeline",
+      "exit_date": "2026-07-27",
+      "entry_date": "2026-07-08",
+      "duration_days": 19,
+      "exit_type": "partial",
+      "entry_price": 70.4409,
+      "exit_price": 79.75,
+      "pnl_pct": 13.21,
+      "pnl_dollars": 647.78,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
     }
   ],
-  "last_updated": "2026-07-25T14:59:57.762297+00:00"
+  "last_updated": "2026-07-27T22:33:59.489491+00:00"
 }
