@@ -270,14 +270,50 @@ def cmd_monitor_check(payload):
     )])
 
 
+def _resting_stops(client) -> dict:
+    """
+    Map of symbol -> stop_price for protective stop orders currently resting
+    at Alpaca. These are the levels that will ACTUALLY execute.
+    """
+    try:
+        from alpaca.trading.requests import GetOrdersRequest
+        from alpaca.trading.enums import QueryOrderStatus
+        orders = client.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN, limit=500))
+        out = {}
+        for o in orders:
+            if str(o.order_type).lower().endswith("stop") and getattr(o, "stop_price", None):
+                out[o.symbol] = float(o.stop_price)
+        return out
+    except Exception as exc:
+        log.warning("Could not read resting stop orders (%s)", exc)
+        return {}
+
+
 def _stoploss_scan(portfolio: str = "pipeline"):
-    """Evaluate every Alpaca position against its stop. Returns (client, rows, breached, regime)."""
+    """
+    Evaluate every Alpaca position against its stop.
+    Returns (client, rows, breached, regime).
+
+    FIX 2026-07-27: this used to ALWAYS recompute an entry-anchored stop, even
+    when a real protective order was resting at the broker. Once stops were
+    trailed up to the current price those two numbers diverged badly (MRK:
+    reported $105.50, actually resting at $123.12) — and the reported level was
+    the looser one, so the command would call a position "safe" that the broker
+    was about to sell. The resting order is the truth; only fall back to a
+    computed level when nothing rests.
+    """
     client    = get_client(portfolio)
     positions = get_positions(client)
     regime    = _detect_regime()
-    rows, breached = [], []
+    resting   = _resting_stops(client)
+    rows, breached, unprotected = [], [], []
     for t, p in sorted(positions.items()):
-        stop, method = _stop_price(t, p["avg_entry_price"], regime)
+        if t in resting:
+            stop, method = resting[t], "resting @ broker"
+        else:
+            stop, method = _stop_price(t, p["avg_entry_price"], regime)
+            method += " ⚠ NOT AT BROKER"
+            unprotected.append(t)
         hit = p["current_price"] <= stop
         rows.append(
             f"{'🛑' if hit else '✅'} **{t}** ${p['current_price']:.2f} vs stop ${stop:.2f} "
@@ -285,6 +321,12 @@ def _stoploss_scan(portfolio: str = "pipeline"):
         )
         if hit:
             breached.append(t)
+    if unprotected:
+        rows.append(
+            f"\n⚠️ **{len(unprotected)} position(s) have NO stop resting at Alpaca**: "
+            f"{', '.join(unprotected)} — levels shown for these are advisory only. "
+            f"Run `python scripts/protect_positions.py` to attach real stops."
+        )
     return client, rows, breached, regime
 
 
@@ -307,7 +349,18 @@ def cmd_stoploss_execute(payload):
     port_label = "Screener" if portfolio == "screener" else "Pipeline"
     client, rows, breached, regime = _stoploss_scan(portfolio)
     if not breached:
-        _reply(payload, [_embed(f"✅ Stop-Loss Execute [{port_label}]", "No positions are below their stop — nothing to exit.", _GREEN)])
+        # Show WHAT was checked, not just the verdict. A bare "nothing to exit"
+        # is indistinguishable from "it never looked at your account" — which
+        # is exactly the doubt this message used to create.
+        n = len([r for r in rows if r.startswith(("✅", "🛑"))])
+        _reply(payload, [_embed(
+            f"✅ Stop-Loss Execute [{port_label}] — {n} checked, 0 breached",
+            ("\n".join(rows) if rows else "_No open positions._"),
+            _GREEN,
+            [{"name": "Portfolio", "value": port_label,     "inline": True},
+             {"name": "Regime",    "value": regime.upper(), "inline": True},
+             {"name": "Result",    "value": "No positions below their stop — no orders placed.", "inline": False}],
+        )])
         return
     results = []
     for t in breached:
