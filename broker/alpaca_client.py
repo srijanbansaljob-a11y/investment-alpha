@@ -30,8 +30,13 @@ except ImportError:
 
 try:
     from alpaca.trading.client import TradingClient
-    from alpaca.trading.requests import MarketOrderRequest, GetOrdersRequest
-    from alpaca.trading.enums import OrderSide, TimeInForce, OrderStatus, QueryOrderStatus
+    from alpaca.trading.requests import (
+        MarketOrderRequest, GetOrdersRequest, StopOrderRequest,
+        TakeProfitRequest, StopLossRequest,
+    )
+    from alpaca.trading.enums import (
+        OrderSide, TimeInForce, OrderStatus, QueryOrderStatus, OrderClass,
+    )
     from alpaca.data.historical import StockHistoricalDataClient
 except ImportError:
     raise ImportError(
@@ -181,6 +186,8 @@ def place_market_order(
     qty: float,
     side: str,               # "buy" or "sell"
     dry_run: bool = False,
+    stop_price: float | None = None,
+    take_profit_price: float | None = None,
 ) -> dict:
     """
     Place a market order for a given ticker and quantity, then poll until it
@@ -189,17 +196,41 @@ def place_market_order(
     Args:
         client:  Authenticated TradingClient
         ticker:  Stock symbol e.g. "AAPL"
-        qty:     Number of shares (fractional supported by Alpaca)
+        qty:     Number of shares — MUST be a whole number when bracket legs
+                 are requested (Alpaca rejects brackets on fractional qty)
         side:    "buy" or "sell"
         dry_run: If True, log the order but don't submit it
+        stop_price:        optional protective stop, submitted as a bracket leg
+        take_profit_price: optional profit ceiling, submitted as a bracket leg
+
+    When both stop_price and take_profit_price are supplied on a BUY, the order
+    is sent as an Alpaca BRACKET so the exit legs rest at the broker. That
+    matters: a stop held only in our own monitoring code does nothing if the
+    monitor fails or the market gaps while nobody is watching.
 
     Returns dict with order details, including filled_qty / filled_avg_price
     when a fill was confirmed within the poll window.
     """
     side_enum = OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL
 
+    # Brackets are only valid on entries, and only on whole share counts.
+    want_bracket = (
+        side.lower() == "buy"
+        and stop_price is not None
+        and take_profit_price is not None
+    )
+    if want_bracket and float(qty) != int(float(qty)):
+        log.warning(
+            "  %s: qty %.4f is fractional — Alpaca rejects bracket orders on "
+            "fractional quantities. Submitting WITHOUT protective legs.",
+            ticker, qty,
+        )
+        want_bracket = False
+
     if dry_run:
-        log.info(f"  [DRY-RUN] Would place {side.upper()} {qty:.4f} shares of {ticker}")
+        extra = (f"  stop=${stop_price:.2f} tp=${take_profit_price:.2f}"
+                 if want_bracket else "  (no bracket)")
+        log.info(f"  [DRY-RUN] Would place {side.upper()} {qty:.4f} shares of {ticker}{extra}")
         return {
             "ticker":  ticker,
             "side":    side,
@@ -208,17 +239,33 @@ def place_market_order(
             "order_id": None,
             "filled_qty": None,
             "filled_avg_price": None,
+            "bracket": want_bracket,
+            "stop_price": stop_price if want_bracket else None,
+            "take_profit_price": take_profit_price if want_bracket else None,
         }
 
     try:
-        req = MarketOrderRequest(
-            symbol=ticker,
-            qty=round(qty, 4),
-            side=side_enum,
-            time_in_force=TimeInForce.DAY,
-        )
+        if want_bracket:
+            req = MarketOrderRequest(
+                symbol=ticker,
+                qty=int(float(qty)),
+                side=side_enum,
+                time_in_force=TimeInForce.DAY,
+                order_class=OrderClass.BRACKET,
+                stop_loss=StopLossRequest(stop_price=round(float(stop_price), 2)),
+                take_profit=TakeProfitRequest(limit_price=round(float(take_profit_price), 2)),
+            )
+        else:
+            req = MarketOrderRequest(
+                symbol=ticker,
+                qty=round(qty, 4),
+                side=side_enum,
+                time_in_force=TimeInForce.DAY,
+            )
         order = client.submit_order(req)
-        log.info(f"  Order submitted: {side.upper()} {qty:.4f} x {ticker} | ID: {order.id}")
+        log.info(f"  Order submitted: {side.upper()} {qty:.4f} x {ticker} | ID: {order.id}"
+                 + (f" | BRACKET stop=${stop_price:.2f} tp=${take_profit_price:.2f}"
+                    if want_bracket else " | no protective legs"))
 
         final = _wait_for_fill(client, order.id) or order
         status = str(final.status)
@@ -245,6 +292,9 @@ def place_market_order(
             "submitted_at": str(order.submitted_at),
             "filled_qty": filled_qty,
             "filled_avg_price": filled_avg_price,
+            "bracket": want_bracket,
+            "stop_price": stop_price if want_bracket else None,
+            "take_profit_price": take_profit_price if want_bracket else None,
         }
     except Exception as e:
         log.error(f"  ❌ Order failed: {side.upper()} {ticker} — {e}")
@@ -256,7 +306,53 @@ def place_market_order(
             "error":   str(e),
             "filled_qty": None,
             "filled_avg_price": None,
+            "bracket": False,
         }
+
+
+def place_stop_order(
+    client: TradingClient,
+    ticker: str,
+    qty: float,
+    stop_price: float,
+    dry_run: bool = False,
+) -> dict:
+    """
+    Submit a standalone protective SELL STOP against a position already held.
+
+    This is how an existing, unprotected position gets a broker-side stop
+    WITHOUT selling and rebuying it — no spread cost, no time out of the
+    market, no change to the cost basis.
+
+    Alpaca does not accept stop orders on fractional quantities, so callers
+    should pass the whole-share portion (e.g. 538 of a 538.0941 holding). The
+    fractional remainder stays unprotected, which is immaterial at that size.
+    """
+    whole = int(float(qty))
+    if whole < 1:
+        return {"ticker": ticker, "status": "skipped_sub_one_share", "qty": qty}
+
+    if dry_run:
+        log.info(f"  [DRY-RUN] Would place SELL STOP {whole} x {ticker} @ ${stop_price:.2f}")
+        return {"ticker": ticker, "qty": whole, "stop_price": round(stop_price, 2),
+                "status": "dry_run", "order_id": None}
+
+    try:
+        req = StopOrderRequest(
+            symbol=ticker,
+            qty=whole,
+            side=OrderSide.SELL,
+            time_in_force=TimeInForce.GTC,   # rests until hit or cancelled
+            stop_price=round(float(stop_price), 2),
+        )
+        order = client.submit_order(req)
+        log.info(f"  ✅ STOP resting: SELL {whole} x {ticker} @ ${stop_price:.2f} | ID: {order.id}")
+        return {"ticker": ticker, "qty": whole, "stop_price": round(stop_price, 2),
+                "status": str(order.status), "order_id": str(order.id)}
+    except Exception as e:
+        log.error(f"  ❌ Stop order failed: {ticker} — {e}")
+        return {"ticker": ticker, "qty": whole, "stop_price": round(stop_price, 2),
+                "status": "failed", "error": str(e)}
 
 
 def close_position(

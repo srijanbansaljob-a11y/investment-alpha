@@ -32,10 +32,23 @@ log = logging.getLogger(__name__)
 # ── Position Sizing ────────────────────────────────────────────────────────
 
 def calc_shares(target_value: float, current_price: float) -> float:
-    """Round fractional share quantity to 4 decimal places."""
+    """
+    Whole-share quantity for a target dollar value.
+
+    CHANGED 2026-07-27: previously returned a fractional quantity rounded to 4
+    decimals. Alpaca REJECTS bracket orders (and standalone stop orders) on
+    fractional quantities, which meant every position the pipeline opened was
+    structurally incapable of carrying a broker-side stop. Verified live: all
+    12 open pipeline positions were fractional and had zero resting protective
+    orders.
+
+    Flooring to whole shares costs at most one share of precision per position
+    (well under 1% of a typical position) and buys the ability to attach a real
+    stop at the broker. That trade is worth taking.
+    """
     if current_price <= 0:
         return 0.0
-    return round(target_value / current_price, 4)
+    return float(int(target_value / current_price))
 
 
 # ── Alpaca-first Reconciliation ────────────────────────────────────────────
@@ -150,6 +163,7 @@ def _reconcile_signals(
 def execute_signals(
     signals: list,
     dry_run: bool = True,
+    regime: str = "bull",
 ) -> dict:
     """
     Execute trade signals against the Alpaca paper trading account.
@@ -301,6 +315,33 @@ def execute_signals(
 
     log.info("  Estimated cash for buys: $%s", "{:,.2f}".format(available_cash))
 
+    # ── Exposure cap ──────────────────────────────────────────────────────
+    # Until now the pipeline bought until CASH ran out, with no ceiling on how
+    # much of the account could be at risk. Live check on 2026-07-27 found the
+    # account at 98.3% invested with $1,902 cash — no dry powder, no brake if
+    # the model is wrong. The regime caps existed in the mean-reversion sleeve
+    # and in the health checker's WARNING, but nothing enforced them here.
+    exposure_caps = getattr(config, "PIPELINE_MAX_INVESTED_PCT", None) or {
+        "bull": 0.60, "neutral": 0.40, "bear": 0.20,
+    }
+    regime_key = (regime or "bull").lower()
+    if regime_key not in exposure_caps:
+        regime_key = "bull"
+    max_invested = exposure_caps.get(regime_key, 0.70)
+    invested_value = max(0.0, equity - float(account_before["cash"]))
+    exposure_budget = max(0.0, (equity * max_invested) - invested_value)
+
+    log.info("  Exposure cap     : %.0f%% (%s regime) — invested $%s of $%s equity (%.1f%%)",
+             max_invested * 100, regime_key.upper(),
+             "{:,.0f}".format(invested_value), "{:,.0f}".format(equity),
+             (invested_value / equity * 100) if equity else 0)
+    if exposure_budget <= 0:
+        log.warning("  Already at or above the %.0f%% exposure cap — NO new buys "
+                    "will be placed until positions close.", max_invested * 100)
+    else:
+        log.info("  Room for new buys: $%s (cap) vs $%s (cash) — lower of the two applies",
+                 "{:,.0f}".format(exposure_budget), "{:,.0f}".format(available_cash))
+
     for sig in buy_signals:
         ticker           = sig["ticker"]
         weight           = sig.get("weight", config.EQUAL_WEIGHT)
@@ -347,17 +388,50 @@ def execute_signals(
                                "status": "skipped_insufficient_cash"})
                 continue
 
+            # Exposure cap — the second, independent brake. Cash alone is not a
+            # risk limit: an account can be 100% invested and still have cash.
+            if cost > exposure_budget:
+                log.warning(
+                    "    BUY %-6s: would breach the %.0f%% exposure cap "
+                    "(need $%.2f, %.0f%% budget remaining $%.2f)%s",
+                    ticker, max_invested * 100, cost, max_invested * 100,
+                    exposure_budget, reason_note,
+                )
+                orders.append({"ticker": ticker, "action": "BUY",
+                               "status": "skipped_exposure_cap"})
+                continue
+
+            # Protective legs — computed from the SIGNAL price. Alpaca holds
+            # these at the broker, so they work even if our monitor is down.
+            stop_price = take_price = None
+            try:
+                from broker.stop_loss import compute_stop_price, compute_take_profit
+                stop_price, stop_method, atr_val = compute_stop_price(ticker, price, regime_key)
+                take_price, _monitor, tp_method  = compute_take_profit(ticker, price, regime_key, atr_val)
+                if stop_price and take_price:
+                    log.info("      stop $%.2f (%s) · target $%.2f (%s)",
+                             stop_price, stop_method, take_price, tp_method)
+            except Exception as exc:
+                log.warning("      %s: could not compute protective levels (%s) — "
+                            "order will be placed WITHOUT a bracket", ticker, exc)
+
             log.info(
-                "    BUY %-6s  delta=+%.4f  price=$%.2f  cost=$%.2f"
+                "    BUY %-6s  delta=+%.0f sh  price=$%.2f  cost=$%.2f"
                 "  weight=%.0f pct%s",
                 ticker, delta_qty, price, cost, weight * 100, reason_note,
             )
-            order = alpaca.place_market_order(client, ticker, delta_qty, "buy",
-                                              dry_run=dry_run)
+            order = alpaca.place_market_order(
+                client, ticker, delta_qty, "buy", dry_run=dry_run,
+                stop_price=stop_price, take_profit_price=take_price,
+            )
             order["action"]       = "BUY"
             order["target_value"] = round(cost, 2)
             order["weight"]       = weight
             order["rationale"]    = sig.get("entry_rationale", reconcile_reason)
+            if order.get("status") not in ("failed",):
+                exposure_budget -= cost
+            if not order.get("bracket") and order.get("status") not in ("failed", "dry_run"):
+                log.warning("      %s: submitted WITHOUT protective stop — verify manually", ticker)
             if not dry_run:
                 if order.get("filled_avg_price"):
                     log.info("      -> filled @ $%.2f", order["filled_avg_price"])
@@ -398,6 +472,7 @@ def execute_signals(
     terminal_statuses = {
         "dry_run", "held", "no_position", "at_target",
         "skipped_no_price", "skipped_insufficient_cash", "skipped_cooldown",
+        "skipped_exposure_cap",
     }
     orders_submitted = [o for o in orders if o.get("status") not in terminal_statuses
                         and o.get("status") != "failed"]

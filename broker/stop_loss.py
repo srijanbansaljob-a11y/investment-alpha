@@ -159,6 +159,12 @@ def compute_stop_price(ticker: str, entry_price: float, regime: str = "bull") ->
 
     Returns (stop_price, stop_method, atr_value). atr_value is None when the
     fixed-percentage fallback was used (ATR disabled or unavailable).
+
+    2026-07-27: the raw ATR result is now clamped to
+    [STOP_PCT_FLOOR, STOP_PCT_CAP] below entry. Previously `entry - mult*ATR`
+    was unbounded, so a very quiet stock could yield a ~1% stop (hit by noise)
+    and a very volatile one a 20%+ stop (no real protection). This mirrors the
+    floor/cap guard already proven in the screener.
     """
     regime = (regime or "bull").lower()
     if regime not in config.STOP_LOSS_PCT:
@@ -169,14 +175,64 @@ def compute_stop_price(ticker: str, entry_price: float, regime: str = "bull") ->
     atr_period = getattr(config, "ATR_PERIOD", 14)
     atr_mult = atr_multipliers.get(regime, 2.0)
 
+    floor_pct = getattr(config, "STOP_PCT_FLOOR", 0.03)
+    cap_pct   = getattr(config, "STOP_PCT_CAP",   0.12)
+
     if use_atr:
         atr_value = _compute_atr(ticker, period=atr_period)
-        if atr_value is not None and atr_value > 0:
-            return entry_price - (atr_mult * atr_value), f"ATR({atr_period})×{atr_mult}", atr_value
+        if atr_value is not None and atr_value > 0 and entry_price > 0:
+            raw_stop = entry_price - (atr_mult * atr_value)
+            raw_pct  = (entry_price - raw_stop) / entry_price
+            clamped  = min(max(raw_pct, floor_pct), cap_pct)
+            stop     = entry_price * (1 - clamped)
+            method   = f"ATR({atr_period})x{atr_mult}"
+            if abs(clamped - raw_pct) > 1e-9:
+                which = "floor" if clamped > raw_pct else "cap"
+                method += f" [{which} {clamped*100:.0f}%]"
+                logger.info("%s: ATR stop %.1f%% clamped to %.1f%% by %s",
+                            ticker, raw_pct * 100, clamped * 100, which)
+            return stop, method, atr_value
         logger.warning("%s: ATR unavailable, falling back to fixed %% stop", ticker)
 
     stop_multiplier = config.STOP_LOSS_PCT.get(regime, 0.85)
     return entry_price * stop_multiplier, "fixed_pct", None
+
+
+def compute_take_profit(ticker: str, entry_price: float, regime: str = "bull",
+                        atr_value: float | None = None) -> tuple[float | None, float | None, str]:
+    """
+    Compute the take-profit ceiling and the earlier monitor-alert level.
+
+    Returns (ceiling_price, monitor_price, method). Both are None when
+    take-profit is disabled or no ATR is available.
+
+    Tiered like the screener: `ceiling` is the hard limit Alpaca enforces as
+    the bracket's take_profit leg; `monitor` fires earlier (default 80% of the
+    way there) so you get a Discord alert and a chance to decide before the
+    automatic exit triggers.
+    """
+    if not getattr(config, "TAKE_PROFIT_ENABLED", True) or entry_price <= 0:
+        return None, None, "disabled"
+
+    regime = (regime or "bull").lower()
+    mults  = getattr(config, "ATR_TAKE_PROFIT_MULTIPLIER",
+                     {"bull": 5.0, "neutral": 4.0, "bear": 3.0})
+    mult   = mults.get(regime, 4.0)
+    floor_pct = getattr(config, "TAKE_PROFIT_PCT_FLOOR", 0.08)
+    cap_pct   = getattr(config, "TAKE_PROFIT_PCT_CAP",   0.35)
+    ratio     = getattr(config, "TAKE_PROFIT_MONITOR_RATIO", 0.80)
+
+    if atr_value is None:
+        atr_value = _compute_atr(ticker, period=getattr(config, "ATR_PERIOD", 14))
+
+    if atr_value is None or atr_value <= 0:
+        return None, None, "atr_unavailable"
+
+    raw_pct = (mult * atr_value) / entry_price
+    clamped = min(max(raw_pct, floor_pct), cap_pct)
+    ceiling = entry_price * (1 + clamped)
+    monitor = entry_price * (1 + clamped * ratio)
+    return ceiling, monitor, f"ATRx{mult} [{clamped*100:.0f}%]"
 
 
 # ── Core Logic ─────────────────────────────────────────────────────────────

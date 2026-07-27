@@ -136,6 +136,34 @@ STOP_LOSS_PCT = {
     "bear":    0.90,   # 10% loss
 }
 
+# ── Stop guardrails (ported from the screener, 2026-07-27) ────────────────
+# Raw ATR × multiplier is unbounded: a quiet stock can produce a ~1% stop that
+# gets hit on ordinary noise, and a volatile one a 20%+ stop that defeats the
+# purpose. The screener clamped this to a sane band and it should apply here
+# too. Measured on the live 12-position pipeline book these bind rarely, but
+# they are the difference between a bad tail and a blown position.
+STOP_PCT_FLOOR = 0.03   # never tighter than 3% below entry
+STOP_PCT_CAP   = 0.12   # never wider than 12% below entry
+# NOTE: the floor is 3% (not the screener's 2%) and the cap 12% (not 8%)
+# deliberately. Pipeline holds for WEEKS on a fundamentals+momentum thesis;
+# the screener flips in days. A 2% stop that suits a 3-day hold would eject a
+# pipeline position on noise long before the thesis resolves. Width stays at
+# 2.5× ATR — only the guardrails are ported, not the multiplier.
+
+# ── Take-profit (tiered, mirrors the screener's design) ───────────────────
+# The bracket's take_profit leg is the hard ceiling Alpaca enforces. The
+# monitor alert fires earlier (at TAKE_PROFIT_MONITOR_RATIO of it) so you get
+# a chance to decide before the automatic exit triggers.
+TAKE_PROFIT_ENABLED       = True
+ATR_TAKE_PROFIT_MULTIPLIER = {
+    "bull":    5.0,   # wider target in a bull tape — let winners run
+    "neutral": 4.0,
+    "bear":    3.0,
+}
+TAKE_PROFIT_PCT_FLOOR     = 0.08   # never closer than 8% above entry
+TAKE_PROFIT_PCT_CAP       = 0.35   # never further than 35% above entry
+TAKE_PROFIT_MONITOR_RATIO = 0.80   # alert at 80% of the hard ceiling
+
 # ── 200-day MA Filter — Soft Boundary (Phase 4) ───────────────────────────
 # Instead of hard exclude at SMA200, apply a penalty for stocks near the boundary
 MA200_SOFT_ZONE    = 0.03   # stocks within 3% BELOW 200MA: penalize, don't exclude
@@ -399,6 +427,19 @@ MAX_INVESTED_PCTS = {
     "BEARISH":     0.20,   # up to 20% invested — defensive, mostly cash
 }
 MAX_INVESTED_DEFAULT = 0.80  # fallback when regime is unknown (fail-safe = allow)
+
+# Pipeline-native exposure cap (3-tier), enforced in broker/executor.py.
+# Deliberately the SAME numbers the health checker measures against, via the
+# established pipeline->screener label mapping (bull=MOD BULL, neutral=NEUTRAL,
+# bear=BEARISH). Before 2026-07-27 the cap existed only as a health-check
+# WARNING; the executor ignored it and bought until cash ran out, which is how
+# the account reached 98.3% invested with $1,902 left. Warning and enforcement
+# now agree.
+PIPELINE_MAX_INVESTED_PCT = {
+    "bull":    0.60,
+    "neutral": 0.40,
+    "bear":    0.20,
+}
 
 # Drawdown pause: if portfolio equity drops this far from its recent peak,
 # stop opening new positions until it recovers. Prevents doubling down into

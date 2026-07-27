@@ -290,6 +290,7 @@ def run_pipeline(
         broker_result = broker_executor.execute_signals(
             signals=enriched_signals,
             dry_run=broker_dry_run,
+            regime=regime_result.get("regime", "bull"),
         )
         all_results["broker"] = broker_result
         log.info("  Broker status  : %s", broker_result.get("status"))
