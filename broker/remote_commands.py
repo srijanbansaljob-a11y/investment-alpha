@@ -335,21 +335,110 @@ def _run_pipeline(execute: bool) -> tuple[bool, str]:
         return False, "Pipeline timed out after 50 minutes."
 
 
+def _load_run_summary() -> dict | None:
+    """
+    Read data/pipeline_run_latest.json, written by main.py at the end of
+    every run (dry or execute). This is structured data — regime, account
+    snapshot, orders with fill prices — used to build the Discord embed
+    instead of dumping raw console output.
+    """
+    path = config.DATA_DIR / "pipeline_run_latest.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        log.warning("Could not read pipeline run summary: %s", e)
+        return None
+
+
+def _format_pipeline_fields(summary: dict, execute: bool) -> list[dict]:
+    """Build Discord embed fields (market, portfolio, top picks, orders)
+    from the structured run summary."""
+    fields = []
+    regime = summary.get("regime") or {}
+
+    market_val = f"**{regime.get('label', '?')}**"
+    if regime.get("vix") is not None:
+        market_val += f" · VIX {regime['vix']:.1f}"
+    if regime.get("spx_vs_200ma_pct") is not None:
+        market_val += f" · SPX {regime['spx_vs_200ma_pct']:+.1f}% vs 200MA"
+    fields.append({"name": "📊 Market", "value": market_val, "inline": False})
+
+    acct = summary.get("account")
+    if acct:
+        inv_pct = (acct.get("invested_pct") or 0) * 100
+        port_val = (
+            f"Equity ${acct.get('equity', 0):,.2f} · Cash ${acct.get('cash', 0):,.2f} "
+            f"· {inv_pct:.0f}% invested · {acct.get('position_count', 0)} positions"
+        )
+        fields.append({"name": "💼 Portfolio (live Alpaca)", "value": port_val, "inline": False})
+
+    top = (summary.get("top_holdings") or [])[:8]
+    if top:
+        line = " · ".join(f"#{s['rank']} {s['ticker']} ({s['composite_score']:.2f})" for s in top)
+        fields.append({"name": "🏆 Top picks", "value": line[:1024], "inline": False})
+
+    if execute:
+        orders = summary.get("orders") or []
+        lines = []
+        for o in orders:
+            action = o.get("action")
+            status = o.get("status")
+            if action not in ("BUY", "EXIT", "TRIM"):
+                continue
+            if status in ("held", "at_target"):
+                continue
+            if status in ("skipped_insufficient_cash", "skipped_cooldown",
+                          "skipped_no_price", "no_position"):
+                lines.append(f"⏭️ {action} {o.get('ticker')} — skipped ({status})")
+            elif o.get("filled_avg_price"):
+                lines.append(
+                    f"✅ {action} {o.get('ticker')} {o.get('qty', 0):.2f} "
+                    f"@ ${o['filled_avg_price']:.2f}"
+                )
+            else:
+                lines.append(f"⚠️ {action} {o.get('ticker')} — submitted, fill NOT confirmed (status={status})")
+        if lines:
+            fields.append({"name": "📝 Orders", "value": "\n".join(lines)[:1024], "inline": False})
+        unconfirmed = summary.get("orders_unconfirmed", 0)
+        if unconfirmed:
+            fields.append({
+                "name": "⚠️ Unconfirmed fills",
+                "value": f"{unconfirmed} order(s) submitted but not confirmed filled within the poll "
+                         f"window — check Alpaca directly before trusting the price above.",
+                "inline": False,
+            })
+
+    return fields
+
+
 def cmd_pipeline_dry(payload):
     ok, out = _run_pipeline(execute=False)
+    summary = _load_run_summary() if ok else None
+    fields = _format_pipeline_fields(summary, execute=False) if summary else []
+    if ok:
+        desc = "Signals generated — see below for market context and today's picks."
+        if fields:
+            fields.append({
+                "name": "Next step", "value": "Happy with the signals? Run `/pipeline mode:execute`.",
+                "inline": False,
+            })
+    else:
+        desc = f"```\n{out}\n```"
     _reply(payload, [_embed(
         "📈 Pipeline — Dry Run" + ("" if ok else " (FAILED)"),
-        f"```\n{out}\n```", _BLUE if ok else _RED,
-        [{"name": "Next step", "value": "Happy with the signals? Run `/pipeline mode:execute`.", "inline": False}] if ok else [],
+        desc, _BLUE if ok else _RED, fields,
     )])
 
 
 def cmd_pipeline_execute(payload):
     ok, out = _run_pipeline(execute=True)
     _journal({"decision": "pipeline_execute", "success": ok})
+    summary = _load_run_summary() if ok else None
+    fields = _format_pipeline_fields(summary, execute=True) if summary else []
+    desc = "Execution complete — see below for what actually happened." if ok else f"```\n{out}\n```"
     _reply(payload, [_embed(
         "🚀 Pipeline — EXECUTED" + ("" if ok else " (FAILED)"),
-        f"```\n{out}\n```", _GREEN if ok else _RED,
+        desc, _GREEN if ok else _RED, fields,
     )])
 
 

@@ -24,6 +24,7 @@ import json
 import logging
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -296,6 +297,31 @@ def run_pipeline(
                  broker_result.get("summary", {}).get("orders_placed", 0))
 
     # ================================================================
+    # ACCOUNT SNAPSHOT — always fetched, dry-run or execute.
+    # This is what the Discord message uses for "current portfolio"
+    # context: real Alpaca equity/cash, not the pipeline's target weights.
+    # ================================================================
+    account_snapshot = None
+    try:
+        if execute and broker_result and broker_result.get("account_after"):
+            acct_raw  = broker_result["account_after"]
+            positions = broker_result.get("open_positions", {}) or {}
+        else:
+            snap_client = alpaca.get_client()
+            acct_raw    = alpaca.get_account_summary(snap_client)
+            positions   = alpaca.get_positions(snap_client)
+        equity = float(acct_raw.get("equity", 0) or 0)
+        cash   = float(acct_raw.get("cash", 0) or 0)
+        account_snapshot = {
+            "equity":         round(equity, 2),
+            "cash":           round(cash, 2),
+            "invested_pct":   round((equity - cash) / equity, 4) if equity else 0.0,
+            "position_count": len(positions),
+        }
+    except Exception as e:
+        log.warning("Account snapshot failed (non-fatal): %s", e)
+
+    # ================================================================
     # FEEDBACK LOOP: Update factor weights based on last month's performance
     # Runs after every successful pipeline completion (not dry-run)
     # ================================================================
@@ -354,6 +380,55 @@ def run_pipeline(
                 final_json = json.load(f)
         except Exception:
             pass
+
+    # ================================================================
+    # RUN SUMMARY JSON — structured data for Discord messaging.
+    # Replaces scraping raw stdout: broker/remote_commands.py reads this
+    # file to build the /pipeline embed instead of tailing console output
+    # (which used to dump whatever script happened to print last, including
+    # the unrelated paper-trading validator report).
+    # ================================================================
+    try:
+        orders_out = []
+        if broker_result:
+            for o in broker_result.get("orders", []):
+                orders_out.append({
+                    "ticker":           o.get("ticker"),
+                    "action":           o.get("action"),
+                    "status":           o.get("status"),
+                    "qty":              o.get("filled_qty") if o.get("filled_qty") else o.get("qty"),
+                    "filled_avg_price": o.get("filled_avg_price"),
+                })
+
+        run_summary = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "regime": {
+                "label":            regime_result.get("regime", "unknown").upper(),
+                "vix":              regime_result.get("vix_current"),
+                "spx_vs_200ma_pct": regime_result.get("spx_vs_200ma_pct"),
+                "notes":            regime_result.get("notes", ""),
+            },
+            "universe_size":      (final_json or {}).get("universe_size", 0),
+            "elapsed_seconds":    round(elapsed, 1),
+            "stop_loss_triggered": (stop_loss_result or {}).get("triggered", []),
+            "account":            account_snapshot,
+            "top_holdings":       (final_json or {}).get("top_10_stocks", [])[:10],
+            "orders":             orders_out,
+            "broker_status":      broker_result.get("status") if broker_result else None,
+            "dry_run":            broker_result.get("dry_run") if broker_result else True,
+            "market_open":        broker_result.get("market_open") if broker_result else None,
+            "orders_unconfirmed": (broker_result.get("summary", {}) or {}).get("orders_unconfirmed", 0)
+                                   if broker_result else 0,
+        }
+        summary_path = Path(getattr(config, "DATA_DIR", "data"))
+        if not summary_path.is_absolute():
+            summary_path = Path(__file__).parent / summary_path
+        summary_path.mkdir(parents=True, exist_ok=True)
+        (summary_path / "pipeline_run_latest.json").write_text(
+            json.dumps(run_summary, indent=2, default=str), encoding="utf-8"
+        )
+    except Exception as e:
+        log.warning("Could not write run summary JSON (non-fatal): %s", e)
 
     return {
         "pipeline_status": out_result.get("status", "skipped"),

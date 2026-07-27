@@ -261,6 +261,11 @@ def execute_signals(
             order = alpaca.close_position(client, ticker, dry_run=dry_run)
             order["action"]    = "EXIT"
             order["rationale"] = sig.get("entry_rationale", reason)
+            if not dry_run:
+                if order.get("filled_avg_price"):
+                    log.info("      -> filled @ $%.2f", order["filled_avg_price"])
+                else:
+                    log.warning("      -> NOT CONFIRMED FILLED (status=%s) — verify in Alpaca", order.get("status"))
             orders.append(order)
         else:
             log.info("    EXIT %-6s  (no open position -- nothing to close)", ticker)
@@ -353,6 +358,11 @@ def execute_signals(
             order["target_value"] = round(cost, 2)
             order["weight"]       = weight
             order["rationale"]    = sig.get("entry_rationale", reconcile_reason)
+            if not dry_run:
+                if order.get("filled_avg_price"):
+                    log.info("      -> filled @ $%.2f", order["filled_avg_price"])
+                else:
+                    log.warning("      -> NOT CONFIRMED FILLED (status=%s) — verify in Alpaca", order.get("status"))
             orders.append(order)
             available_cash -= cost
 
@@ -367,6 +377,11 @@ def execute_signals(
                                               dry_run=dry_run)
             order["action"]    = "TRIM"
             order["rationale"] = reconcile_reason or "weight_drift_trim"
+            if not dry_run:
+                if order.get("filled_avg_price"):
+                    log.info("      -> filled @ $%.2f", order["filled_avg_price"])
+                else:
+                    log.warning("      -> NOT CONFIRMED FILLED (status=%s) — verify in Alpaca", order.get("status"))
             orders.append(order)
             available_cash += trim_qty * price
 
@@ -384,6 +399,8 @@ def execute_signals(
         "dry_run", "held", "no_position", "at_target",
         "skipped_no_price", "skipped_insufficient_cash", "skipped_cooldown",
     }
+    orders_submitted = [o for o in orders if o.get("status") not in terminal_statuses
+                        and o.get("status") != "failed"]
     summary = {
         "signals_processed": len(signals),
         "exits":             len(exit_signals),
@@ -392,6 +409,11 @@ def execute_signals(
         "orders_placed":     sum(1 for o in orders
                                  if o.get("status") not in terminal_statuses),
         "orders_failed":     sum(1 for o in orders if o.get("status") == "failed"),
+        # Submitted but NOT confirmed filled within the poll window (status
+        # still "accepted"/"pending_new" etc.) — worth flagging separately
+        # from a genuine fill, since we don't yet know the real price.
+        "orders_unconfirmed": sum(1 for o in orders_submitted
+                                  if not o.get("filled_avg_price")) if not dry_run else 0,
         "dry_run":           dry_run,
         "market_open":       market_open,
         "executed_at":       datetime.now().isoformat(),
@@ -403,6 +425,9 @@ def execute_signals(
     log.info("    Buys          : %d", summary["buys"])
     log.info("    Orders placed : %d", summary["orders_placed"])
     log.info("    Orders failed : %d", summary["orders_failed"])
+    if summary["orders_unconfirmed"]:
+        log.warning("    Orders unconfirmed (submitted, no fill price yet): %d",
+                    summary["orders_unconfirmed"])
 
     # Release execution lock now that orders are submitted
     if lock_acquired and not dry_run:

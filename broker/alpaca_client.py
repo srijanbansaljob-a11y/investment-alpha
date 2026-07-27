@@ -15,6 +15,7 @@ The live endpoint is intentionally not included to prevent accidents.
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -139,6 +140,41 @@ def get_positions(client: TradingClient) -> dict:
 
 # ── Order Management ───────────────────────────────────────────────────────
 
+_FILL_TERMINAL_STATUSES = {
+    "filled", "canceled", "expired", "rejected", "done_for_day", "replaced",
+}
+_FILL_POLL_TIMEOUT_SEC   = 15
+_FILL_POLL_INTERVAL_SEC  = 0.5
+
+
+def _wait_for_fill(client: TradingClient, order_id, timeout: float = _FILL_POLL_TIMEOUT_SEC):
+    """
+    Poll Alpaca for an order's terminal status after submission.
+
+    Market orders during regular hours normally fill within 1-2 seconds, but
+    submit_order() only ever returns the *acceptance* status ("accepted" /
+    "pending_new") — never the fill. Without this poll, "order placed" was
+    being logged and counted as success even when the order hadn't actually
+    filled yet, which meant we never knew the real execution price and could
+    not distinguish a genuine fill from an order still sitting open.
+
+    Returns the final order object (whatever status it reached — caller
+    decides what to do with a non-terminal result), or None on error.
+    """
+    deadline = time.time() + timeout
+    last = None
+    while time.time() < deadline:
+        try:
+            last = client.get_order_by_id(order_id)
+        except Exception as e:
+            log.warning("  Could not poll order %s: %s", order_id, e)
+            return last
+        if str(last.status).lower() in _FILL_TERMINAL_STATUSES:
+            return last
+        time.sleep(_FILL_POLL_INTERVAL_SEC)
+    return last  # timed out — return whatever the last poll showed
+
+
 def place_market_order(
     client: TradingClient,
     ticker: str,
@@ -147,7 +183,8 @@ def place_market_order(
     dry_run: bool = False,
 ) -> dict:
     """
-    Place a market order for a given ticker and quantity.
+    Place a market order for a given ticker and quantity, then poll until it
+    fills (or times out) so we can report the actual execution price.
 
     Args:
         client:  Authenticated TradingClient
@@ -156,7 +193,8 @@ def place_market_order(
         side:    "buy" or "sell"
         dry_run: If True, log the order but don't submit it
 
-    Returns dict with order details.
+    Returns dict with order details, including filled_qty / filled_avg_price
+    when a fill was confirmed within the poll window.
     """
     side_enum = OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL
 
@@ -168,6 +206,8 @@ def place_market_order(
             "qty":     qty,
             "status":  "dry_run",
             "order_id": None,
+            "filled_qty": None,
+            "filled_avg_price": None,
         }
 
     try:
@@ -178,14 +218,33 @@ def place_market_order(
             time_in_force=TimeInForce.DAY,
         )
         order = client.submit_order(req)
-        log.info(f"  ✅ Order placed: {side.upper()} {qty:.4f} × {ticker} | ID: {order.id}")
+        log.info(f"  Order submitted: {side.upper()} {qty:.4f} x {ticker} | ID: {order.id}")
+
+        final = _wait_for_fill(client, order.id) or order
+        status = str(final.status)
+        filled_qty       = float(final.filled_qty) if getattr(final, "filled_qty", None) else 0.0
+        filled_avg_price = float(final.filled_avg_price) if getattr(final, "filled_avg_price", None) else None
+
+        if filled_avg_price:
+            log.info(
+                f"  ✅ FILLED: {side.upper()} {filled_qty:.4f} x {ticker} "
+                f"@ ${filled_avg_price:.2f}  (status={status})"
+            )
+        else:
+            log.warning(
+                f"  ⚠️  {ticker} order {order.id} not confirmed filled within "
+                f"{_FILL_POLL_TIMEOUT_SEC}s (status={status}) -- check Alpaca directly"
+            )
+
         return {
             "ticker":    ticker,
             "side":      side,
             "qty":       qty,
-            "status":    str(order.status),
+            "status":    status,
             "order_id":  str(order.id),
             "submitted_at": str(order.submitted_at),
+            "filled_qty": filled_qty,
+            "filled_avg_price": filled_avg_price,
         }
     except Exception as e:
         log.error(f"  ❌ Order failed: {side.upper()} {ticker} — {e}")
@@ -195,6 +254,8 @@ def place_market_order(
             "qty":     qty,
             "status":  "failed",
             "error":   str(e),
+            "filled_qty": None,
+            "filled_avg_price": None,
         }
 
 
@@ -204,20 +265,37 @@ def close_position(
     dry_run: bool = False,
 ) -> dict:
     """
-    Close (sell) the entire position in a ticker.
+    Close (sell) the entire position in a ticker, then poll until it fills so
+    we can report the real exit price.
     Safer than calculating qty manually — Alpaca handles it.
     """
     if dry_run:
         log.info(f"  [DRY-RUN] Would close entire position in {ticker}")
-        return {"ticker": ticker, "status": "dry_run"}
+        return {"ticker": ticker, "status": "dry_run", "filled_qty": None, "filled_avg_price": None}
 
     try:
         order = client.close_position(ticker)
-        log.info(f"  ✅ Position closed: {ticker} | ID: {order.id}")
+        log.info(f"  Close submitted: {ticker} | ID: {order.id}")
+
+        final = _wait_for_fill(client, order.id) or order
+        status = str(final.status)
+        filled_qty       = float(final.filled_qty) if getattr(final, "filled_qty", None) else 0.0
+        filled_avg_price = float(final.filled_avg_price) if getattr(final, "filled_avg_price", None) else None
+
+        if filled_avg_price:
+            log.info(f"  ✅ CLOSED: {ticker}  qty={filled_qty:.4f} @ ${filled_avg_price:.2f}  (status={status})")
+        else:
+            log.warning(
+                f"  ⚠️  {ticker} close {order.id} not confirmed filled within "
+                f"{_FILL_POLL_TIMEOUT_SEC}s (status={status}) -- check Alpaca directly"
+            )
+
         return {
             "ticker":   ticker,
-            "status":   str(order.status),
+            "status":   status,
             "order_id": str(order.id),
+            "filled_qty": filled_qty,
+            "filled_avg_price": filled_avg_price,
         }
     except Exception as e:
         log.error(f"  ❌ Close failed: {ticker} — {e}")
