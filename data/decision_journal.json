@@ -170,5 +170,10 @@
     "order_status": "OrderStatus.PENDING_NEW",
     "pnl_pct_at_decision": 18.85,
     "timestamp": "2026-07-17T09:12:31.724373+00:00"
+  },
+  {
+    "decision": "pipeline_execute",
+    "success": true,
+    "timestamp": "2026-07-27T14:37:53.672390+00:00"
   }
 ]
