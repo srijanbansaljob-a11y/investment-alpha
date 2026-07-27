@@ -62,3 +62,16 @@ jobs:
           FINNHUB_API_KEY:     ${{ secrets.FINNHUB_API_KEY }}
         run: |
           python broker/monitor.py --once
+
+      # Added 2026-07-27 (audit F3): this job is the stop-loss safety net and
+      # runs every 15 min. Without this alert, a persistent failure looks
+      # exactly like "nothing triggered" — silence must never mean "healthy".
+      - name: Alert Discord on failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"🚨 Position Monitor FAILED\",\"description\":\"The 15-minute stop-loss monitor did not complete. **Stop-loss alerts are not firing right now.**\\n[View run]($RUN_URL)\",\"color\":15158332}]}"

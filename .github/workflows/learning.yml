@@ -67,3 +67,16 @@ jobs:
           else
             echo "No learning state changes"
           fi
+
+      # Added 2026-07-27 (audit F6): this job rewrites the factor weights that
+      # choose your stocks. A silent failure means the model quietly stops
+      # adapting and you would never know.
+      - name: Alert Discord on failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"🚨 Weekly Learning FAILED\",\"description\":\"Factor-weight update did not complete — the model did not adapt this week.\\n[View run]($RUN_URL)\",\"color\":15158332}]}"

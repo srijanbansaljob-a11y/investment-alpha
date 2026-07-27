@@ -61,16 +61,19 @@ def _embed(title, description, color, fields=None, footer="Investment Alpha"):
     }
 
 
-def _reply(payload: dict, embeds: list):
+def _reply(payload: dict, embeds: list, components: list | None = None):
     """Send result back: edit the deferred slash-command response if we have
-    an interaction token, otherwise post a fresh channel message."""
+    an interaction token, otherwise post a fresh channel message.
+
+    `components` lets a reply carry action buttons — used by the scheduled
+    pipeline dry run so you can approve execution straight from the card."""
     token = payload.get("interaction_token")
     app_id = payload.get("application_id")
     if token and app_id:
-        if dn.edit_interaction_response(app_id, token, embeds):
+        if dn.edit_interaction_response(app_id, token, embeds, components):
             return
         log.warning("Interaction token expired — falling back to channel post")
-    dn.post_message(embeds)
+    dn.post_message(embeds, components)
 
 
 # ── Stop level (Alpaca-sourced, no local files) ────────────────────────────
@@ -412,22 +415,47 @@ def _format_pipeline_fields(summary: dict, execute: bool) -> list[dict]:
 
 
 def cmd_pipeline_dry(payload):
+    """
+    Dry run — signals only, nothing traded.
+
+    When invoked by the scheduled workflow (payload sets scheduled=True) the
+    card carries an execute button so you can approve the rebalance in one tap.
+    This is the human-in-the-loop step: the cron generates the proposal, you
+    decide whether it trades. See audit finding F1 in docs/workflow_audit.md.
+    """
     ok, out = _run_pipeline(execute=False)
     summary = _load_run_summary() if ok else None
     fields = _format_pipeline_fields(summary, execute=False) if summary else []
+    scheduled = bool(payload.get("scheduled"))
+    components = None
+
     if ok:
         desc = "Signals generated — see below for market context and today's picks."
-        if fields:
+        if scheduled:
+            desc = ("**Weekly rebalance proposal.** Nothing has traded. "
+                    "Review the picks below, then approve or dismiss.")
+            components = [{
+                "type": 1,
+                "components": [
+                    {"type": 2, "style": 3, "label": "🚀 Execute rebalance",
+                     "custom_id": "ia|confirm_pipeline_execute||pipeline"},
+                    {"type": 2, "style": 2, "label": "Dismiss",
+                     "custom_id": "ia|cancel||pipeline"},
+                ],
+            }]
+        elif fields:
             fields.append({
                 "name": "Next step", "value": "Happy with the signals? Run `/pipeline mode:execute`.",
                 "inline": False,
             })
     else:
         desc = f"```\n{out}\n```"
+
+    title = "📅 Weekly Pipeline Proposal" if (scheduled and ok) else "📈 Pipeline — Dry Run"
     _reply(payload, [_embed(
-        "📈 Pipeline — Dry Run" + ("" if ok else " (FAILED)"),
+        title + ("" if ok else " (FAILED)"),
         desc, _BLUE if ok else _RED, fields,
-    )])
+    )], components)
 
 
 def cmd_pipeline_execute(payload):

@@ -1,0 +1,98 @@
+name: Scheduled Pipeline Proposal
+
+# Audit finding F1 (docs/workflow_audit.md, 2026-07-27):
+# main.py previously ran in ZERO workflows — the core stock-selection pipeline
+# only executed when the owner manually fired /pipeline in Discord. This gives
+# it a heartbeat.
+#
+# Deliberately DRY RUN only. The cron generates the proposal and posts it to
+# Discord with an "Execute rebalance" button; nothing trades until that button
+# is tapped. Human stays in the loop before any money moves.
+#
+# Monday 09:45 ET — after the open, so prices and the regime read are current,
+# and early enough in the week that an approved rebalance has time to fill.
+
+on:
+  schedule:
+    - cron: "45 13 * * 1"   # 09:45 EDT (summer)
+    - cron: "45 14 * * 1"   # 09:45 EST (winter)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: discord-commands     # share the trade lock with command runs
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Check it's 09:45 in New York
+        id: tz
+        run: |
+          HOUR=$(TZ=America/New_York date +%H)
+          echo "Local NY hour: $HOUR"
+          if [ "$HOUR" = "09" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "go=true" >> $GITHUB_OUTPUT
+          else
+            echo "go=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout code
+        if: steps.tz.outputs.go == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        if: steps.tz.outputs.go == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        if: steps.tz.outputs.go == 'true'
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline (DRY — proposes, never trades)
+        if: steps.tz.outputs.go == 'true'
+        env:
+          ALPACA_API_KEY:      ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY:   ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL:     ${{ secrets.ALPACA_BASE_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_BOT_TOKEN:   ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID:  ${{ secrets.DISCORD_CHANNEL_ID }}
+          FINNHUB_API_KEY:     ${{ secrets.FINNHUB_API_KEY }}
+          FRED_API_KEY:        ${{ secrets.FRED_API_KEY }}
+          COMMAND_PAYLOAD:     '{"command": "pipeline_dry", "scheduled": true}'
+        run: |
+          python broker/remote_commands.py
+
+      - name: Commit run summary + state
+        if: steps.tz.outputs.go == 'true'
+        run: |
+          git config user.name "investment-alpha-bot"
+          git config user.email "actions@github.com"
+          git add data/*.json outputs/ || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: scheduled pipeline proposal $(date -u +%Y-%m-%d) [skip ci]"
+            git pull --rebase origin main || true
+            git push
+          else
+            echo "No state changes to commit"
+          fi
+
+      - name: Alert Discord on failure
+        if: failure() && steps.tz.outputs.go == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"🚨 Scheduled Pipeline FAILED\",\"description\":\"The weekly pipeline proposal did not run — you have no rebalance proposal this week.\\n[View run]($RUN_URL)\",\"color\":15158332}]}"

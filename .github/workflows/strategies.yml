@@ -101,3 +101,16 @@ jobs:
           else
             echo "No state changes to commit"
           fi
+
+      # Added 2026-07-27 (audit F5): mean-reversion proposals, position
+      # snapshots and trade-outcome logging all run here. A silent failure
+      # means no proposals AND a hole in the trade history used for learning.
+      - name: Alert Discord on failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"🚨 Strategy Sleeves FAILED\",\"description\":\"Mean-reversion scan / position snapshot / trade-outcome logging did not complete.\\n[View run]($RUN_URL)\",\"color\":15158332}]}"

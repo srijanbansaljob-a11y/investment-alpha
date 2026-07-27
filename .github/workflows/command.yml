@@ -71,3 +71,17 @@ jobs:
           else
             echo "No state changes to commit"
           fi
+
+      # Added 2026-07-27 (audit F4): remote_commands.py replies to Discord on a
+      # Python exception, but if the job dies BEFORE Python runs (checkout,
+      # pip install, timeout) the deferred Discord interaction just hangs with
+      # no error. This closes that hole.
+      - name: Alert Discord on failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"❌ Discord Command FAILED\",\"description\":\"Your command did not complete — the job failed before it could reply.\\n[View run]($RUN_URL)\",\"color\":15158332}]}"

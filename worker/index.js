@@ -139,10 +139,15 @@ async function postDiscordWebhook(webhookUrl, embeds, components = []) {
 
 // ── Alpaca trade helpers ────────────────────────────────────────────────────
 // Two Alpaca accounts:
-//   ALPACA_KEY / ALPACA_SECRET         → pipeline account (TradingView webhook, portfolio)
-//   ALPACA_KEY_SCREENER / ALPACA_SECRET_SCREENER → screener account (/buy, /sell Discord commands)
-
-function screenerHeaders(env) { return portfolioHeaders(env, "screener"); }
+//   ALPACA_KEY / ALPACA_SECRET                   → pipeline account (PRIMARY —
+//       TradingView webhook, /buy, /sell, /pipeline, all order routing)
+//   ALPACA_KEY_SCREENER / ALPACA_SECRET_SCREENER → screener account (RETIRING —
+//       read-only display in /brief and the morning brief so the winding-down
+//       positions stay visible. No new orders should ever route here.)
+//
+// 2026-07-27: every portfolio default in this file is "pipeline". The screener
+// account is on margin at -$8,766 and is being retired; a stray "screener"
+// fallback would put a real order into it. See docs/workflow_audit.md.
 
 function portfolioHeaders(env, portfolio) {
   if (portfolio === "pipeline") {
@@ -177,7 +182,11 @@ async function getAlpacaPrice(env, symbol) {
   } catch { return null; }
 }
 
-async function placeBracketOrder(env, symbol, customQty = null, portfolio = "screener") {
+// NOTE 2026-07-27: every portfolio default below is "pipeline", NOT "screener".
+// The screener account is being retired (Phase A of docs/workflow_audit.md) and
+// still sits on margin at -$8,766. Any code path that falls back to "screener"
+// would route a real order into the account we are winding down.
+async function placeBracketOrder(env, symbol, customQty = null, portfolio = "pipeline") {
   const alpacaBase   = "https://paper-api.alpaca.markets";
   const alpacaKey    = portfolio === "pipeline" ? (env.ALPACA_KEY || "").trim() : (env.ALPACA_KEY_SCREENER || env.ALPACA_KEY || "").trim();
   const alpacaSecret = portfolio === "pipeline" ? (env.ALPACA_SECRET || "").trim() : (env.ALPACA_SECRET_SCREENER || env.ALPACA_SECRET || "").trim();
@@ -623,7 +632,7 @@ async function handleTradingViewWebhook(request, env) {
 
 
 // ── Buy preview helper — shared by /buy slash cmd, screener Buy button, modal submit ──
-async function buildBuyPreview(env, ticker, customQty = null, portfolio = "screener") {
+async function buildBuyPreview(env, ticker, customQty = null, portfolio = "pipeline") {
   const alpacaBase = "https://paper-api.alpaca.markets";
   const headers    = portfolioHeaders(env, portfolio);
 
@@ -779,7 +788,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       if (!customQty || customQty < 1 || customQty > 10000) {
         return ephemeral("❌ Invalid quantity. Enter a whole number between 1 and 10,000.");
       }
-      const preview = await buildBuyPreview(env, mticker, customQty, mportfolio || "screener");
+      const preview = await buildBuyPreview(env, mticker, customQty, mportfolio || "pipeline");
       if (preview.error) return ephemeral(preview.error);
       return json({ type: R_CHANNEL_MESSAGE, data: { flags: EPHEMERAL, embeds: preview.embeds, components: preview.components } });
     }
@@ -789,7 +798,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
   // ── Button presses ───────────────────────────────────────────────────────
   if (i.type === MESSAGE_COMPONENT) {
     const [tag, action, ticker, trigger, qtyOverride, portfolioId] = (i.data.custom_id || "").split("|");
-    const portfolio = portfolioId || "screener";
+    const portfolio = portfolioId || "pipeline";
     if (tag !== "ia") return ephemeral("Unknown button.");
 
     if (action === "reject") {
@@ -1099,7 +1108,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       if (nearEarnings) return ephemeral(`⚠️ **${ticker}** is in earnings blackout (within 14 days). Wait until after earnings.`);
       if (!regimeOk)    return ephemeral(`🚫 **${ticker}** bucket \`${bucket}\` not permitted in **${regimeLabel}**.\nPermitted: ${permitted.join(", ") || "none"}`);
 
-      const preview = await buildBuyPreview(env, ticker, null, "screener");
+      const preview = await buildBuyPreview(env, ticker, null, "pipeline");
       if (preview.error) return ephemeral(preview.error);
       return json({ type: R_CHANNEL_MESSAGE, data: { flags: EPHEMERAL, embeds: preview.embeds, components: preview.components } });
     }
@@ -1834,7 +1843,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
     // /buy — enriched calculator preview with Change qty support
     if (name === "buy") {
       const symbol = (opts.symbol || "").toUpperCase();
-      const portfolio = (opts.portfolio || "screener").toLowerCase();
+      const portfolio = (opts.portfolio || "pipeline").toLowerCase();
       if (!symbol) return ephemeral("Provide a ticker: `/buy symbol:AAPL`");
 
       // Regime + bucket gates (same as before)
@@ -1863,7 +1872,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
     // /sell — preview position then confirm close
     if (name === "sell") {
       const symbol = (opts.symbol || "").toUpperCase();
-      const portfolio = (opts.portfolio || "screener").toLowerCase();
+      const portfolio = (opts.portfolio || "pipeline").toLowerCase();
       const customQty = opts.qty ? parseInt(opts.qty) : null;
       if (!symbol) return ephemeral("Provide a ticker: `/sell symbol:AAPL`");
 
