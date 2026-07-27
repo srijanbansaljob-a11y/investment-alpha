@@ -22,6 +22,15 @@ data/congressional_cache.json
 data/insider_cache.json
 data/pending_actions.json
 
+# ── Per-run result files (written then read inside the SAME job) ──────────
+# These were previously committed by CI on every run, which meant every local
+# `git pull` collided with a bot commit touching the same file. Nothing reads
+# them across runs — health_check.py / main.py write them, and the Discord
+# command reads them moments later in the same job — so there is no reason to
+# version them. Untracked via `git rm --cached` on 2026-07-27.
+data/health_check_latest.json
+data/pipeline_run_latest.json
+
 # ── Portfolio state (live positions — not code) ───────────────────────────
 # Uncomment the line below if you don't want portfolio snapshots in git.
 # outputs/latest_portfolio.json

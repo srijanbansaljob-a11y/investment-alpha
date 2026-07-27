@@ -93,20 +93,14 @@ jobs:
           FRED_API_KEY:               ${{ secrets.FRED_API_KEY }}
         run: python scripts/health_check.py
 
-      # Runs even when the check fails, so the RED result is still recorded.
-      - name: Commit health result
-        if: always() && steps.tz.outputs.go == 'true'
-        run: |
-          git config user.name "investment-alpha-bot"
-          git config user.email "actions@github.com"
-          git add data/health_check_latest.json || true
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: health check $(date -u +%Y-%m-%d) [skip ci]"
-            git pull --rebase origin main || true
-            git push
-          else
-            echo "No health result change to commit"
-          fi
+      # 2026-07-27: the "commit health result" step was REMOVED.
+      # data/health_check_latest.json is now gitignored. It is written by
+      # health_check.py and read moments later by the same job (or by
+      # cmd_health in remote_commands.py within the same run) — nothing reads
+      # it across runs. Committing it on every scheduled run meant every local
+      # `git pull` collided with a bot commit touching that one file, which was
+      # a recurring source of rebase conflicts and stale index.lock errors.
+      # The result is still fully visible: it's posted to Discord as an embed.
 
       - name: Alert Discord on failure
         if: failure() && steps.tz.outputs.go == 'true'
