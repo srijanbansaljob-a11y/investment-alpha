@@ -436,10 +436,25 @@ MAX_INVESTED_DEFAULT = 0.80  # fallback when regime is unknown (fail-safe = allo
 # the account reached 98.3% invested with $1,902 left. Warning and enforcement
 # now agree.
 PIPELINE_MAX_INVESTED_PCT = {
-    "bull":    0.60,
-    "neutral": 0.40,
-    "bear":    0.20,
+    "bull":    0.95,
+    "neutral": 0.75,
+    "bear":    0.40,
 }
+# RAISED 2026-07-27 (was 0.60/0.40/0.20).
+#
+# Rationale: cash was doing the job that stops should do. Holding 40% cash in a
+# neutral tape is a permanent drag — you forgo the market's baseline return to
+# avoid volatility. Now that every pipeline position carries a REAL protective
+# stop resting at Alpaca (~5-11% below price), downside per position is bounded
+# by the stop rather than by not being invested. A long-only systematic book
+# normally runs 90-100% invested and expresses caution through position sizing
+# and stop distance, not cash.
+#
+# CAVEAT worth re-reading before going live: these are paper-trading settings,
+# chosen while the strategy has only 4 closed trades. Cash is a hedge against
+# MODEL risk (the edge isn't real) as much as market risk, and 4 trades is no
+# evidence of an edge. Revisit once there are 30+ closed trades and a measured
+# win rate. If the win rate disappoints, these come back down.
 
 # Drawdown pause: if portfolio equity drops this far from its recent peak,
 # stop opening new positions until it recovers. Prevents doubling down into
