@@ -3519,5 +3519,192 @@
       "start_date": "2026-05-01",
       "end_date": "2026-07-30"
     }
+  },
+  {
+    "timestamp": "2026-07-28T11:39:29.323861+00:00",
+    "run_date": "2026-07-28",
+    "regime": "bull",
+    "total_capital": 1000.0,
+    "portfolio_value": 1000.0,
+    "realised_pnl": 0.0,
+    "total_portfolio_value": 1000.0,
+    "total_return_pct": -0.0,
+    "benchmark_return_pct": 2.823,
+    "alpha_pct": -2.823,
+    "sharpe_ratio": 0.026,
+    "max_drawdown_pct": -1.337,
+    "win_rate_pct": 0.0,
+    "avg_gain_pct": 0.0,
+    "avg_loss_pct": 0.0,
+    "positions": [
+      {
+        "ticker": "HST",
+        "weight": 0.14195,
+        "entry_price": 24.97,
+        "current_price": 24.97,
+        "cost_basis": 141.95,
+        "current_value": 141.95,
+        "unrealised_pnl": -0.0,
+        "unrealised_pct": -0.0,
+        "score": 0.6576,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "NUE",
+        "weight": 0.097754,
+        "entry_price": 247.86,
+        "current_price": 247.86,
+        "cost_basis": 97.75,
+        "current_value": 97.75,
+        "unrealised_pnl": 0.0,
+        "unrealised_pct": 0.0,
+        "score": 0.6075,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "APA",
+        "weight": 0.06968,
+        "entry_price": 34.74,
+        "current_price": 34.74,
+        "cost_basis": 69.68,
+        "current_value": 69.68,
+        "unrealised_pnl": 0.0,
+        "unrealised_pct": 0.0,
+        "score": 0.605,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "EIX",
+        "weight": 0.141158,
+        "entry_price": 78.64,
+        "current_price": 78.64,
+        "cost_basis": 141.16,
+        "current_value": 141.16,
+        "unrealised_pnl": -0.0,
+        "unrealised_pct": -0.0,
+        "score": 0.5951,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "weight": 0.090986,
+        "entry_price": 17.64,
+        "current_price": 17.64,
+        "cost_basis": 90.99,
+        "current_value": 90.99,
+        "unrealised_pnl": -0.0,
+        "unrealised_pct": -0.0,
+        "score": 0.5887,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "CVS",
+        "weight": 0.10794,
+        "entry_price": 107.07,
+        "current_price": 107.07,
+        "cost_basis": 107.94,
+        "current_value": 107.94,
+        "unrealised_pnl": -0.0,
+        "unrealised_pct": -0.0,
+        "score": 0.587,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "MATX",
+        "weight": 0.083242,
+        "entry_price": 205.45,
+        "current_price": 205.45,
+        "cost_basis": 83.24,
+        "current_value": 83.24,
+        "unrealised_pnl": -0.0,
+        "unrealised_pct": -0.0,
+        "score": 0.5857,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "DAL",
+        "weight": 0.079367,
+        "entry_price": 86.67,
+        "current_price": 86.67,
+        "cost_basis": 79.37,
+        "current_value": 79.37,
+        "unrealised_pnl": -0.0,
+        "unrealised_pct": -0.0,
+        "score": 0.5809,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "CF",
+        "weight": 0.077012,
+        "entry_price": 119.78,
+        "current_price": 119.78,
+        "cost_basis": 77.01,
+        "current_value": 77.01,
+        "unrealised_pnl": -0.0,
+        "unrealised_pct": -0.0,
+        "score": 0.5752,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "moderate",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "MO",
+        "weight": 0.110911,
+        "entry_price": 72.89,
+        "current_price": 72.89,
+        "cost_basis": 110.91,
+        "current_value": 110.91,
+        "unrealised_pnl": -0.0,
+        "unrealised_pct": -0.0,
+        "score": 0.5711,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      }
+    ],
+    "closed_positions": [],
+    "paper_trading": {
+      "in_validation": true,
+      "days_elapsed": 88,
+      "days_remaining": 2,
+      "start_date": "2026-05-01",
+      "end_date": "2026-07-30"
+    }
   }
 ]

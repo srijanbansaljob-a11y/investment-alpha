@@ -29,5 +29,36 @@
       "sentiment": 0.1,
       "volatility": 0.1
     }
+  },
+  {
+    "month": "2026-07",
+    "timestamp": "2026-07-28T11:39:29.323208+00:00",
+    "positions": 10,
+    "avg_return": 0.0,
+    "hit_rate": 0.0,
+    "factor_correlations": {
+      "momentum": NaN,
+      "trend": NaN,
+      "quality": NaN,
+      "valuation": NaN,
+      "sentiment": NaN,
+      "volatility": NaN
+    },
+    "weights_before": {
+      "momentum": 0.28,
+      "trend": 0.2,
+      "quality": 0.18,
+      "valuation": 0.14,
+      "sentiment": 0.1,
+      "volatility": 0.1
+    },
+    "weights_after": {
+      "momentum": 0.28,
+      "trend": 0.2,
+      "quality": 0.18,
+      "valuation": 0.14,
+      "sentiment": 0.1,
+      "volatility": 0.1
+    }
   }
 ]

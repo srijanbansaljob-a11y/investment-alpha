@@ -586,5 +586,152 @@
         }
       }
     ]
+  },
+  {
+    "date": "2026-07-28",
+    "regime": "bull",
+    "evaluated": false,
+    "stocks": [
+      {
+        "ticker": "HST",
+        "rank": 1,
+        "composite": 0.6576,
+        "price": 24.97,
+        "scores": {
+          "momentum": 0.726,
+          "trend": 0.6274,
+          "quality": 0.6906,
+          "valuation": 0.8632,
+          "sentiment": 0.4524,
+          "volatility": 0.1012
+        }
+      },
+      {
+        "ticker": "NUE",
+        "rank": 2,
+        "composite": 0.6075,
+        "price": 247.86,
+        "scores": {
+          "momentum": 0.8188,
+          "trend": 0.699,
+          "quality": 0.5666,
+          "valuation": 0.632,
+          "sentiment": 0.5303,
+          "volatility": 0.4258
+        }
+      },
+      {
+        "ticker": "APA",
+        "rank": 3,
+        "composite": 0.605,
+        "price": 34.74,
+        "scores": {
+          "momentum": 0.7096,
+          "trend": 0.6034,
+          "quality": 0.8212,
+          "valuation": 0.8813,
+          "sentiment": 0.4556,
+          "volatility": 0.726
+        }
+      },
+      {
+        "ticker": "EIX",
+        "rank": 4,
+        "composite": 0.5951,
+        "price": 78.64,
+        "scores": {
+          "momentum": 0.6468,
+          "trend": 0.6625,
+          "quality": 0.6102,
+          "valuation": 0.8351,
+          "sentiment": 0.3771,
+          "volatility": 0.1047
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "rank": 5,
+        "composite": 0.5887,
+        "price": 17.64,
+        "scores": {
+          "momentum": 0.7204,
+          "trend": 0.661,
+          "quality": 0.5006,
+          "valuation": 0.9484,
+          "sentiment": 0.4301,
+          "volatility": 0.5096
+        }
+      },
+      {
+        "ticker": "CVS",
+        "rank": 6,
+        "composite": 0.587,
+        "price": 107.07,
+        "scores": {
+          "momentum": 0.7539,
+          "trend": 0.6152,
+          "quality": 0.5165,
+          "valuation": 0.7181,
+          "sentiment": 0.5218,
+          "volatility": 0.3194
+        }
+      },
+      {
+        "ticker": "MATX",
+        "rank": 7,
+        "composite": 0.5857,
+        "price": 205.45,
+        "scores": {
+          "momentum": 0.7878,
+          "trend": 0.6091,
+          "quality": 0.4399,
+          "valuation": 0.8964,
+          "sentiment": 0.5992,
+          "volatility": 0.5951
+        }
+      },
+      {
+        "ticker": "DAL",
+        "rank": 8,
+        "composite": 0.5809,
+        "price": 86.67,
+        "scores": {
+          "momentum": 0.8094,
+          "trend": 0.6503,
+          "quality": 0.409,
+          "valuation": 0.9444,
+          "sentiment": 0.6109,
+          "volatility": 0.6353
+        }
+      },
+      {
+        "ticker": "CF",
+        "rank": 9,
+        "composite": 0.5752,
+        "price": 119.78,
+        "scores": {
+          "momentum": 0.5211,
+          "trend": 0.7847,
+          "quality": 0.7513,
+          "valuation": 0.8442,
+          "sentiment": 0.3856,
+          "volatility": 0.6597
+        }
+      },
+      {
+        "ticker": "MO",
+        "rank": 10,
+        "composite": 0.5711,
+        "price": 72.89,
+        "scores": {
+          "momentum": 0.6297,
+          "trend": 0.6425,
+          "quality": 0.714,
+          "valuation": 0.7501,
+          "sentiment": 0.3798,
+          "volatility": 0.2984
+        }
+      }
+    ]
   }
 ]
