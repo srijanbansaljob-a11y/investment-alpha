@@ -293,7 +293,161 @@
         "rs_vs_spy": 0
       },
       "win": true
+    },
+    {
+      "ticker": "BIIB",
+      "portfolio": "pipeline",
+      "exit_date": "2026-07-31",
+      "entry_date": "2026-07-08",
+      "duration_days": 23,
+      "exit_type": "full",
+      "entry_price": 198.8,
+      "exit_price": 205.2686,
+      "pnl_pct": 3.25,
+      "pnl_dollars": 263.68,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "BMY",
+      "portfolio": "pipeline",
+      "exit_date": "2026-07-31",
+      "entry_date": "2026-07-08",
+      "duration_days": 23,
+      "exit_type": "full",
+      "entry_price": 56.3518,
+      "exit_price": 64.98,
+      "pnl_pct": 15.31,
+      "pnl_dollars": 1880.89,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "DAL",
+      "portfolio": "pipeline",
+      "exit_date": "2026-07-31",
+      "entry_date": "2026-07-27",
+      "duration_days": 4,
+      "exit_type": "partial",
+      "entry_price": 85.9021,
+      "exit_price": 88.59,
+      "pnl_pct": 3.13,
+      "pnl_dollars": 3.23,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "DE",
+      "portfolio": "pipeline",
+      "exit_date": "2026-07-31",
+      "entry_date": "2026-07-13",
+      "duration_days": 18,
+      "exit_type": "full",
+      "entry_price": 588.1619,
+      "exit_price": 599.47,
+      "pnl_pct": 1.92,
+      "pnl_dollars": 42.14,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "EIX",
+      "portfolio": "pipeline",
+      "exit_date": "2026-07-31",
+      "entry_date": "2026-07-08",
+      "duration_days": 23,
+      "exit_type": "full",
+      "entry_price": 70.699,
+      "exit_price": 78.73,
+      "pnl_pct": 11.36,
+      "pnl_dollars": 1323.14,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "MRK",
+      "portfolio": "pipeline",
+      "exit_date": "2026-07-31",
+      "entry_date": "2026-07-08",
+      "duration_days": 23,
+      "exit_type": "full",
+      "entry_price": 113.8036,
+      "exit_price": 129.79,
+      "pnl_pct": 14.05,
+      "pnl_dollars": 985.48,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
+    },
+    {
+      "ticker": "MTCH",
+      "portfolio": "pipeline",
+      "exit_date": "2026-07-31",
+      "entry_date": "2026-07-08",
+      "duration_days": 23,
+      "exit_type": "full",
+      "entry_price": 35.0526,
+      "exit_price": 39.31,
+      "pnl_pct": 12.15,
+      "pnl_dollars": 1050.48,
+      "signals": {
+        "regime": "UNKNOWN",
+        "bucket": "unknown",
+        "score": 0,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0
+      },
+      "win": true
     }
   ],
-  "last_updated": "2026-07-30T22:35:50.960995+00:00"
+  "last_updated": "2026-07-31T22:32:50.057721+00:00"
 }
