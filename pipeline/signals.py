@@ -99,22 +99,69 @@ def _recent_stop_exits(cooldown_days):
     return out
 
 
+# Durable ledger (audit P0-3): outputs/ is gitignored, so on a fresh GitHub
+# Actions checkout latest_portfolio.json does not exist — every cloud run was
+# stateless, generated zero EXIT signals, and the reconciler then kept the
+# dropped names as "manual positions". The cloud could add but never remove
+# (hence 12 live positions against top_n=10). The ledger lives in data/,
+# which the workflows already `git add data/*.json` and commit.
+LEDGER_FILE = config.DATA_DIR / "portfolio_state.json"
+
+
+def _read_json_nullsafe(path: Path) -> dict:
+    """Binary read + strip OneDrive null-byte corruption."""
+    raw = Path(path).read_bytes().rstrip(b"\x00")
+    return json.loads(raw)
+
+
 def _load_prior_portfolio():
-    """Load prior run's portfolio from state file. Returns {} if none exists."""
-    path = config.PORTFOLIO_STATE_FILE
-    if not path.exists():
-        log.info("Stage 7: No prior portfolio state -- all signals will be BUY")
-        return {}
+    """
+    Prior pipeline-owned portfolio, by ticker. Tries the durable ledger
+    (data/portfolio_state.json, git-tracked → exists in the cloud) first,
+    then the legacy outputs/latest_portfolio.json.
+    """
+    for path in (LEDGER_FILE, config.PORTFOLIO_STATE_FILE):
+        try:
+            if not Path(path).exists():
+                continue
+            data = _read_json_nullsafe(path)
+            prior = {item["ticker"]: item for item in data.get("portfolio", [])}
+            log.info("Stage 7: Loaded prior portfolio from %s -- %d stocks: %s",
+                     Path(path).name, len(prior), list(prior.keys()))
+            return prior
+        except Exception as exc:
+            log.warning("Stage 7: Could not read %s (%s)", Path(path).name, exc)
+    log.info("Stage 7: No prior portfolio state found")
+    return {}
+
+
+def _load_live_holdings():
+    """
+    Live Alpaca positions {ticker: {"qty", "avg_entry_price"}} — the SOURCE OF
+    TRUTH for what is held (audit P0-3). Returns None when Alpaca is
+    unreachable so callers can fall back to the ledger.
+    """
     try:
-        with open(path) as f:
-            data = json.load(f)
-        prior = {item["ticker"]: item for item in data.get("portfolio", [])}
-        log.info("Stage 7: Loaded prior portfolio -- %d stocks: %s",
-                 len(prior), list(prior.keys()))
-        return prior
+        from broker.alpaca_client import get_client, get_positions
+        positions = get_positions(get_client())
+        return {t: {"qty": p["qty"], "avg_entry_price": p["avg_entry_price"]}
+                for t, p in positions.items()}
     except Exception as exc:
-        log.warning("Stage 7: Could not read prior portfolio state (%s) -- first run", exc)
-        return {}
+        log.warning("Stage 7: Alpaca unreachable (%s) -- falling back to ledger "
+                    "for held-position detection", exc)
+        return None
+
+
+def _sleeve_tickers() -> set:
+    """Mean-reversion sleeve holdings — same account, NOT pipeline-managed.
+    Excluded from EXIT generation so the pipeline never sells sleeve names."""
+    try:
+        path = config.DATA_DIR / "sleeve_mr.json"
+        if path.exists():
+            return set(_read_json_nullsafe(path).keys())
+    except Exception:
+        pass
+    return set()
 
 
 def _entry_rationale(row):
@@ -183,9 +230,20 @@ def run(portfolio_result, selection_result, regime_result=None):
             "signal_summary": {},
         }
 
+    # ── What is actually held? Alpaca first (audit P0-3) ──────────────────
+    # BUY/HOLD/EXIT is decided against LIVE broker positions, not a state
+    # file that only exists on one machine. The ledger supplies entry_date
+    # memory and pipeline-ownership tagging (held ∧ not-in-ledger = manual).
     prior = _load_prior_portfolio()
+    live  = _load_live_holdings()
     current_tickers = {p["ticker"] for p in portfolio}
-    prior_tickers   = set(prior.keys())
+    if live is not None:
+        held_tickers = set(live.keys())
+        log.info("Stage 7: held-position source = Alpaca (%d positions)", len(held_tickers))
+    else:
+        held_tickers = set(prior.keys())
+        log.info("Stage 7: held-position source = ledger fallback (%d positions)", len(held_tickers))
+    prior_tickers = held_tickers
 
     score_idx = selected_df.set_index("ticker") if not selected_df.empty else pd.DataFrame()
     today_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -208,13 +266,16 @@ def run(portfolio_result, selection_result, regime_result=None):
         rationale = _entry_rationale(row)
         risk      = _risk_note(row)
 
-        # Preserve entry_price and entry_date from prior state on HOLD
+        # Entry price: real broker cost basis when held (Alpaca avg_entry_price
+        # is the truth); ledger memory for entry_date; current price for new buys.
         if is_new:
             entry_price = item.get("entry_price", item.get("current_price"))
             entry_date  = today_iso
         else:
-            prior_item  = prior[ticker]
-            entry_price = prior_item.get("entry_price", item.get("current_price"))
+            prior_item  = prior.get(ticker, {})
+            entry_price = (live or {}).get(ticker, {}).get("avg_entry_price") \
+                          or prior_item.get("entry_price") \
+                          or item.get("current_price")
             entry_date  = prior_item.get("entry_date", today_iso)
 
         # --- Earnings blackout: block BUY within 5 trading days of earnings ---
@@ -253,22 +314,39 @@ def run(portfolio_result, selection_result, regime_result=None):
                  action, ticker, item["score"],
                  entry_price or 0, rationale[:55])
 
-    # --- EXIT ---
-    for ticker in prior_tickers - current_tickers:
-        prior_item = prior[ticker]
+    # --- EXIT (Alpaca-first, audit P0-3) ---
+    # held ∧ not selected → EXIT, with two exclusions:
+    #   - mean-reversion sleeve names (same account, not pipeline-managed)
+    #   - manual positions (held but never in the pipeline ledger) when
+    #     MANUAL_POSITION_ACTION="keep" — those stay the reconciler's business
+    sleeve        = _sleeve_tickers()
+    manual_action = str(getattr(config, "MANUAL_POSITION_ACTION", "keep")).lower()
+    for ticker in sorted(prior_tickers - current_tickers):
+        if ticker in sleeve:
+            log.info("  SKIP  %-6s  (mean-reversion sleeve -- not pipeline-managed)", ticker)
+            continue
+        pipeline_owned = ticker in prior
+        if not pipeline_owned and manual_action != "exit":
+            log.info("  KEEP  %-6s  (held but not in pipeline ledger -- manual position)", ticker)
+            continue
+        prior_item = prior.get(ticker, {})
         exit_signals.append({
             "ticker":          ticker,
             "name":            prior_item.get("name", ticker),
             "action":          "EXIT",
             "weight":          0.0,
             "composite_score": prior_item.get("score"),
-            "entry_price":     prior_item.get("entry_price"),
+            "entry_price":     (live or {}).get(ticker, {}).get("avg_entry_price")
+                               or prior_item.get("entry_price"),
             "entry_date":      prior_item.get("entry_date"),
-            "entry_rationale": "Dropped from selection -- no longer in top-ranked universe.",
+            "entry_rationale": ("Dropped from selection -- no longer in top-ranked universe."
+                                if pipeline_owned else
+                                "Manual position exited (MANUAL_POSITION_ACTION=exit)."),
             "risk_note":       "Close position at next rebalancing date.",
             "signals":         {"trend": "exit", "momentum": "exit"},
         })
-        log.info("  EXIT  %-6s  (was in prior portfolio)", ticker)
+        log.info("  EXIT  %-6s  (%s)", ticker,
+                 "held, no longer selected" if pipeline_owned else "manual, purity mode")
 
     all_signals = trade_signals + exit_signals
 
@@ -285,7 +363,7 @@ def run(portfolio_result, selection_result, regime_result=None):
              summary["buy"], summary["hold"], summary["exit"])
 
     # --- Persist state for next run and stop_loss.py ---
-    _save_portfolio_state(trade_signals, summary, regime_result)
+    _save_portfolio_state(trade_signals, summary, regime_result, live_holdings=live)
 
     return {
         "stage":          "signal_generation",
@@ -297,47 +375,61 @@ def run(portfolio_result, selection_result, regime_result=None):
     }
 
 
-def _save_portfolio_state(trade_signals, summary, regime_result=None):
-    """Write latest_portfolio.json - the SINGLE source for next run's HOLD/EXIT
-    detection and stop_loss.py. Preserves regime, entry_date and sticky
-    entry_price. Written atomically (temp file + os.replace) to survive OneDrive
-    mid-sync corruption.
+def _save_portfolio_state(trade_signals, summary, regime_result=None,
+                          live_holdings=None):
+    """
+    Persist portfolio state to BOTH locations (audit P0-3):
+      - outputs/latest_portfolio.json — legacy path, local convenience
+      - data/portfolio_state.json    — DURABLE ledger, git-tracked, committed
+        by the workflows' `git add data/*.json` step, so cloud runs are no
+        longer stateless
+
+    Ledger honesty: blocked names (earnings blackout / cooldown) that are not
+    actually held are excluded — recording them as owned made never-bought
+    stocks look like positions. Written atomically (temp file + os.replace)
+    to survive OneDrive mid-sync corruption.
     """
     import os, tempfile
+    held = set((live_holdings or {}).keys())
+    entries = []
+    for s in trade_signals:  # only BUY/HOLD positions
+        blocked = s.get("earnings_blocked") or s.get("cooldown_blocked")
+        if blocked and s["ticker"] not in held:
+            continue  # not owned, not being bought — keep it out of the ledger
+        entries.append({
+            "ticker":     s["ticker"],
+            "name":       s["name"],
+            "action":     s["action"],
+            "weight":     s["weight"],
+            "score":      s["composite_score"],
+            "entry_price": s["entry_price"],
+            "entry_date":  s["entry_date"],
+            "signals":    s["signals"],
+        })
     state = {
         "schema_version": getattr(config, "STATE_SCHEMA_VERSION", 2),
         "run_date":  summary["run_date"],
         "regime":    (regime_result or {}).get("regime", "unknown"),
         "regime_detail": regime_result or {},
         "signal_summary": summary,
-        "portfolio": [
-            {
-                "ticker":     s["ticker"],
-                "name":       s["name"],
-                "action":     s["action"],
-                "weight":     s["weight"],
-                "score":      s["composite_score"],
-                "entry_price": s["entry_price"],
-                "entry_date":  s["entry_date"],
-                "signals":    s["signals"],
-            }
-            for s in trade_signals  # only BUY/HOLD positions
-        ],
+        "portfolio": entries,
     }
-    try:
-        path = config.PORTFOLIO_STATE_FILE
-        payload = json.dumps(state, indent=2)
-        fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+    payload = json.dumps(state, indent=2, default=str)
+    for path in (config.PORTFOLIO_STATE_FILE, LEDGER_FILE):
         try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(payload); f.flush(); os.fsync(f.fileno())
-            os.replace(tmp, path)
-        finally:
-            if os.path.exists(tmp):
-                os.remove(tmp)
-        log.info("Portfolio state saved (atomic) -> %s", path)
-    except Exception as exc:
-        log.error("Failed to save portfolio state: %s", exc)
+            path = Path(path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(payload); f.flush(); os.fsync(f.fileno())
+                os.replace(tmp, path)
+            finally:
+                if os.path.exists(tmp):
+                    os.remove(tmp)
+            log.info("Portfolio state saved (atomic) -> %s", path)
+        except Exception as exc:
+            log.error("Failed to save portfolio state to %s: %s", path, exc)
 
 
 if __name__ == "__main__":

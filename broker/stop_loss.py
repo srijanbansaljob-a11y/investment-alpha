@@ -116,11 +116,16 @@ def _exit_via_alpaca(ticker: str) -> bool:
     Returns True on success, False on error.
     """
     try:
-        from broker.alpaca_client import get_client
+        from broker.alpaca_client import get_client, sell_with_cleanup
         client = get_client()
-        client.close_position(ticker)
-        logger.info("Alpaca: closed position %s", ticker)
-        return True
+        r = sell_with_cleanup(client, ticker, dry_run=False)
+        ok = r.get("status") not in ("failed",)
+        if ok:
+            logger.info("Alpaca: closed position %s (cancelled %d resting order(s) first)",
+                        ticker, r.get("cancelled_orders", 0))
+        else:
+            logger.error("Alpaca close of %s failed: %s", ticker, r.get("error"))
+        return ok
     except Exception as exc:
         logger.error("Alpaca close_position(%s) failed: %s", ticker, exc)
         return False
@@ -235,6 +240,94 @@ def compute_take_profit(ticker: str, entry_price: float, regime: str = "bull",
     return ceiling, monitor, f"ATRx{mult} [{clamped*100:.0f}%]"
 
 
+# ── Stop reconciler — THE single stop mechanism (audit P0-1 / P1-1) ────────
+#
+# One rule: every held position ends every execute run with exactly one
+# correct GTC SELL STOP resting at the broker. Stops are computed from
+# max(entry, current) so they ratchet UP on winners (trailing discipline,
+# same logic proven in scripts/protect_positions.py) and are NEVER lowered.
+# This replaces bracket legs on buys AND the old blanket cancel/re-place:
+# buys go out as plain market orders, then this pass attaches protection.
+# Take-profit is a monitor ALERT, not a resting limit order — a hard sell
+# ceiling on a momentum book amputates the right tail, and a resting TP
+# would hold shares and re-create the P0-2 sell-conflict.
+
+def reconcile_protective_stops(client=None, regime: str = "bull",
+                               dry_run: bool = True) -> dict:
+    """
+    Ensure every held position has one correct resting stop.
+
+    For each Alpaca position:
+      - no resting stop            → place one (whole shares)
+      - resting stop below desired → cancel & replace (ratchet up)
+      - resting qty out of sync    → cancel & replace at current whole qty
+      - resting stop >= desired    → leave alone (never lower a stop)
+
+    Returns {"placed": [...], "replaced": [...], "kept": [...], "failed": [...]}.
+    """
+    from broker.alpaca_client import (
+        get_client, get_positions, get_resting_stops,
+        cancel_orders_for_symbol, place_stop_order,
+    )
+    if client is None:
+        client = get_client()
+    regime = (regime or "bull").lower()
+    positions = get_positions(client)
+    resting   = get_resting_stops(client)
+
+    out = {"placed": [], "replaced": [], "kept": [], "failed": []}
+    for ticker, pos in sorted(positions.items()):
+        qty   = float(pos["qty"])
+        whole = int(qty)
+        if whole < 1:
+            continue
+        entry   = float(pos.get("avg_entry_price") or 0)
+        current = float(pos.get("current_price") or 0)
+        anchor  = max(entry, current) if entry and current else (entry or current)
+        if not anchor:
+            out["failed"].append({"ticker": ticker, "reason": "no_price"})
+            continue
+
+        desired, method, _atr = compute_stop_price(ticker, anchor, regime)
+        desired = round(desired, 2)
+        existing = resting.get(ticker)
+
+        if existing:
+            ex_stop = existing["stop_price"]
+            qty_ok  = abs(existing["qty"] - whole) < 1
+            if ex_stop >= desired - 0.01 and qty_ok:
+                out["kept"].append({"ticker": ticker, "stop": ex_stop})
+                continue
+            reason = "ratchet_up" if ex_stop < desired - 0.01 else "qty_sync"
+            logger.info("  %s: replacing stop $%.2f -> $%.2f (%s, %s)",
+                        ticker, ex_stop, max(desired, ex_stop), reason, method)
+            if not dry_run:
+                cancel_orders_for_symbol(client, ticker)
+            # Never lower: qty_sync keeps the higher of the two levels
+            new_stop = max(desired, ex_stop)
+            r = place_stop_order(client, ticker, whole, new_stop, dry_run=dry_run)
+            (out["replaced"] if r.get("status") not in ("failed",) else out["failed"]).append(
+                {"ticker": ticker, "old": ex_stop, "new": new_stop,
+                 "reason": reason, "status": r.get("status")})
+        else:
+            logger.info("  %s: no resting stop — placing $%.2f (%s)", ticker, desired, method)
+            r = place_stop_order(client, ticker, whole, desired, dry_run=dry_run)
+            (out["placed"] if r.get("status") not in ("failed",) else out["failed"]).append(
+                {"ticker": ticker, "stop": desired, "status": r.get("status")})
+
+    n_prot = len(out["placed"]) + len(out["replaced"]) + len(out["kept"])
+    logger.info("Stop reconcile%s: %d/%d positions protected "
+                "(%d placed, %d replaced, %d kept, %d failed)",
+                " [DRY]" if dry_run else "", n_prot, len(positions),
+                len(out["placed"]), len(out["replaced"]), len(out["kept"]),
+                len(out["failed"]))
+    if len(positions) and n_prot < len(positions):
+        logger.warning("⚠️  %d position(s) remain UNPROTECTED — investigate: %s",
+                       len(positions) - n_prot,
+                       [f["ticker"] for f in out["failed"]])
+    return out
+
+
 # ── Core Logic ─────────────────────────────────────────────────────────────
 
 def check_and_execute(regime: str = None, dry_run: bool = True) -> dict:
@@ -314,6 +407,16 @@ def check_and_execute(regime: str = None, dry_run: bool = True) -> dict:
     tickers = [h["ticker"] for h in held]
     prices = _get_current_prices(tickers)
 
+    # Resting broker-side stops are the SOURCE OF TRUTH for stop levels
+    # (audit P1-1). Recomputed levels are advisory fallbacks for positions
+    # that have no resting protection.
+    resting_stops = {}
+    try:
+        from broker.alpaca_client import get_client as _gc, get_resting_stops as _grs
+        resting_stops = _grs(_gc())
+    except Exception as exc:
+        logger.warning("Could not read resting stops (%s) — using computed levels", exc)
+
     checked = []
     triggered = []
     log_entries = []
@@ -329,8 +432,14 @@ def check_and_execute(regime: str = None, dry_run: bool = True) -> dict:
             skipped.append(ticker)
             continue
 
-        # ── Stop price: shared calc (see compute_stop_price) ─────────────
-        stop_price, stop_method, atr_value = compute_stop_price(ticker, entry_price, regime)
+        # ── Stop price: resting broker order first, computed fallback ────
+        if ticker in resting_stops:
+            stop_price  = resting_stops[ticker]["stop_price"]
+            stop_method = "resting@broker"
+            atr_value   = None
+        else:
+            stop_price, stop_method, atr_value = compute_stop_price(ticker, entry_price, regime)
+            stop_method += " [NOT at broker]"
 
         loss_pct = (current_price - entry_price) / entry_price * 100
         breached  = current_price < stop_price
@@ -363,8 +472,17 @@ def check_and_execute(regime: str = None, dry_run: bool = True) -> dict:
             triggered.append(ticker)
 
             if not dry_run:
-                success = _exit_via_alpaca(ticker)
-                event["executed"] = success
+                if ticker in resting_stops:
+                    # The broker's own GTC stop is at/above this price and will
+                    # (or already did) fire — selling locally too would double-
+                    # sell or race the broker. Detection only (audit P1-1).
+                    logger.info("  %s: resting broker stop $%.2f handles the exit — "
+                                "no local order placed", ticker, stop_price)
+                    event["executed"] = False
+                    event["handled_by"] = "broker_resting_stop"
+                else:
+                    success = _exit_via_alpaca(ticker)
+                    event["executed"] = success
             else:
                 logger.info("  [DRY RUN] Would exit %s at %.2f", ticker, current_price)
                 event["executed"] = False

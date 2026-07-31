@@ -1,0 +1,29 @@
+# Line-ending normalisation.
+#
+# WHY (2026-07-31): core.autocrlf was unset while the working tree held CRLF
+# files, so git reported every CRLF file as entirely rewritten. A commit of
+# ~1,000 lines of real changes appeared as 14,310 insertions / 13,573
+# deletions — unreviewable, and it would have buried the order-routing fixes
+# in noise. `text=auto` stores LF in the repo and leaves the working tree
+# alone, so this can't recur on either PC.
+
+* text=auto
+
+# Explicit: source and data are text
+*.py    text
+*.js    text
+*.json  text
+*.md    text
+*.yml   text
+*.yaml  text
+*.toml  text
+*.csv   text
+*.pine  text
+
+# Explicit: never touch binaries
+*.parquet binary
+*.xlsx    binary
+*.docx    binary
+*.png     binary
+*.jpg     binary
+*.ipynb   binary

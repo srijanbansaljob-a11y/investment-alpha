@@ -1,185 +1,158 @@
-# Investment Alpha — Claude Code Briefing
-# Read this first before doing anything.
+# Investment Alpha — Agent Briefing
+# Read this first, then docs/ARCHITECTURE.md (the ownership rules and
+# invariants any change must respect), then memory/AGENT_MEMORY.md for
+# decision history.
+# Last verified against the running system: 2026-07-31.
 
-## What this project is
+## What this is
 
-A 7-factor quantitative stock-picking pipeline that:
-- Scores 618 US stocks (S&P 500 + mid-cap) across momentum, quality, valuation, trend, sentiment, volatility, and PEAD
-- Selects the top 10 stocks monthly, sizes positions using inverse-volatility weighting
-- Executes paper trades via Alpaca paper trading API
-- Tracks performance over a 3-month validation period
-- Gradually learns which factors work best by adjusting weights after 25+ observations
+A 7-factor quantitative stock-picking pipeline trading a **paper** Alpaca
+account. It scores ~580 US stocks (S&P 500 + mid-cap) on momentum, quality,
+valuation, trend, sentiment, volatility and PEAD, selects the regime-adjusted
+top-N, sizes by inverse volatility, and places orders with a protective stop
+resting at the broker for every position.
 
-**AUM**: ~$102,000 paper money on Alpaca  
-**Portfolio**: 10 stocks, monthly rebalance, weekly stop-loss check  
-**Regime**: BULL (VIX=18.8, SPX +9.8% above 200MA)  
-**Paper trading started**: 2026-05-01 (day 14 of 90)
+**Current status**: paper only, ~$114k equity, 4 closed trades. The strategy
+has no proven edge yet. Treat every parameter as provisional.
 
----
-
-## Current portfolio (as of 2026-05-15)
-
-All 10 positions are live in Alpaca paper account:
-
-| # | Ticker | Company | Entry | Weight |
-|---|---|---|---|---|
-| 1 | MRK | Merck | $113.41 | 12.1% |
-| 2 | HST | Host Hotels | $21.54 | 10.9% |
-| 3 | MATX | Matson | $182.25 | 8.3% |
-| 4 | INVA | Innoviva | $22.86 | 12.6% |
-| 5 | BMY | Bristol-Myers | $56.77 | 12.0% |
-| 6 | HAS | Hasbro | $95.65 | 9.2% |
-| 7 | CHRD | Chord Energy | $142.54 | 6.7% |
-| 8 | GM | General Motors | $77.75 | 9.3% |
-| 9 | EIX | Edison Intl | $70.73 | 12.6% |
-| 10 | DAL | Delta Air Lines | $71.55 | 6.7% |
+**Direction of travel**: pipeline-only. The `screener/` half of the repo is
+being retired (plan: `docs/FABLE_AUDIT_2026-07-27.md` §4). Do not add features
+to screener code.
 
 ---
 
-## Project structure
+## Non-negotiable rules for any agent working here
+
+1. **Never place, cancel, or modify a live order.** Write preview-first
+   scripts; the owner runs the `--execute` step. This includes "just testing".
+2. **Every sell goes through `broker.alpaca_client.sell_with_cleanup()`.**
+   A position with a resting GTC stop has its shares held against that order —
+   a bare `close_position` is rejected by Alpaca. Never call it directly.
+3. **Never add a second stop mechanism.** `stop_loss.reconcile_protective_stops()`
+   is the only thing that places, moves, or removes protective stops. No
+   bracket legs on buys.
+4. **Never blanket-cancel orders.** `cancel_open_orders()` is deprecated and
+   kills every protective stop on the account. Use `cancel_orders_for_symbol()`.
+5. **Alpaca is the source of truth for what is held.** Files are caches.
+6. **Run `python -m unittest discover -s tests` before you claim anything works.**
+   30 tests guard the rules above (risk paths + architecture); CI runs them on
+   every push. A failure in `test_architecture.py` usually means "route this
+   through the existing owner", not "edit the test".
+7. **Nothing auto-executes.** Every trade needs an owner button press or an
+   owner-run command. Preserve this.
+8. **Follow the change protocol** in `docs/ARCHITECTURE.md` §5 for anything
+   touching `broker/`, `config.py`, order routing, or a Discord surface:
+   name the owner → check blast radius → state the invariant at risk → add a
+   test → update docs → exercise once on paper.
+
+---
+
+## The invariant
+
+> **Count of open SELL STOP orders == count of open positions.**
+
+Check it after any change to `broker/`. If it doesn't hold, positions are
+unprotected and that is the highest-priority bug in the repo.
+
+---
+
+## Architecture
 
 ```
-main.py                    # entry point — run with: python main.py [--execute]
-config.py                  # all tunable parameters
+main.py                    # entry point: python main.py [--execute]
+config.py                  # ALL tunable parameters — never hardcode elsewhere
 pipeline/
-  ingestion.py             # Stage 1: downloads prices + fundamentals (yfinance)
-  features.py              # Stage 2: computes 20+ signals per stock
-  scoring.py               # Stage 3: 7-factor weighted composite score
-  filters.py               # Stage 4: 200MA, volatility, liquidity, sector cap
-  selection.py             # Stage 5: picks top N by score
-  portfolio.py             # Stage 6: inverse-vol position sizing
-  signals.py               # Stage 7: BUY/HOLD/EXIT vs prior portfolio
-  output.py                # Stage 8: saves JSON, Excel, HTML dashboard
-  regime.py                # BULL/NEUTRAL/BEAR from VIX + SPX 200MA + yield curve
-  feedback.py              # adaptive weight learning (needs 25 obs minimum)
-  performance_tracker.py   # paper trading P&L snapshots
-  sentiment.py             # analyst revision scores (via yfinance)
-  insider.py               # SEC EDGAR Form 4 open-market purchases
+  ingestion → features → scoring → filters → selection → portfolio → signals → output
+  regime.py                # BULL/NEUTRAL/BEAR from VIX + SPX 200MA + yield curve + credit
+  sentiment/insider/congressional.py   # alternative signals blended into sentiment
+  feedback.py, learning.py, shadow.py  # adaptive weights (locked until 25+ observations)
+  performance_tracker.py, postmortem.py
 broker/
-  executor.py              # orchestrates Alpaca order execution
-  alpaca_client.py         # Alpaca SDK wrapper
-  stop_loss.py             # ATR-based weekly stop-loss checker
-memory/
-  AGENT_MEMORY.md          # persistent project memory
-  SESSION_LOG.md           # session-by-session diary
-outputs/                   # timestamped JSON, Excel, HTML dashboards
-data/                      # cache files, learned weights, paper trading log
+  alpaca_client.py         # THE broker interface: sell_with_cleanup, get_resting_stops,
+                           #   cancel_orders_for_symbol, get_recent_stop_fills
+  executor.py              # signals → orders; reconcile → exits → buys → stop reconcile
+  stop_loss.py             # compute_stop_price/take_profit + reconcile_protective_stops
+  monitor.py               # 15-min alerts (reads RESTING stops, never recomputed)
+  remote_commands.py       # Discord slash commands / buttons (runs in GitHub Actions)
+strategies/mean_reversion.py   # PAUSED (MR_ENABLED=False) — needs a real
+                               #   capital carve-out first, see ARCHITECTURE §3
+strategies/dual_momentum.py    # monthly advisory card, never trades
+worker/index.js            # Cloudflare Worker: Discord front door
+tests/test_risk_paths.py   # regression guards for order-placing logic
+tests/test_architecture.py # guards the ownership rules / invariants
+docs/ARCHITECTURE.md       # THE contract: single owners, invariants, protocol
+docs/FABLE_AUDIT_2026-07-27.md   # findings + rationale for the current design
+docs/UAT_CHECKLIST.md      # drills that must pass before real money
+memory/                    # AGENT_MEMORY.md (decisions), SESSION_LOG.md (diary)
 ```
+
+**State files**
+- `data/portfolio_state.json` — durable ledger, **git-tracked**, so cloud runs
+  aren't stateless. Supplies entry_date + pipeline-ownership tagging.
+- `outputs/latest_portfolio.json` — legacy local mirror; gitignored.
+- Holdings themselves always come from Alpaca.
 
 ---
 
-## Alpaca credentials
+## How execution works (`--execute`)
 
-Stored in `.env` file. Paper trading account. Keys already configured and tested — connection verified working.
-
-```
-ALPACA_BASE_URL=https://paper-api.alpaca.markets
-```
-
-Do NOT print the .env file to screen — keys should stay private.
-
----
-
-## Three tasks to implement (in priority order)
-
-### TASK 1 — Alpaca-first portfolio reconciliation (MOST IMPORTANT)
-
-**Problem**: `broker/executor.py` uses `outputs/latest_portfolio.json` as its memory of what's held. But Alpaca is the real truth. They diverge when:
-- Cash runs out and buys are skipped (happened on first run)
-- User manually buys/sells stocks in Alpaca
-- Orders partially fill
-
-**Fix — implement in `broker/executor.py`**:
-
-At the start of every `--execute` run, before generating any signals:
-1. Fetch actual live positions from Alpaca (`client.get_all_positions()`)
-2. Compare against the pipeline's target portfolio (this run's top 10)
-3. Generate corrective orders:
-   - In Alpaca but NOT in target → EXIT (sell)
-   - In target but NOT in Alpaca → BUY (regardless of what state file says)
-   - In both but weight has drifted >3% from target → rebalance (trim or add)
-4. Manual positions (in Alpaca but not selected by the model) → log a WARNING and respect a config flag:
-   - `MANUAL_POSITION_ACTION = "keep"` — leave it, just log it
-   - `MANUAL_POSITION_ACTION = "exit"` — sell it to maintain model purity
-
-The state file (`latest_portfolio.json`) should still be written but used ONLY for entry price/date tracking, not as the source of truth for what's held.
-
-Config flags to add to `config.py`:
-```python
-ALPACA_RECONCILE_ON_EXECUTE = True      # always sync with Alpaca before trading
-ALPACA_WEIGHT_DRIFT_THRESHOLD = 0.03   # rebalance if weight drifts >3%
-MANUAL_POSITION_ACTION = "keep"         # "keep" or "exit" manual positions
-```
-
-### TASK 2 — Congressional trading signal
-
-**Background**: Under the STOCK Act (2012), all US senators and representatives must disclose trades within 45 days. Data is public and has shown 5-10% annual alpha, especially from members of Intelligence and Armed Services committees.
-
-**Implement as `pipeline/congressional.py`**:
-
-Structure it identically to `pipeline/insider.py`. Fetch from:
-- Senate: `https://efts.senate.gov/LATEST/search-index?q=%22stock%22&dateRange=custom&startDate={90_days_ago}&endDate={today}&senator=&committee=`
-- Or use the Capitol Trades API (free, cleaner): `https://api.capitoltrades.com/trades?pageSize=100&issuer={ticker}`
-
-Signal scoring (return float in [-1, +1]):
-- +1.0 : 3+ senators bought in last 90 days, >$50k each
-- +0.5 : 1-2 senators bought
-- 0.0  : no signal or mixed
-- -0.5 : net selling
-
-Blend into the existing sentiment score in `scoring.py` at 30% weight alongside the insider signal (which currently has 40% weight within sentiment). Keep it behind a config flag `CONGRESSIONAL_ENABLED = True`.
-
-Cache results in `data/congressional_cache.json` with 24-hour TTL (same pattern as insider.py).
-
-### TASK 3 — Dead ticker pruning
-
-Remove 37 confirmed-delisted/acquired tickers from `ALL_TICKERS` in `config.py`. They generate 404 errors on every run and waste ~2 minutes of fetch time.
-
-Tickers to remove:
-`ANSS, PXD, HES, MRO, CMA, DAY, DFS, FI, FLT, JNPR, IPG, K, MMC, WBA, WRK, JAMF, PING, NAPA, CADE, PGTI, AMNB, AXNX, BECN, HTLF, GES, DINE, AVLR, CEIX, AZEK, ZI, COUP, HMST, MNRL, HMLP, ROIC, CIVI, PTVE, FOX`
+1. Kill switch (`EXECUTION_ENABLED`) + KV execution lock + market-open guard
+2. Cooldown set built from the stop log **and** Alpaca's filled stop orders
+3. Reconcile signals vs live Alpaca positions (HOLD→BUY upgrades are blocked
+   for earnings-blackout and cooldown names)
+4. EXITs first (each cancels that ticker's orders, then sells) — frees cash
+5. BUYs: whole shares, delta-aware, gated by cash **and** the regime exposure cap
+6. **Stop reconcile**: every held position ends with exactly one correct GTC
+   stop, anchored to `max(entry, current)` so stops ratchet up and never down
 
 ---
 
-## Key technical constraints
+## Key parameters (config.py)
 
-- **Python**: 3.14 on Windows (`C:\Users\srija\AppData\Local\Python\pythoncore-3.14-64\python.exe`)
-- **OneDrive sync corruption**: Files sometimes get trailing null bytes (`\x00`). Always read JSON files in binary mode and strip nulls: `data = path.read_bytes().rstrip(b'\x00'); json.loads(data)`
-- **yfinance**: Used for all price/fundamental data. No paid API keys needed.
-- **Alpaca SDK**: `alpaca-py` (not `alpaca-trade-api`). Use `TradingClient` from `alpaca.trading.client`.
-- **File encoding**: Always use `encoding="utf-8"` when writing files.
-- **No f-strings with backslashes inside expressions** — causes SyntaxError in some Python versions. Use string concatenation or `.format()` instead.
+- `PIPELINE_MAX_INVESTED_PCT` = bull 95% / neutral 75% / bear 40% — the single
+  cap table; `MAX_INVESTED_PCTS` is derived from it. Raised 2026-07-27 on the
+  reasoning that real broker-side stops bound downside better than idle cash.
+  **Revisit at 30+ closed trades** — cash also hedges *model* risk.
+- Stops: 2.5×ATR(14) in bull, clamped to a 3–12% band.
+- Take-profit: ATR-based, 8–35% band — used as a monitor **alert only**, never
+  a resting order (a hard ceiling amputates momentum's right tail).
+- `REBALANCE_RANK_BUFFER=3`, `REENTRY_COOLDOWN_DAYS=5`, `MAX_POSITION_WEIGHT=0.20`,
+  `EARNINGS_BLACKOUT_DAYS=5`, `MIN_FEEDBACK_OBSERVATIONS=25`.
 
 ---
 
-## How to run
+## Technical constraints
+
+- **CI runs Python 3.11** — match it locally; order-routing code shouldn't run
+  on an untested interpreter.
+- **Repo currently lives in OneDrive**, which corrupts files with trailing null
+  bytes. Read JSON as `path.read_bytes().rstrip(b"\x00")`, write atomically,
+  always `encoding="utf-8"`. Moving the repo out of OneDrive is a pending fix.
+- `alpaca-py` (not `alpaca-trade-api`). yfinance for prices/fundamentals;
+  `broker/market_data.py` gives real-time via Alpaca IEX → Finnhub → yfinance.
+- Credentials in `.env` — never print them.
+
+---
+
+## Commands
 
 ```bash
-# Dry run (no trades)
-python main.py
-
-# Live execution (places orders on Alpaca paper account)
-python main.py --execute
-
-# Weekly stop-loss check
-python broker/stop_loss.py
-
-# Test Alpaca connection
-python -c "from dotenv import load_dotenv; load_dotenv(); from alpaca.trading.client import TradingClient; import os; c=TradingClient(os.getenv('ALPACA_API_KEY'),os.getenv('ALPACA_SECRET_KEY'),paper=True); print(c.get_account().status)"
+python main.py                     # dry run, no trades
+python main.py --execute           # places paper orders  (owner runs this)
+python -m unittest discover -s tests -v
+python scripts/protect_positions.py            # preview stop attachment
+python broker/stop_loss.py                     # weekly check (dry by default)
+python scripts/health_check.py
 ```
 
 ---
 
-## Memory system
+## Working agreements
 
-After completing tasks, update:
-- `memory/AGENT_MEMORY.md` — add decisions to KEY DECISIONS LOG, update last-updated date
-- `memory/SESSION_LOG.md` — append a new SESSION entry with what was done
-
----
-
-## Phase history
-
-- **Phase 1-2**: Basic 4-factor pipeline (momentum, trend, quality, volatility)
-- **Phase 3**: Added valuation + analyst sentiment + SEC insider signals
-- **Phase 4** (complete): Yield curve regime downgrade, ATR stops, inverse-vol sizing, soft 200MA boundary, feedback learning guard, performance tracker, PEG-adjusted valuation, soft sector cap, earnings blackout
-- **Next (Tasks 1-3 above)**: Alpaca reconciliation, congressional signal, dead ticker cleanup
+- **Feature freeze until 30 closed trades.** Reliability and observability
+  changes only. The machinery-to-evidence ratio is this project's main risk.
+- One session = one concern. The worst regressions came from broad sessions
+  touching order routing incidentally.
+- Finish by updating `memory/AGENT_MEMORY.md` (decisions) and
+  `memory/SESSION_LOG.md` (what happened).
+- Keep this file true. A stale briefing makes every future session start wrong.

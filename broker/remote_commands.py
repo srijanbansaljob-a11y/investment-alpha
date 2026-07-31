@@ -38,8 +38,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
 from broker.alpaca_client import (
     get_client, get_positions, get_account_summary, is_market_open,
-    close_position,
+    close_position, sell_with_cleanup,
 )
+# NOTE (audit P0-2): sells must go through sell_with_cleanup, never bare
+# close_position — a position with a resting GTC stop has its shares held
+# against that order, and Alpaca rejects any other sell until it's cancelled.
 from broker.stop_loss import compute_stop_price
 from broker import discord_notify as dn
 
@@ -364,7 +367,7 @@ def cmd_stoploss_execute(payload):
         return
     results = []
     for t in breached:
-        r = close_position(client, t)
+        r = sell_with_cleanup(client, t)
         ok = r.get("status") not in ("failed",)
         results.append(f"{'✅' if ok else '❌'} {t}: {r.get('status')}" + (f" — {r.get('error')}" if r.get("error") else ""))
         _journal({"decision": "stoploss_execute", "ticker": t,
@@ -765,7 +768,7 @@ def cmd_approve_sell(payload):
         dn.post_message([_embed(f"⚠️ {ticker}", "Position no longer exists — no order placed.", _ORANGE)])
         return
     price_now = positions[ticker]["current_price"]
-    r = close_position(client, ticker)
+    r = sell_with_cleanup(client, ticker)
     ok = r.get("status") not in ("failed",)
     _journal({
         "decision": "approve_sell", "ticker": ticker, "trigger": trigger,

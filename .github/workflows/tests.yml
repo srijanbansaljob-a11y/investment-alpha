@@ -1,0 +1,39 @@
+name: Risk-Path Tests
+
+# Audit follow-up (docs/FABLE_AUDIT_2026-07-27.md §7.3): every path that can
+# place, cancel, or skip an order is covered by tests/test_risk_paths.py.
+# This gate would have caught P0-4 (blackout bypass) and P0-5 (fractional
+# bracket loss) at commit time. No network calls, no Alpaca credentials.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run risk-path tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Notify Discord on failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"❌ Risk-path tests FAILED\",\"description\":\"A commit broke an order-safety guarantee.\\n[View run]($RUN_URL)\",\"color\":15158332}]}"

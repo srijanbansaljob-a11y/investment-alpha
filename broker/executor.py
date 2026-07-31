@@ -53,10 +53,125 @@ def calc_shares(target_value: float, current_price: float) -> float:
 
 # ── Alpaca-first Reconciliation ────────────────────────────────────────────
 
+def _check_drawdown_pause(equity: float) -> tuple[bool, str]:
+    """
+    Portfolio-level circuit breaker: stop opening NEW positions once equity is
+    DRAWDOWN_PAUSE_PCT below its high-water mark; resume when it recovers to
+    within DRAWDOWN_RESUME_PCT. Exits and protective stops are unaffected —
+    this only stops you buying into a decline.
+
+    OWNERSHIP (2026-07-31): this gate previously lived ONLY inside
+    strategies/mean_reversion.py::_check_cash_management. When the sleeve was
+    paused (MR_ENABLED=False) the drawdown pause silently stopped being
+    enforced anywhere, even though config still declared it. Buy-gating belongs
+    to the executor, so it lives here now — one owner, applied to the strategy
+    that actually trades.
+
+    State: data/portfolio_peak.json (git-tracked, so the high-water mark
+    survives stateless cloud runs).
+
+    Returns (ok_to_buy, reason).
+    """
+    if not getattr(config, "CASH_MGMT_ENABLED", True) or equity <= 0:
+        return True, ""
+
+    import json as _json
+    pause_pct  = getattr(config, "DRAWDOWN_PAUSE_PCT", 0.08)
+    resume_pct = getattr(config, "DRAWDOWN_RESUME_PCT", 0.05)
+    path = Path(getattr(config, "DATA_DIR", "data")) / "portfolio_peak.json"
+
+    data = {}
+    try:
+        if path.exists():
+            raw = path.read_bytes().rstrip(b"\x00")
+            data = _json.loads(raw) if raw else {}
+    except Exception as exc:
+        log.warning("  Drawdown: could not read peak file (%s) — treating today as peak", exc)
+
+    peak    = float(data.get("peak_equity") or equity)
+    paused  = bool(data.get("paused", False))
+    if equity > peak:
+        peak = equity
+    drawdown = (peak - equity) / peak if peak > 0 else 0.0
+
+    if paused and drawdown < resume_pct:
+        paused = False
+        log.info("  Drawdown recovered to %.1f%% — new buys re-enabled.", drawdown * 100)
+    elif not paused and drawdown >= pause_pct:
+        paused = True
+        log.warning("  DRAWDOWN PAUSE TRIGGERED: equity $%s is %.1f%% below the $%s peak.",
+                    "{:,.0f}".format(equity), drawdown * 100, "{:,.0f}".format(peak))
+
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(_json.dumps({
+            "peak_equity": round(peak, 2),
+            "paused":      paused,
+            "drawdown_pct": round(drawdown * 100, 2),
+            "updated":     datetime.now().isoformat(),
+        }, indent=2), encoding="utf-8")
+    except Exception as exc:
+        log.warning("  Drawdown: could not persist peak state (%s)", exc)
+
+    if paused:
+        return False, ("drawdown pause active — equity {:.1f}% below its ${:,.0f} peak; "
+                       "new buys blocked until it recovers above -{:.0f}%"
+                       .format(drawdown * 100, peak, resume_pct * 100))
+    return True, ""
+
+
+def _blocked_from_buying(sig: dict, cooldown_tickers: set) -> str | None:
+    """
+    Reasons a reconcile HOLD→BUY upgrade must NOT happen (audit P0-4).
+
+    Before this guard, the reconciler silently defeated two safety rules:
+      - earnings blackout: signals.py downgrades a pre-earnings BUY to HOLD;
+        the reconciler saw "HOLD but not held" and upgraded it right back.
+      - re-entry cooldown: a stopped-out name still in the top-N arrives as
+        HOLD (so signals.py never set cooldown_blocked), its position is gone
+        from Alpaca, and the reconciler re-bought it instantly.
+
+    Returns a reason string if blocked, None if the upgrade may proceed.
+    """
+    if sig.get("earnings_blocked"):
+        return "earnings_blackout"
+    if sig.get("cooldown_blocked"):
+        return "reentry_cooldown"
+    if sig["ticker"] in cooldown_tickers:
+        return "reentry_cooldown_broker"
+    return None
+
+
+def _cooldown_tickers(client=None) -> set:
+    """
+    Union of names stopped out within REENTRY_COOLDOWN_DAYS from BOTH sources:
+      - stop_loss_log.json (local checker scans)
+      - Alpaca filled SELL STOP orders (broker-side GTC stops fill without
+        ever touching the local log — the gap that let a stopped-out name
+        be re-bought on the very next run)
+    """
+    days = int(getattr(config, "REENTRY_COOLDOWN_DAYS", 0) or 0)
+    if days <= 0:
+        return set()
+    out = set()
+    try:
+        from pipeline.signals import _recent_stop_exits
+        out |= set(_recent_stop_exits(days).keys())
+    except Exception as exc:
+        log.warning("  Cooldown: could not read stop log (%s)", exc)
+    try:
+        if client is not None:
+            out |= set(alpaca.get_recent_stop_fills(client, days=days).keys())
+    except Exception as exc:
+        log.warning("  Cooldown: could not read broker stop fills (%s)", exc)
+    return out
+
+
 def _reconcile_signals(
     signals: list,
     live_positions: dict,
     equity: float,
+    cooldown_tickers: set | None = None,
 ) -> list:
     """
     Override pipeline signals based on what Alpaca actually holds.
@@ -74,6 +189,7 @@ def _reconcile_signals(
     if not getattr(config, "ALPACA_RECONCILE_ON_EXECUTE", True):
         return signals
 
+    cooldown_tickers = cooldown_tickers or set()
     drift_threshold = getattr(config, "ALPACA_WEIGHT_DRIFT_THRESHOLD", 0.03)
     manual_action   = getattr(config, "MANUAL_POSITION_ACTION", "keep").lower()
 
@@ -96,6 +212,14 @@ def _reconcile_signals(
         target_weight = sig.get("weight", 0)
 
         if action == "HOLD" and not pos_exists:
+            block = _blocked_from_buying(sig, cooldown_tickers)
+            if block:
+                log.info(
+                    "  RECONCILE %-6s: HOLD not in Alpaca, but upgrade BLOCKED (%s) "
+                    "-- staying flat this run", ticker, block,
+                )
+                corrected.append(dict(sig, reconcile_reason="upgrade_blocked_" + block))
+                continue
             log.warning(
                 "  RECONCILE %-6s: HOLD but not in Alpaca "
                 "-> upgrading to BUY (missed entry or manual close)",
@@ -247,19 +371,34 @@ def execute_signals(
     log.info("  Open positions   : %d", len(current_positions))
     log.info("  Signals received : %d", len(signals))
 
+    # ── Cooldown set (stop log + broker-side stop fills, audit P0-4) ──────
+    cooldown_tickers = _cooldown_tickers(client)
+    if cooldown_tickers:
+        log.info("  Re-entry cooldown active for: %s", sorted(cooldown_tickers))
+
     # ── Alpaca-first reconciliation ───────────────────────────────────────
     if getattr(config, "ALPACA_RECONCILE_ON_EXECUTE", True):
         log.info("\n  [RECONCILE] Checking live Alpaca positions vs pipeline signals...")
-        signals = _reconcile_signals(signals, current_positions, equity)
+        signals = _reconcile_signals(signals, current_positions, equity,
+                                     cooldown_tickers=cooldown_tickers)
+
+    # Broker-side stop fills also block plain BUY signals (signals.py can
+    # only see the local stop log; the broker's GTC fills happen without it).
+    for s in signals:
+        if s["action"] == "BUY" and s["ticker"] in cooldown_tickers:
+            s["cooldown_blocked"] = True
 
     orders       = []
     exit_signals = [s for s in signals if s["action"] == "EXIT"]
     buy_signals  = [s for s in signals if s["action"] == "BUY"]
     hold_signals = [s for s in signals if s["action"] == "HOLD"]
 
-    # ── Step 1: Cancel stale open orders ─────────────────────────────────
-    if not dry_run:
-        alpaca.cancel_open_orders(client)
+    # ── Step 1: (REMOVED — audit P0-1) ────────────────────────────────────
+    # This used to be a blanket alpaca.cancel_open_orders(client), which
+    # cancelled EVERY resting protective stop on the account and never put
+    # them back. Cancellation is now per-ticker, inside sell_with_cleanup,
+    # and protection is restored for all positions by the stop-reconcile
+    # pass at the end of this function.
 
     # ── Step 2: EXIT first (free cash before buying) ──────────────────────
     log.info("\n  [EXIT] Processing %d exits...", len(exit_signals))
@@ -272,7 +411,7 @@ def execute_signals(
                 "    EXIT %-6s  qty=%.4f  value=$%.2f  reason=%s",
                 ticker, pos["qty"], pos["market_value"], reason,
             )
-            order = alpaca.close_position(client, ticker, dry_run=dry_run)
+            order = alpaca.sell_with_cleanup(client, ticker, dry_run=dry_run)
             order["action"]    = "EXIT"
             order["rationale"] = sig.get("entry_rationale", reason)
             if not dry_run:
@@ -335,6 +474,15 @@ def execute_signals(
              max_invested * 100, regime_key.upper(),
              "{:,.0f}".format(invested_value), "{:,.0f}".format(equity),
              (invested_value / equity * 100) if equity else 0)
+
+    # ── Drawdown circuit breaker (independent of the exposure cap) ────────
+    # The cap asks "how much may I hold?"; this asks "should I be adding at
+    # all right now?". Both must pass before any BUY.
+    dd_ok, dd_reason = _check_drawdown_pause(equity)
+    if not dd_ok:
+        log.warning("  🛑 NO BUYS THIS RUN — %s", dd_reason)
+        exposure_budget = 0.0
+
     if exposure_budget <= 0:
         log.warning("  Already at or above the %.0f%% exposure cap — NO new buys "
                     "will be placed until positions close.", max_invested * 100)
@@ -367,6 +515,16 @@ def execute_signals(
         existing_qty = current_positions.get(ticker, {}).get("qty", 0)
         delta_qty    = round(target_qty - existing_qty, 4)
 
+        if target_qty == 0 and existing_qty == 0:
+            # Price too high for this weight's dollar target — surface it
+            # instead of silently logging "at_target" (audit P1-3).
+            log.warning("    BUY %-6s: target $%.0f < 1 share @ $%.2f -- "
+                        "skipped (too expensive for weight)%s",
+                        ticker, target_value, price, reason_note)
+            orders.append({"ticker": ticker, "action": "BUY",
+                           "status": "skipped_too_expensive"})
+            continue
+
         if abs(delta_qty) < 0.0001:
             log.info(
                 "    BUY %-6s: already at target (%.4f shares), no action%s",
@@ -377,7 +535,16 @@ def execute_signals(
             continue
 
         if delta_qty > 0:
-            # Need to buy more shares
+            # Whole shares only (audit P0-5): a fractional top-up can't carry
+            # a broker-side stop, and all protection now comes from the
+            # stop-reconcile pass which places whole-share stops.
+            delta_qty = float(int(delta_qty))
+            if delta_qty < 1:
+                log.info("    BUY %-6s: delta rounds below 1 share -- no action%s",
+                         ticker, reason_note)
+                orders.append({"ticker": ticker, "action": "BUY",
+                               "status": "at_target", "qty": existing_qty})
+                continue
             cost = delta_qty * price
             if cost > available_cash * getattr(config, "CASH_BUFFER_MULTIPLIER", 1.0):
                 log.warning(
@@ -391,6 +558,11 @@ def execute_signals(
             # Exposure cap — the second, independent brake. Cash alone is not a
             # risk limit: an account can be 100% invested and still have cash.
             if cost > exposure_budget:
+                if not dd_ok:
+                    log.info("    BUY %-6s: skipped — %s%s", ticker, dd_reason, reason_note)
+                    orders.append({"ticker": ticker, "action": "BUY",
+                                   "status": "skipped_drawdown_pause"})
+                    continue
                 log.warning(
                     "    BUY %-6s: would breach the %.0f%% exposure cap "
                     "(need $%.2f, %.0f%% budget remaining $%.2f)%s",
@@ -401,20 +573,11 @@ def execute_signals(
                                "status": "skipped_exposure_cap"})
                 continue
 
-            # Protective legs — computed from the SIGNAL price. Alpaca holds
-            # these at the broker, so they work even if our monitor is down.
-            stop_price = take_price = None
-            try:
-                from broker.stop_loss import compute_stop_price, compute_take_profit
-                stop_price, stop_method, atr_val = compute_stop_price(ticker, price, regime_key)
-                take_price, _monitor, tp_method  = compute_take_profit(ticker, price, regime_key, atr_val)
-                if stop_price and take_price:
-                    log.info("      stop $%.2f (%s) · target $%.2f (%s)",
-                             stop_price, stop_method, take_price, tp_method)
-            except Exception as exc:
-                log.warning("      %s: could not compute protective levels (%s) — "
-                            "order will be placed WITHOUT a bracket", ticker, exc)
-
+            # Plain market buy (audit P0-5/P1-1): brackets are gone. A bracket
+            # only protected new whole-share buys, silently dropped its legs on
+            # fractional deltas, and its resting legs conflicted with every
+            # other sell path. ALL protection now comes from the single
+            # stop-reconcile pass at the end of this run — one mechanism.
             log.info(
                 "    BUY %-6s  delta=+%.0f sh  price=$%.2f  cost=$%.2f"
                 "  weight=%.0f pct%s",
@@ -422,7 +585,6 @@ def execute_signals(
             )
             order = alpaca.place_market_order(
                 client, ticker, delta_qty, "buy", dry_run=dry_run,
-                stop_price=stop_price, take_profit_price=take_price,
             )
             order["action"]       = "BUY"
             order["target_value"] = round(cost, 2)
@@ -430,8 +592,6 @@ def execute_signals(
             order["rationale"]    = sig.get("entry_rationale", reconcile_reason)
             if order.get("status") not in ("failed",):
                 exposure_budget -= cost
-            if not order.get("bracket") and order.get("status") not in ("failed", "dry_run"):
-                log.warning("      %s: submitted WITHOUT protective stop — verify manually", ticker)
             if not dry_run:
                 if order.get("filled_avg_price"):
                     log.info("      -> filled @ $%.2f", order["filled_avg_price"])
@@ -447,8 +607,11 @@ def execute_signals(
                 "    TRIM %-6s  delta=%.4f  price=$%.2f  (overweight trim)%s",
                 ticker, -delta_qty, price, reason_note,
             )
-            order = alpaca.place_market_order(client, ticker, trim_qty, "sell",
-                                              dry_run=dry_run)
+            # sell_with_cleanup cancels the ticker's resting stop first
+            # (audit P0-2); the reconcile pass below re-attaches it at the
+            # reduced quantity.
+            order = alpaca.sell_with_cleanup(client, ticker, qty=trim_qty,
+                                             dry_run=dry_run)
             order["action"]    = "TRIM"
             order["rationale"] = reconcile_reason or "weight_drift_trim"
             if not dry_run:
@@ -458,6 +621,19 @@ def execute_signals(
                     log.warning("      -> NOT CONFIRMED FILLED (status=%s) — verify in Alpaca", order.get("status"))
             orders.append(order)
             available_cash += trim_qty * price
+
+    # ── Stop reconcile: every held position ends the run protected ────────
+    # THE single stop mechanism (audit P0-1/P1-1). Places a stop where one is
+    # missing, ratchets existing stops up on winners, re-syncs quantity after
+    # trims. Runs in dry-run mode too so the preview shows what would happen.
+    stop_reconcile = None
+    try:
+        from broker.stop_loss import reconcile_protective_stops
+        log.info("\n  [PROTECT] Reconciling protective stops for all positions...")
+        stop_reconcile = reconcile_protective_stops(client, regime_key, dry_run=dry_run)
+    except Exception as exc:
+        log.error("  ⚠️  Stop reconcile FAILED (%s) — positions may be "
+                  "unprotected, run scripts/protect_positions.py", exc)
 
     # ── Account state AFTER ────────────────────────────────────────────────
     if not dry_run:
@@ -472,7 +648,7 @@ def execute_signals(
     terminal_statuses = {
         "dry_run", "held", "no_position", "at_target",
         "skipped_no_price", "skipped_insufficient_cash", "skipped_cooldown",
-        "skipped_exposure_cap",
+        "skipped_exposure_cap", "skipped_too_expensive", "skipped_drawdown_pause",
     }
     orders_submitted = [o for o in orders if o.get("status") not in terminal_statuses
                         and o.get("status") != "failed"]
@@ -522,6 +698,7 @@ def execute_signals(
         "open_positions": final_positions,
         "orders":         orders,
         "summary":        summary,
+        "stop_reconcile": stop_reconcile,
     }
 
 

@@ -1,5 +1,5 @@
 # 🧠 Agent Memory — Investment Alpha Trading System
-# Last Updated: 2026-06-10 (Session 006 — Discord approval system, learning overhaul, strategy sleeves)
+# Last Updated: 2026-07-27 (Session 008 — Fable audit + P0/P1 remediation, risk-path tests)
 # Purpose: Persistent context for the trading agent to learn from user decisions and constraints
 
 ---
@@ -138,6 +138,21 @@ Learned weights saved to `data/learned_weights.json` and loaded by scoring.py.
 | 2026-05-15 | 38 dead/delisted tickers removed from ALL_TICKERS | Universe: 618 → 580; saves ~2 min per run; eliminates recurring 404 errors |
 | 2026-05-15 | ALPACA_RECONCILE_ON_EXECUTE, ALPACA_WEIGHT_DRIFT_THRESHOLD=0.03, MANUAL_POSITION_ACTION="keep" added to config.py | Controls reconciliation behavior on --execute runs |
 | 2026-05-15 | CONGRESSIONAL_ENABLED=True, CONGRESSIONAL_LOOKBACK_DAYS=90, CONGRESSIONAL_MIN_TRADE_USD=50000 added to config.py | Congressional signal config |
+| 2026-07-27 | **Full system audit by Fable** (`docs/FABLE_AUDIT_2026-07-27.md`) | 5 P0s found and reproduced with tests; system had too many layers doing the same job three different ways |
+| 2026-07-27 | **ONE sell path**: `alpaca_client.sell_with_cleanup()` | Positions with resting GTC stops have their shares held; a bare close is rejected. Every sell (executor EXIT/TRIM, stop_loss, `/stoploss execute`, approve-sell, worker) now cancels the ticker's orders first, confirms, then sells |
+| 2026-07-27 | **ONE stop mechanism**: `stop_loss.reconcile_protective_stops()` | Replaces bracket legs on buys AND the blanket cancel. Runs at the end of every execute: every held position ends with exactly one correct GTC stop, anchored to max(entry, current) so stops ratchet UP and are never lowered |
+| 2026-07-27 | Blanket `cancel_open_orders()` removed from executor | It cancelled all 12 protective stops and never replaced them — one rebalance would have left the whole book naked |
+| 2026-07-27 | Brackets on buys removed entirely | They silently dropped legs on fractional qty, only covered new buys, and their resting legs conflicted with every other sell path. One mechanism instead of three |
+| 2026-07-27 | Reconciler HOLD→BUY upgrade now honours earnings blackout + cooldown | The upgrade was silently defeating both safety rules |
+| 2026-07-27 | Cooldown reads **broker-side stop fills** too (`get_recent_stop_fills`) | GTC stops fill at Alpaca without ever touching stop_loss_log.json, so a stopped-out name was re-bought on the next run |
+| 2026-07-27 | **Alpaca-first exits** + durable ledger `data/portfolio_state.json` | `outputs/` is gitignored → cloud runs were stateless → zero EXIT signals ever generated in the cloud → the book grew to 12 names against top_n=10. Holdings now come from live Alpaca; the git-tracked ledger supplies entry_date + pipeline-ownership |
+| 2026-07-27 | Buy deltas floored to whole shares | Fractional top-ups could not carry a broker-side stop |
+| 2026-07-27 | Resting broker stops are the single truth for stop LEVELS | monitor.py + weekly checker recomputed entry-anchored levels that disagreed with the broker by up to $17 (MRK) — in the permissive direction |
+| 2026-07-27 | Weekly stop checker no longer double-sells | If a resting broker stop covers the position, the checker detects and reports but does not place its own order |
+| 2026-07-27 | `MAX_INVESTED_PCTS` DERIVED from `PIPELINE_MAX_INVESTED_PCT` | Three components enforced three different exposure caps on the same account (95% / 80% / 60%) |
+| 2026-07-27 | 12 duplicate config keys actually removed | Prior "duplicates removed" comments were false; LOG_LEVEL was genuinely last-wins |
+| 2026-07-27 | `tests/test_risk_paths.py` + `tests.yml` CI gate | 17 tests over every order-placing/cancelling/skipping path. Caught a 3rd unguarded worker sell path during its own authoring |
+| 2026-07-27 | UAT drills mandatory before real money (`docs/UAT_CHECKLIST.md`) | "Shipped" now means exercised once on paper, not merged. `/stoploss execute` was "done" for weeks and was structurally broken |
 | 2026-05-15 | DATA_DIR = BASE_DIR / "data" added to config.py | Proper path for insider_cache.json and congressional_cache.json |
 
 ---

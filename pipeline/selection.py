@@ -24,17 +24,25 @@ log = logging.getLogger(__name__)
 
 
 def _load_prior_tickers() -> set:
-    """Tickers held as of the last run (latest_portfolio.json). Empty on first run."""
-    path = config.PORTFOLIO_STATE_FILE
-    if not path.exists():
-        return set()
-    try:
-        raw = path.read_bytes().rstrip(b"\x00")
-        data = json.loads(raw)
-        return {p["ticker"] for p in data.get("portfolio", []) if p.get("ticker")}
-    except Exception as exc:
-        log.warning("Selection: could not read prior holdings (%s)", exc)
-        return set()
+    """
+    Tickers held as of the last run. Tries the durable git-tracked ledger
+    first (data/portfolio_state.json — exists on cloud checkouts, audit
+    P0-3), then the legacy gitignored outputs/latest_portfolio.json.
+    Empty on first run.
+    """
+    for path in (config.DATA_DIR / "portfolio_state.json",
+                 config.PORTFOLIO_STATE_FILE):
+        try:
+            path = Path(path)
+            if not path.exists():
+                continue
+            raw = path.read_bytes().rstrip(b"\x00")
+            data = json.loads(raw)
+            return {p["ticker"] for p in data.get("portfolio", []) if p.get("ticker")}
+        except Exception as exc:
+            log.warning("Selection: could not read prior holdings from %s (%s)",
+                        path.name, exc)
+    return set()
 
 
 def _apply_turnover_guard(ranked, selected, n_select):

@@ -572,8 +572,11 @@ async function handleTradingViewWebhook(request, env) {
   } else if (action.toLowerCase() === "sell" || action.toLowerCase() === "close") {
     // Market sell / close position
     try {
-      // Try close_position first (handles fractional shares cleanly)
-      const resp = await fetch(`${alpacaBase}/v2/positions/${ticker}`, {
+      // Try close_position first (handles fractional shares cleanly).
+      // cancel_orders=true (audit P0-2): the position's shares are held
+      // against its resting GTC protective stop — without this flag Alpaca
+      // rejects the close with "insufficient qty available".
+      const resp = await fetch(`${alpacaBase}/v2/positions/${ticker}?cancel_orders=true`, {
         method:  "DELETE",
         headers: alpacaHeaders,
       });
@@ -900,7 +903,9 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       const headers = portfolioHeaders(env, portfolio);
       let ok = false, errMsg = "";
       try {
-        const r = await fetch(`${alpacaBase}/v2/positions/${ticker}`, { method: "DELETE", headers });
+        // cancel_orders=true — see audit P0-2: without it the resting stop's
+        // held shares make Alpaca reject the close.
+        const r = await fetch(`${alpacaBase}/v2/positions/${ticker}?cancel_orders=true`, { method: "DELETE", headers });
         ok = r.status === 200 || r.status === 204;
         if (!ok) { const b = await r.json(); errMsg = b?.message || `HTTP ${r.status}`; }
       } catch (e) { errMsg = e.message; }
@@ -1146,7 +1151,9 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
             body: JSON.stringify({ symbol: ticker, qty: String(sellQty), side: "sell", type: "market", time_in_force: "day" }),
           });
         } else {
-          r = await fetch(`${alpacaBase}/v2/positions/${ticker}`, { method: "DELETE", headers });
+          // cancel_orders=true is belt-and-braces here (Step 1 above already
+          // cancelled) — kept so every position-close in this file carries it.
+          r = await fetch(`${alpacaBase}/v2/positions/${ticker}?cancel_orders=true`, { method: "DELETE", headers });
         }
         ok = r.status >= 200 && r.status < 300;
         if (!ok) { const b = await r.json().catch(() => ({})); errMsg = b?.message || `HTTP ${r.status}`; }

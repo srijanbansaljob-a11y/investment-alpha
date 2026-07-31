@@ -138,6 +138,35 @@ def _get_regime_label() -> str:
         return ""
 
 
+def _should_post_skip_notice() -> bool:
+    """
+    Rate-limit the 'entries skipped' embed to once per 7 days.
+
+    A notification that repeats daily and can't be acted on trains you to
+    ignore the channel — and the channel is where genuine stop-loss alerts
+    arrive. State lives in the sleeve file so it survives stateless runs.
+    """
+    # Deliberately NOT stored in sleeve_mr.json: every key in that file is
+    # treated as a held ticker (the ghost-position reconciler would try to
+    # "remove" a metadata key). Separate file, separate concern.
+    from datetime import timedelta
+    path = config.DATA_DIR / "mr_notice_state.json"
+    now  = datetime.now(timezone.utc)
+    try:
+        if path.exists():
+            last = json.loads(path.read_bytes().rstrip(b"\x00")).get("last_skip_notice")
+            if last and now - datetime.fromisoformat(last) < timedelta(days=7):
+                return False
+    except Exception:
+        pass
+    try:
+        path.write_text(json.dumps({"last_skip_notice": now.isoformat()}, indent=2),
+                        encoding="utf-8")
+    except Exception:
+        pass
+    return True
+
+
 def _check_cash_management(equity: float, invested: float) -> tuple[bool, str]:
     """
     Returns (ok_to_buy, reason_string).
@@ -190,9 +219,15 @@ def _check_cash_management(equity: float, invested: float) -> tuple[bool, str]:
 
     invested_pct = invested / equity if equity > 0 else 0
     if invested_pct >= max_pct:
-        return False, (f"💰 **Exposure limit reached** — {invested_pct*100:.0f}% of equity invested "
-                       f"(limit is {max_pct*100:.0f}% in **{regime_label or 'UNKNOWN'}** regime). "
-                       f"Holding cash until a position closes or regime improves.")
+        # KNOWN LIMITATION (documented in docs/ARCHITECTURE.md "Capital
+        # allocation"): this compares ACCOUNT-WIDE exposure to the
+        # ACCOUNT-WIDE cap, but the sleeve owns only MR_SLEEVE_PCT of equity.
+        # It therefore blocks on the pipeline's exposure, not its own budget.
+        # The sleeve is PAUSED (MR_ENABLED=False) until it has a real
+        # carve-out. Do not re-enable by flipping the flag alone.
+        return False, (f"💰 **Exposure limit reached** — {invested_pct*100:.0f}% of account equity "
+                       f"invested (account cap {max_pct*100:.0f}% in "
+                       f"**{regime_label or 'UNKNOWN'}** regime). Sleeve entries paused.")
 
     return True, ""
 
@@ -304,16 +339,22 @@ def scan() -> dict:
             ok_to_buy, cash_reason = _check_cash_management(equity, invested)
             if not ok_to_buy:
                 log.info("Cash management: skipping entries. %s", cash_reason)
-                if cash_reason:
+                # Post ONLY when the skip is news (audit: a daily alert that
+                # cannot lead to an action is alert fatigue — this exact embed
+                # fired every weekday for weeks while the sleeve was
+                # structurally unable to buy). Once per week is enough to say
+                # "still blocked"; the log always has the detail.
+                if cash_reason and _should_post_skip_notice():
                     dn.post_message([{
                         "title": "📊 MR Scan — Entries Skipped",
                         "description": (
                             cash_reason + "\n\n"
-                            "Cash will free up naturally as positions hit stops or time-outs.\n"
-                            "Use **`/rebalance`** anytime to manually review winners and trim 50% of chosen positions."
+                            "Sleeve entries resume when account exposure falls below the cap — "
+                            "pipeline positions exit on stop-outs or at the weekly rebalance.\n"
+                            "Use **`/rebalance`** to review winners and trim 50% of chosen positions."
                         ),
                         "color": 0xF39C12,
-                        "footer": {"text": "Investment Alpha — cash management"},
+                        "footer": {"text": "Investment Alpha — cash management (weekly notice)"},
                     }])
                 return {"entries": 0, "exits": n_exits}
         except Exception as e:

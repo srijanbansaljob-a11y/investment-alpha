@@ -28,7 +28,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
 from broker import discord_notify as dn
-from broker.alpaca_client import get_client, get_positions, get_account_summary, place_market_order
+from broker.alpaca_client import (get_client, get_positions, get_account_summary,
+                                  place_market_order, sell_with_cleanup)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -234,8 +235,24 @@ def cmd_trim_half(payload: dict) -> None:
         return
 
     log.info("Trimming %d shares of %s (50%% of %.0f total) on %s account", trim_qty, ticker, qty, portfolio)
-    result = place_market_order(client, ticker, trim_qty, "sell")
+    # sell_with_cleanup, not a raw sell: the position's shares are held against
+    # its resting GTC protective stop, so a bare sell is REJECTED by Alpaca
+    # ("insufficient qty available"). This path was missed by the 2026-07-27
+    # audit and caught by tests/test_architecture.py — the /rebalance Trim 50%
+    # button could never have filled while stops were resting.
+    result = sell_with_cleanup(client, ticker, qty=trim_qty)
     ok     = result.get("status") not in ("failed",)
+
+    # The trim cancelled this ticker's stop; re-attach protection at the
+    # reduced quantity. Without this the remaining half sits unprotected.
+    if ok:
+        try:
+            from broker.stop_loss import reconcile_protective_stops
+            from broker.remote_commands import _detect_regime
+            reconcile_protective_stops(client, _detect_regime(), dry_run=False)
+        except Exception as exc:
+            log.error("Stop re-attach after trim FAILED (%s) — %s may be unprotected; "
+                      "run scripts/protect_positions.py", exc, ticker)
 
     if ok:
         dn.post_message([{

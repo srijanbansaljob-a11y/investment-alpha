@@ -399,7 +399,14 @@ def close_position(
 
 
 def cancel_open_orders(client: TradingClient) -> int:
-    """Cancel all open orders. Returns count cancelled."""
+    """Cancel all open orders. Returns count cancelled.
+
+    ⚠️ DEPRECATED for pipeline use (audit P0-1, 2026-07-27): this cancels
+    EVERY open order on the account — including the protective GTC stops
+    resting against held positions. The executor no longer calls it. Use
+    cancel_orders_for_symbol() for targeted cleanup instead. Kept only so
+    external callers don't break.
+    """
     try:
         cancelled = client.cancel_orders()
         count = len(cancelled) if cancelled else 0
@@ -408,6 +415,135 @@ def cancel_open_orders(client: TradingClient) -> int:
     except Exception as e:
         log.warning(f"  Could not cancel open orders: {e}")
         return 0
+
+
+def get_open_orders(client: TradingClient, symbol: str | None = None) -> list:
+    """Open orders, optionally filtered to one symbol."""
+    try:
+        req = GetOrdersRequest(status=QueryOrderStatus.OPEN, limit=500,
+                               symbols=[symbol] if symbol else None)
+        return list(client.get_orders(req) or [])
+    except Exception as e:
+        log.warning(f"  Could not list open orders: {e}")
+        return []
+
+
+def get_resting_stops(client: TradingClient) -> dict:
+    """
+    {symbol: {"stop_price", "qty", "order_id"}} for protective SELL STOP
+    orders currently resting at the broker. These are the levels that will
+    ACTUALLY execute — the single source of truth for stop levels
+    (audit P1-1). Sub-modules (monitor, remote_commands, stop reconciler)
+    should read this rather than recomputing entry-anchored stops.
+    """
+    out = {}
+    for o in get_open_orders(client):
+        try:
+            if ("stop" in str(o.type).lower()
+                    and str(o.side).lower().endswith("sell")
+                    and getattr(o, "stop_price", None)):
+                out[o.symbol] = {
+                    "stop_price": float(o.stop_price),
+                    "qty":        float(o.qty or 0),
+                    "order_id":   str(o.id),
+                }
+        except Exception:
+            continue
+    return out
+
+
+def cancel_orders_for_symbol(client: TradingClient, ticker: str,
+                             wait_seconds: float = 10.0) -> int:
+    """
+    Cancel ONLY the given symbol's open orders, then poll until Alpaca
+    confirms they are gone (cancellation is asynchronous — selling before
+    it completes still fails with 'insufficient qty available').
+
+    Returns the number of orders cancelled. Other symbols' protective
+    stops are untouched (audit P0-1/P0-2).
+    """
+    orders = get_open_orders(client, symbol=ticker)
+    if not orders:
+        return 0
+    for o in orders:
+        try:
+            client.cancel_order_by_id(o.id)
+        except Exception as e:
+            log.warning(f"  {ticker}: cancel of order {o.id} failed: {e}")
+    deadline = time.time() + wait_seconds
+    while time.time() < deadline:
+        if not get_open_orders(client, symbol=ticker):
+            log.info(f"  {ticker}: {len(orders)} open order(s) cancelled and confirmed gone")
+            return len(orders)
+        time.sleep(0.5)
+    log.warning(f"  {ticker}: open orders still present after {wait_seconds}s — "
+                f"subsequent sell may be rejected (shares held for orders)")
+    return len(orders)
+
+
+def sell_with_cleanup(
+    client: TradingClient,
+    ticker: str,
+    qty: float | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """
+    THE single sell path (audit P0-2). Every close/trim in the codebase must
+    go through here. Sequence:
+
+      1. Cancel the symbol's resting orders (protective stop included) and
+         wait for confirmation — otherwise Alpaca rejects the sell because
+         the shares are held against the open stop order.
+      2. qty=None → close the entire position; qty=N → market-sell N shares.
+      3. Poll for the fill so the caller gets a real exit price.
+
+    NOTE for callers: after a partial sell (trim), the position's stop is
+    gone — run the stop reconciler (broker.stop_loss.reconcile_protective_stops)
+    afterwards to re-attach protection at the new quantity.
+    """
+    if dry_run:
+        what = "entire position" if qty is None else f"{qty:.4f} shares"
+        log.info(f"  [DRY-RUN] Would cancel {ticker} open orders, then sell {what}")
+        return {"ticker": ticker, "status": "dry_run", "cancelled_orders": 0,
+                "filled_qty": None, "filled_avg_price": None}
+
+    cancelled = cancel_orders_for_symbol(client, ticker)
+    if qty is None:
+        result = close_position(client, ticker, dry_run=False)
+    else:
+        result = place_market_order(client, ticker, qty, "sell", dry_run=False)
+    result["cancelled_orders"] = cancelled
+    return result
+
+
+def get_recent_stop_fills(client: TradingClient, days: int = 5) -> dict:
+    """
+    {symbol: iso_timestamp} of SELL STOP orders FILLED in the last `days`.
+
+    Why (audit P0-4): re-entry cooldown used to read only stop_loss_log.json,
+    which records the weekly checker's scans — but broker-side GTC stops fill
+    at Alpaca without ever touching that file. This asks the broker directly,
+    so a name stopped out by a resting order is correctly blocked from
+    immediate re-purchase.
+    """
+    out = {}
+    try:
+        from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+        after = _dt.now(_tz.utc) - _td(days=days)
+        req = GetOrdersRequest(status=QueryOrderStatus.CLOSED, limit=500, after=after)
+        for o in client.get_orders(req) or []:
+            try:
+                if ("stop" in str(o.type).lower()
+                        and str(o.side).lower().endswith("sell")
+                        and str(o.status).lower().endswith("filled")):
+                    ts = str(getattr(o, "filled_at", "") or getattr(o, "updated_at", ""))
+                    if o.symbol not in out or ts > out[o.symbol]:
+                        out[o.symbol] = ts
+            except Exception:
+                continue
+    except Exception as e:
+        log.warning(f"  Could not fetch recent stop fills: {e}")
+    return out
 
 
 def is_market_open(client: TradingClient) -> bool:

@@ -386,3 +386,124 @@ Files created/modified:
 - Discord interaction tokens expire ~15 min: long pipeline runs fall back to fresh channel messages.
 
 **Next steps**: push to GitHub, redeploy worker, watch first MR sleeve proposals and Saturday learning report. Go/no-go live review ~2026-08-01.
+
+---
+
+## SESSION 008 — 2026-07-27 (Fable audit + P0/P1 remediation)
+
+**Topics Covered**: full-system audit (PM view on workflow gaps + trader view on algo logic), then implementation of every P0/P1 fix, a risk-path test suite, and a UAT plan.
+
+**Why**: owner's read was "too many layers". Correct — and the layers had started
+contradicting each other. Three stop systems with three different answers, two
+exposure-cap tables, two regime taxonomies, four sell paths none of which knew
+about the resting stops placed hours earlier.
+
+**Audit findings** (full report: `docs/FABLE_AUDIT_2026-07-27.md`):
+
+- **P0-1** Executor's blanket `cancel_orders()` cancelled all 12 protective stops and never re-placed them. One "Execute rebalance" press → whole book naked.
+- **P0-2** Every sell path (weekly checker, `/stoploss execute`, approve-sell button, worker, executor EXIT/TRIM) would be REJECTED by Alpaca — shares are held against the resting stop. `/stoploss execute` wasn't merely untested, it could not have worked.
+- **P0-3** `outputs/` is gitignored → cloud runs started stateless → no EXIT signals were ever generated in the cloud, and dropped names were retained as "manual positions". This is why the account held 12 names against top_n=10: the cloud pipeline could add but never remove.
+- **P0-4** Reconciler's HOLD→BUY upgrade silently defeated the earnings blackout and re-entry cooldown (both reproduced with unit tests). Cooldown also never saw broker-side stop fills.
+- **P0-5** Fractional top-up buys silently lost their bracket legs; all 12 live positions are fractional.
+- P1: monitor/weekly checker alerted on entry-anchored levels up to $17 below the broker's actual stop (MRK $105.50 vs $123.12 resting) — wrong in the permissive direction; two exposure-cap tables (95/80/60 on one account); two regime taxonomies; 12 duplicate config keys.
+
+**Live state verified read-only**: pipeline $113.8k, 12 positions, 12 GTC stops resting (98–100% share coverage), NUE test stop armed at $245.29. Screener account: 8 positions, **zero stops, −$8,766 cash, 108% invested on margin** — liquidate it.
+
+**Implemented this session**:
+- `sell_with_cleanup()` — the single sell path; cancels the symbol's orders, polls until Alpaca confirms, then sells. All call sites routed (Python + worker `cancel_orders=true`).
+- `reconcile_protective_stops()` — the single stop mechanism. Runs at the end of every execute; places missing stops, ratchets stops up on winners (anchor = max(entry, current)), re-syncs qty after trims, never lowers a stop. Brackets on buys deleted.
+- `cancel_orders_for_symbol()`, `get_resting_stops()`, `get_open_orders()`, `get_recent_stop_fills()` in alpaca_client.
+- Alpaca-first exits in signals.py + durable git-tracked ledger `data/portfolio_state.json`; sleeve and manual positions excluded from EXIT generation.
+- Whole-share buy deltas; `skipped_too_expensive` status instead of a silent "at_target".
+- monitor.py + weekly checker read resting broker stops as truth; checker no longer double-sells what the broker already covers.
+- `MAX_INVESTED_PCTS` derived from `PIPELINE_MAX_INVESTED_PCT`; 12 duplicate config keys removed.
+- `tests/test_risk_paths.py` (17 tests) + `.github/workflows/tests.yml` CI gate with Discord failure alert.
+- `docs/UAT_CHECKLIST.md` — six supervised drills to bridge from "tests pass" to "system trusted".
+
+**Key decisions**:
+- One writer per concern: one sell path, one stop mechanism, Alpaca is truth for holdings, files are caches.
+- Take-profit stays a monitor ALERT, never a resting limit order — a hard ceiling on a momentum book amputates the right tail, and a resting TP re-creates the sell-conflict.
+- "Shipped" now means exercised once on paper, not merged.
+- Feature freeze until 30 closed trades. The machinery-to-evidence ratio is the core problem.
+
+**Watch-outs**:
+- The test suite caught a third unguarded worker sell path *while being written*. Keep it green; it is the cheapest guarantee in the repo.
+- Screener retirement is deliberately NOT started — audit §4 orders it after these fixes are UAT'd, and step 1 (liquidating the screener account) is an owner action in the Alpaca UI.
+- Repo still lives in OneDrive; null-byte corruption workarounds remain necessary until it moves.
+
+**Next steps**: run `docs/UAT_CHECKLIST.md` drills 0→6 (drill 1 is free — NUE's armed stop gives a real cooldown test at market open), then screener retirement §4, then re-decide exposure caps with real win-rate data.
+
+---
+
+## SESSION 009 — 2026-07-31 (MR sleeve paused, architecture contract established)
+
+**Trigger**: owner questioned a Discord message — *"MR Scan — Entries Skipped:
+90% of equity invested (limit is 60% in MOD BULL regime)"* — asking whether the
+messaging was right.
+
+**It wasn't, and it was pointing at a design flaw, not a wording problem:**
+
+1. The 60% was the pre-fix cap (now 95%, derived). The message was evidence of
+   audit finding P1-2 running live: the sleeve enforced 60% while the executor
+   bought to 95% on the same account.
+2. `MOD BULL` vs `/regime`'s `BULL` — two vocabularies for one state (P1-5).
+3. **The real bug**: `_check_cash_management` gates on ACCOUNT-WIDE exposure
+   against the ACCOUNT-WIDE cap, though the sleeve owns only `MR_SLEEVE_PCT`
+   (10%). With the pipeline at 90%+ the sleeve could never trade — it posted an
+   identical skip notice every weekday for weeks. After the cap rose to 95% the
+   failure inverts: sleeve buys would silently consume the pipeline's headroom.
+   Two strategies, one unpartitioned pot.
+4. "positions hit stops or time-outs" — time-outs are a sleeve mechanic,
+   described as if account-wide.
+
+**Decisions** (owner chose both):
+- **MR sleeve PAUSED** (`MR_ENABLED=False`) rather than patched. Matches the
+  feature freeze: prove one strategy before running two on one account.
+  Re-enabling requires a real carve-out, not a flag flip — enforced by a test.
+- **Architecture guarded by repo doc + CI**, not by memory.
+
+**Built**:
+- `docs/ARCHITECTURE.md` — the contract: single-owner table (sell / stops /
+  cancels / holdings / stop levels / caps / regime / parameters), standing
+  invariants, capital allocation model, message accuracy contract, change
+  protocol, deliberate non-goals. Referenced from CLAUDE.md rule 8.
+- `tests/test_architecture.py` (13 tests) — enforces the above statically.
+  **Mutation-tested**: deliberately re-introduced 5 violations (bare
+  close_position, blanket cancel, cap drift, MR re-enable without carve-out,
+  gitignored ledger) and confirmed every guard caught it.
+- Skip-notice rate limiter (weekly, `data/mr_notice_state.json` — deliberately
+  NOT in sleeve_mr.json, whose keys are all treated as held tickers).
+
+**Found while writing the tests** — `scripts/rebalance_check.py::cmd_trim_half`
+(the `/rebalance` "Trim 50%" button) sold via a raw `place_market_order`
+without cancelling the resting stop. Same rejection bug as P0-2; the audit
+missed it because it only traced `close_position` call sites. Now routed
+through `sell_with_cleanup` + stop re-attach at the reduced quantity. **This is
+the second time the test suite caught a bug during its own authoring.**
+
+**Test count**: 17 risk-path + 13 architecture = 30, all green.
+
+**Next**: run `docs/UAT_CHECKLIST.md` drills 0→6. Note drill 1 partly passed
+already — NUE's stop fired (39 @ $245.08), leaving a 0.4973-share unprotected
+stub worth $121.50 to close manually.
+
+**Follow-up same session — orphaned risk control found.** Owner asked whether
+pausing the sleeve removed the exposure limit. It did not (the cap is enforced
+in `broker/executor.py` via `PIPELINE_MAX_INVESTED_PCT`, currently 95% bull —
+account at 89.9%, ~$5.8k headroom). But the check revealed that the **8%
+drawdown pause lived ONLY inside the sleeve's `_check_cash_management`**.
+Pausing the sleeve left `DRAWDOWN_PAUSE_PCT` declared in config and enforced
+nowhere — a risk control that existed on paper only.
+
+Cause: when pausing the sleeve I checked the blast radius for the exposure cap
+and not for the second gate sitting in the same function — the exact step in
+the change protocol I had just written. Fixed:
+- `_check_drawdown_pause()` now lives in `broker/executor.py` (buy-gating's
+  owner), state in git-tracked `data/portfolio_peak.json`, blocks BUYs only —
+  exits and stops unaffected. Verified: trips at 9% below peak, resumes at 3%.
+- `TestRiskGatesHaveAnOwner` added — fails if a knob config declares is only
+  read by a paused strategy. Mutation-tested: deleting the gate is caught.
+
+**Lesson worth keeping**: pausing a component silently disables every control
+that happens to live inside it. Before disabling anything, list what else that
+code path owns.

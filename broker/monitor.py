@@ -67,7 +67,8 @@ import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
-from broker.alpaca_client import get_client, get_positions, is_market_open
+from broker.alpaca_client import (get_client, get_positions, is_market_open,
+                                  get_resting_stops)
 from broker.stop_loss import _compute_atr, _load_portfolio_state, compute_stop_price
 from broker import discord_notify as dn
 
@@ -280,6 +281,15 @@ def check_positions(client, dry_run: bool = False) -> int:
     new_alerts = []
     num_sent = 0
 
+    # Resting broker-side stops are the truth (audit P1-1). The old
+    # entry-anchored recompute alerted at levels up to $17 below where the
+    # broker would actually sell (MRK: computed $105.50 vs resting $123.12).
+    resting = {}
+    try:
+        resting = get_resting_stops(client)
+    except Exception as exc:
+        log.warning("Could not read resting stops (%s) — using computed levels", exc)
+
     for ticker, pos in positions.items():
         current    = pos["current_price"]
         entry      = pos["avg_entry_price"]
@@ -304,7 +314,16 @@ def check_positions(client, dry_run: bool = False) -> int:
             return bool(a)
 
         # ── Trigger 1: Stop-Loss ───────────────────────────────────────
-        stop_price = _get_stop_price(ticker, entry)
+        # Resting broker stop first; computed level only as advisory
+        # fallback for positions with no broker-side protection.
+        if ticker in resting:
+            stop_price = resting[ticker]["stop_price"]
+        else:
+            stop_price = _get_stop_price(ticker, entry)
+            if stop_price:
+                log.warning("%s: NO resting stop at broker — computed level "
+                            "$%.2f is advisory only. Run protect_positions.py.",
+                            ticker, stop_price)
         if stop_price and current <= stop_price:
             if not _already_pending(["stop_loss"]):
                 loss_pct = (current - entry) / entry * 100

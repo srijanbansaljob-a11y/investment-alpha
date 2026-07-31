@@ -39,7 +39,8 @@ PORTFOLIO_STATE_FILE = OUTPUT_DIR / "latest_portfolio.json"
 STOP_LOSS_LOG_FILE   = OUTPUT_DIR / "stop_loss_log.json"
 
 # ── Logging / Cache ────────────────────────────────────────────────────────
-LOG_LEVEL            = "INFO"          # DEBUG for verbose output
+# LOG_LEVEL is defined ONCE near the bottom (derived from DEBUG_MODE). The
+# duplicate that used to live here silently lost to it (last-wins).
 # CACHE_MAX_AGE_HOURS and HISTORY_DAYS are defined ONCE in the Cache / Data
 # Ingestion sections below. Earlier duplicate definitions removed 2026-06 to
 # stop silent last-wins overrides (effective values were CACHE=4h, HISTORY=400d).
@@ -287,7 +288,7 @@ CONGRESSIONAL_CACHE_HOURS   = 24      # cache TTL (same pattern as insider.py)
 PRICE_HISTORY_DAYS  = 400   # enough for 200-day MA + 12M momentum
 MIN_PRICE           = 5.0   # exclude penny stocks
 MIN_AVG_VOLUME      = 500_000
-BENCHMARK_TICKER    = "SPY"
+# BENCHMARK_TICKER defined once in the Paper Trading Validation section above.
 VIX_TICKER          = "^VIX"
 SPX_TICKER          = "^GSPC"
 
@@ -408,7 +409,26 @@ for t in SP500_TICKERS + CUSTOM_TICKERS + MIDCAP_TICKERS:
 REGIME_FALLBACK = "neutral"
 
 # ── Mean-reversion sleeve (strategies/mean_reversion.py) ───────────────────
-MR_ENABLED       = True    # daily scan posts BUY/EXIT proposals to Discord
+# PAUSED 2026-07-31. Two reasons, both structural rather than "it lost money":
+#
+# 1. WRONG GATE. _check_cash_management compares ACCOUNT-WIDE invested against
+#    the ACCOUNT-WIDE cap, even though the sleeve has its own MR_SLEEVE_PCT
+#    carve-out. With the pipeline running 90%+ invested the sleeve could never
+#    buy — it posted an identical "exposure limit reached" skip to Discord
+#    every weekday for weeks. After the cap rose to 95% the failure mode
+#    inverts: the sleeve becomes able to trade, but any sleeve buy silently
+#    consumes the pipeline's headroom because neither strategy knows the
+#    other's budget. Two strategies, one unpartitioned pot.
+#
+# 2. FEATURE FREEZE. The pipeline has 4 closed trades and no demonstrated
+#    edge. Running a second strategy on the same account multiplies every
+#    order-routing risk the 2026-07-27 audit found, for no measurable gain.
+#
+# To re-enable: give the sleeve a real carve-out first (gate on sleeve-invested
+# vs MR_SLEEVE_PCT, and have PIPELINE_MAX_INVESTED_PCT reserve that slice), then
+# flip this to True. Do NOT just flip the flag — see docs/ARCHITECTURE.md
+# "Capital allocation".
+MR_ENABLED       = False   # daily scan posts BUY/EXIT proposals to Discord
 MR_SLEEVE_PCT    = 0.10    # fraction of equity allocated to the sleeve
 MR_MAX_POSITIONS = 5       # sleeve slots (per-trade = MR_SLEEVE_PCT / slots)
 MR_RSI_ENTRY     = 10      # RSI(2) below this = oversold dip in an uptrend
@@ -420,26 +440,25 @@ MR_MAX_HOLD_DAYS = 10      # time stop (trading days)
 # When the market is weak, the system holds back cash rather than fully deploying.
 CASH_MGMT_ENABLED = True
 
-MAX_INVESTED_PCTS = {
-    "STRONG BULL": 0.80,   # up to 80% invested — strong uptrend, high confidence
-    "MOD BULL":    0.60,   # up to 60% invested — moderate trend, be selective
-    "NEUTRAL":     0.40,   # up to 40% invested — uncertain, preserve dry powder
-    "BEARISH":     0.20,   # up to 20% invested — defensive, mostly cash
-}
-MAX_INVESTED_DEFAULT = 0.80  # fallback when regime is unknown (fail-safe = allow)
-
-# Pipeline-native exposure cap (3-tier), enforced in broker/executor.py.
-# Deliberately the SAME numbers the health checker measures against, via the
-# established pipeline->screener label mapping (bull=MOD BULL, neutral=NEUTRAL,
-# bear=BEARISH). Before 2026-07-27 the cap existed only as a health-check
-# WARNING; the executor ignored it and bought until cash ran out, which is how
-# the account reached 98.3% invested with $1,902 left. Warning and enforcement
-# now agree.
+# SINGLE SOURCE OF TRUTH for exposure caps (audit P1-2). The executor enforces
+# PIPELINE_MAX_INVESTED_PCT; the 4-tier MAX_INVESTED_PCTS (health checker,
+# mean-reversion sleeve, screener-era labels) is now DERIVED from it below.
+# Before 2026-07-27 the two tables were maintained independently and drifted:
+# the executor allowed 95% while the health check warned at 60% and the MR
+# sleeve stopped at 80% — three different answers on the same account.
 PIPELINE_MAX_INVESTED_PCT = {
     "bull":    0.95,
     "neutral": 0.75,
     "bear":    0.40,
 }
+
+MAX_INVESTED_PCTS = {
+    "STRONG BULL": PIPELINE_MAX_INVESTED_PCT["bull"],
+    "MOD BULL":    PIPELINE_MAX_INVESTED_PCT["bull"],
+    "NEUTRAL":     PIPELINE_MAX_INVESTED_PCT["neutral"],
+    "BEARISH":     PIPELINE_MAX_INVESTED_PCT["bear"],
+}
+MAX_INVESTED_DEFAULT = PIPELINE_MAX_INVESTED_PCT["neutral"]  # unknown regime → cautious
 # RAISED 2026-07-27 (was 0.60/0.40/0.20).
 #
 # Rationale: cash was doing the job that stops should do. Holding 40% cash in a
@@ -477,7 +496,7 @@ EARNINGS_BEAT_THRESHOLD_PCT = 10    # earnings beat by this % = momentum bonus
 EARNINGS_BEAT_BONUS         = 8     # pts added for strong earnings beat
 
 # ── Phase 3: Additional Regime Components ────────────────────────────────────
-YIELD_CURVE_ENABLED         = True   # use 2Y/10Y spread as regime component #7
+# YIELD_CURVE_ENABLED defined once in the Market Regime section above.
 YIELD_CURVE_MAX_SCORE       = 10     # max pts from yield curve (positive = normal)
 
 RS_SPY_ENABLED              = True   # relative strength vs SPY in stock scoring
@@ -511,19 +530,10 @@ DEBUG_MODE = False
 LOG_LEVEL  = "DEBUG" if DEBUG_MODE else "INFO"
 
 # ── Technical Indicator Parameters ────────────────────────────────────────
-# Used by pipeline/features.py
-SMA_SHORT        = 50
-SMA_LONG         = 200
-RSI_PERIOD       = 14
-MACD_FAST        = 12
-MACD_SLOW        = 26
-MACD_SIGNAL      = 9
+# SMA/RSI/MACD/MOMENTUM windows are defined ONCE in their sections above
+# (duplicates ACTUALLY removed 2026-07-27 — the 2026-06 comments claimed
+# removal but 12 keys were still defined twice; audit P2-2).
 MIN_HISTORY_DAYS = 252   # minimum days of price history required
-
-# Momentum lookback windows (in calendar days)
-MOMENTUM_3M  = 63
-MOMENTUM_6M  = 126
-MOMENTUM_12M = 252
 
 # ---- Cache ----------------------------------------------------------------
 CACHE_MAX_AGE_HOURS = 4   # refresh cache if older than this
