@@ -260,6 +260,27 @@ class TestStopLevelsComeFromBroker(unittest.TestCase):
                 "recomputed level that disagrees with what Alpaca will execute "
                 "(ARCHITECTURE §4)")
 
+    def test_every_command_showing_a_stop_reads_the_broker(self):
+        """
+        Per-command check. Module-level presence isn't enough: on 2026-08-01
+        cmd_status still recomputed entry-anchored levels while _stoploss_scan
+        next door read the broker, so /status quietly reported stops BELOW the
+        real ones for APA, DAL, HST and TRV.
+        """
+        src = _src(ROOT / "broker" / "remote_commands.py")
+        for cmd in ("cmd_status", "cmd_stoploss_check", "cmd_stoploss_execute"):
+            marker = f"def {cmd}("
+            if marker not in src:
+                continue
+            body = src.split(marker)[1].split("\ndef ")[0]
+            if "stop" not in body.lower():
+                continue
+            self.assertTrue(
+                "_resting_stops" in body or "_stoploss_scan" in body,
+                f"{cmd} displays a stop level without reading the resting broker "
+                "order — it will drift below reality once stops ratchet up "
+                "(ARCHITECTURE §4)")
+
 
 class TestCloudParity(unittest.TestCase):
     """ARCHITECTURE §2.3: nothing critical may live only in gitignored paths."""

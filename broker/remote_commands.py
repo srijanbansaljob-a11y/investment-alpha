@@ -143,13 +143,33 @@ def cmd_status(payload):
     positions  = get_positions(client)
     regime     = _detect_regime()
 
+    # Resting broker stops are the truth (audit P1-1). This surface used to
+    # recompute an ENTRY-ANCHORED level, which matches only while a stop is
+    # freshly placed. Once the reconciler ratchets stops up on winners the
+    # recomputed figure drifts BELOW the real one — i.e. /status would show
+    # more downside room than actually exists. Caught 2026-08-01 by comparing
+    # /status against Alpaca: APA, DAL, HST and TRV all disagreed.
+    resting = _resting_stops(client)
+
     lines = []
+    unprotected = []
     for t, p in sorted(positions.items()):
-        stop, method = _stop_price(t, p["avg_entry_price"], regime)
+        if t in resting:
+            stop, tag = resting[t], ""
+        else:
+            stop, _method = _stop_price(t, p["avg_entry_price"], regime)
+            tag = " ⚠ not at broker"
+            unprotected.append(t)
         dist = (p["current_price"] - stop) / p["current_price"] * 100
         lines.append(
             f"**{t}** {p['qty']:.1f} sh @ ${p['avg_entry_price']:.2f} → ${p['current_price']:.2f} "
-            f"({p['unrealized_plpc']*100:+.1f}% / ${p['unrealized_pl']:,.0f}) · stop ${stop:.2f} ({dist:.1f}% away)"
+            f"({p['unrealized_plpc']*100:+.1f}% / ${p['unrealized_pl']:,.0f}) · "
+            f"stop ${stop:.2f} ({dist:.1f}% away){tag}"
+        )
+    if unprotected:
+        lines.append(
+            f"\n⚠️ **{len(unprotected)} position(s) have NO stop resting at Alpaca**: "
+            f"{', '.join(unprotected)} — levels shown are advisory only."
         )
     desc = "\n".join(lines) if lines else "_No open positions._"
     fields = [
