@@ -507,3 +507,58 @@ the change protocol I had just written. Fixed:
 **Lesson worth keeping**: pausing a component silently disables every control
 that happens to live inside it. Before disabling anything, list what else that
 code path owns.
+
+**Clean restart executed (2026-07-31 / 08-01).** Owner chose to keep the weekly
+horizon (daily churn would measure a different, worse strategy — momentum's
+half-life is monthly, and 30 correlated trades carry ~2-3 independent
+observations) and to keep the approval gate, which removed the need for
+autonomy guards entirely.
+
+Sequence run: preview → single-position proof (DE) → full liquidation → rebuild.
+
+**Every P0 fix proved itself on live data:**
+- P0-2 sell path: 11 sells, 10 stop cancellations, **zero rejections**. Before
+  the fix each of these would have been rejected ("insufficient qty available").
+- P0-5 whole shares: all 9 rebuilt positions whole; zero fractional.
+- P0-1/P1-1 reconciler: 9 positions → 9 resting stops, attached automatically
+  by the pipeline for the first time ever. Risk band 5.3–9.6%.
+- P0-4 cooldown: **EIX was selected #4 and correctly NOT bought** — its stop
+  had fired at 14:57 that day. Nobody prompted this; the fix caught it alone.
+- Exposure cap 85.1% < 95%; drawdown breaker tracking peak $115,135.
+
+Final state: 9 positions / 9 stops / invariant HOLDS / $113,884 equity.
+
+**Three further bugs found by RUNNING the system, none by reading it:**
+1. `scripts/rebalance_check.py::cmd_trim_half` sold via raw market order without
+   cancelling the resting stop — same class as P0-2, missed by the audit because
+   it traced `close_position` call sites and this one used `place_market_order`.
+2. `_load_alpaca_holdings()` returned `{}` for BOTH "Alpaca down" and "account
+   flat". After liquidation the flat account was read as an outage, fell back to
+   a stale state file, and logged phantom stop-loss breaches for NEM and FDX —
+   names not held. Those phantoms feed the cooldown, so they would have blocked
+   real buys. Fixed: None = outage, {} = authoritative.
+3. The scheduled workflow ran `trade_outcome_logger` from a commit predating
+   admin tagging and recorded **7 liquidation exits as genuine model trades**
+   (BMY +15.3%, MRK +14.1%, MTCH +12.2%, avg ~+8.7%, 6 of 7 "wins"). Left alone,
+   factor analysis would have shown an 86% hit rate manufactured entirely by an
+   engineering liquidation. Fixed with a self-healing repair pass.
+
+**The dominant failure mode in this codebase is now clear: silent no-ops.**
+Not crashes — controls that exist, look correct, and are never reached.
+Four instances inside one week: the drawdown breaker orphaned in a paused
+sleeve; `/stoploss execute` replying cheerfully while incapable of selling;
+the admin-exit repair sitting behind two early returns so it printed success
+without running; phantom stop checks on an empty account. Every one of them
+reported success. Guard against reachability, not just correctness.
+
+**Evidence base reset**: 20 total records, 7 tagged administrative, **13 count
+as model trades** (13/30 toward the feature-freeze threshold).
+PAPER_TRADING_START_DATE reset to 2026-07-31.
+
+**Test suite**: 38 (risk paths + architecture). Pushed through 46176c4.
+
+**Known open**: performance_tracker reports a legacy €1,000 simulated book
+("Portfolio value €990.65, alpha −4.14%") against a real $113,884 account —
+fabricated numbers on a live surface, same category as the 7 bad records.
+Drills 7-8 (/status, /stoploss, /pausetrading kill switch) still unrun.
+Backtest (2015-2024) not yet run — that, not paper time, is the real edge evidence.
