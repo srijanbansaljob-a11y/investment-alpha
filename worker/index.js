@@ -362,6 +362,31 @@ async function handleTradingViewWebhook(request, env) {
     return new Response("Missing ticker or action", { status: 400 });
   }
 
+  // 1b. KILL SWITCH — /pausetrading must stop EVERY auto-execution path.
+  // Added 2026-08-01: this handler previously ignored trading_paused entirely,
+  // so a TradingView alert could place orders while the owner believed trading
+  // was stopped. The pause message claimed to cover webhook buys; it didn't.
+  try {
+    const paused = await env.KV.get("trading_paused");
+    if (paused) {
+      console.log(`Webhook: BLOCKED (trading paused) — ${action} ${ticker}`);
+      await postDiscordWebhook(env.DISCORD_WEBHOOK_URL, [{
+        title: "🔴 TradingView signal BLOCKED — trading paused",
+        description: `Ignored **${String(action).toUpperCase()} ${ticker}**`
+          + (strategy ? ` from _${strategy}_` : "")
+          + ".\nTrading is paused, so no order was placed.\nUse `/resumetrading` to re-enable.",
+        color: 0xE74C3C,
+        footer: { text: "Investment Alpha — kill switch" },
+      }]);
+      return new Response("Trading paused — signal ignored", { status: 200 });
+    }
+  } catch (e) {
+    // Fail SAFE here: unlike the pipeline (owner-initiated, human watching),
+    // this path is fully automatic. If the switch can't be read, refuse.
+    console.error("Webhook: pause check failed, refusing to trade:", e.message);
+    return new Response("Kill switch unverifiable — signal refused", { status: 503 });
+  }
+
   const ts = new Date().toISOString();
   console.log(`Webhook: ${action.toUpperCase()} ${ticker} | strategy=${strategy} | price=${price}`);
 

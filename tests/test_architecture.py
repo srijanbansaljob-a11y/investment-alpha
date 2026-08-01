@@ -303,6 +303,28 @@ class TestKillSwitchIsWired(unittest.TestCase):
                               f"{wf} does not pass {var} — the /pausetrading kill "
                               "switch cannot be verified and execution proceeds")
 
+    def test_kill_switch_covers_every_auto_execution_path(self):
+        """
+        A kill switch must stop EVERYTHING that can trade without a human.
+        There are two such paths in the worker: the take-profit auto-seller
+        (cron) and the TradingView webhook. On 2026-08-01 the webhook checked
+        nothing, while the /pausetrading message claimed to cover it.
+        """
+        worker = _src(ROOT / "worker" / "index.js")
+        # Split on the DEFINITION, not the router's call site (which appears
+        # later in the file and would yield an empty body).
+        marker = "async function handleTradingViewWebhook"
+        self.assertIn(marker, worker, "webhook handler not found")
+        body = worker.split(marker, 1)[1].split("\nasync function ")[0]
+        self.assertIn("trading_paused", body,
+                      "TradingView webhook does not check the kill switch — an "
+                      "external alert could trade while trading is paused "
+                      "(ARCHITECTURE §2.2)")
+        # There must be at least two independent readers: cron TP monitor + webhook
+        self.assertGreaterEqual(
+            worker.count('KV.get("trading_paused")'), 2,
+            "fewer kill-switch checks than auto-execution paths")
+
     def test_status_surfaces_pause_state(self):
         src = _src(ROOT / "broker" / "remote_commands.py")
         body = src.split("def cmd_status(")[1].split("\ndef ")[0]
