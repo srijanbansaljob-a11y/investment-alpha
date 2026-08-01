@@ -119,76 +119,77 @@ def take_snapshot() -> dict:
     ts = datetime.now(timezone.utc).isoformat()
     today = datetime.now(timezone.utc).date().isoformat()
 
-    state = _load_json(PORTFOLIO_STATE_FILE, {})
-    portfolio = state.get("portfolio", [])
-    if not portfolio:
-        log.warning("No positions in portfolio state -- snapshot empty")
+    # ── Real account, not a simulation (fixed 2026-08-01) ────────────────
+    # This used to invent a €1,000 book: total_capital fell back to 1000
+    # (config.TOTAL_CAPITAL never existed), share counts were derived as
+    # 1000 x weight / entry_price, and realised P&L was read from the
+    # stop-loss log — which broker-side stops never write to. The result was
+    # a report claiming "€990.65, alpha -4.14%" for a $113,884 account:
+    # confident, precise, and about a portfolio that does not exist.
+    # Equity from the broker is the only honest basis.
+    try:
+        from broker.alpaca_client import get_client, get_account_summary, get_positions
+        _client   = get_client()
+        acct      = get_account_summary(_client)
+        live_pos  = get_positions(_client)
+    except Exception as exc:
+        log.error("Performance tracker: Alpaca unreachable (%s) — no snapshot taken. "
+                  "Refusing to report simulated numbers.", exc)
+        return {"timestamp": ts, "status": "broker_unavailable", "error": str(exc)}
+
+    equity   = float(acct.get("equity", 0) or 0)
+    cash     = float(acct.get("cash", 0) or 0)
+    currency = acct.get("currency", "USD")
+
+    if not live_pos and equity <= 0:
+        log.warning("No positions and no equity -- snapshot empty")
         return {"timestamp": ts, "status": "no_positions"}
 
-    run_date  = state.get("run_date", START_DATE or today)
-    regime    = state.get("regime", "unknown")
-    total_capital = float(getattr(config, "TOTAL_CAPITAL", 1000))
+    state    = _load_json(PORTFOLIO_STATE_FILE, {})
+    run_date = state.get("run_date", START_DATE or today)
+    regime   = state.get("regime", "unknown")
 
-    # ── Fetch current prices for all held positions ──────────────────────
-    tickers = [p["ticker"] for p in portfolio]
-    fetch_start = (datetime.now(timezone.utc).date() - timedelta(days=7)).isoformat()
-    prices_df = _fetch_prices(tickers, fetch_start)
-    current_prices = {}
-    for t in tickers:
-        if t in prices_df.columns and not prices_df[t].dropna().empty:
-            current_prices[t] = float(prices_df[t].dropna().iloc[-1])
+    # ── Baseline equity: what the account was worth when tracking began ──
+    # Stored once so returns are measured against a fixed starting point
+    # rather than a moving one. Git-tracked so cloud runs agree.
+    baseline_file = config.DATA_DIR / "perf_baseline.json"
+    baseline = _load_json(baseline_file, {})
+    if not baseline.get("baseline_equity") or baseline.get("start_date") != START_DATE:
+        baseline = {"start_date": START_DATE, "baseline_equity": round(equity, 2),
+                    "seeded_at": ts}
+        _save_json(baseline_file, baseline)
+        log.info("Performance baseline seeded: %s %.2f on %s",
+                 currency, equity, START_DATE)
+    total_capital = float(baseline["baseline_equity"])
 
-    # ── Per-position unrealised P&L ──────────────────────────────────────
+    # ── Per-position, straight from the broker ───────────────────────────
     positions_out = []
     portfolio_value = 0.0
-    for pos in portfolio:
-        ticker      = pos["ticker"]
-        weight      = float(pos.get("weight", 0))
-        entry_price = float(pos.get("entry_price", pos.get("current_price", 0)))
-        cost_basis  = total_capital * weight
-        shares      = cost_basis / entry_price if entry_price > 0 else 0
-        cur_price   = current_prices.get(ticker, entry_price)
-        cur_value   = shares * cur_price
-        unreal_pnl  = cur_value - cost_basis
-        unreal_pct  = (cur_price - entry_price) / entry_price if entry_price > 0 else 0
-
+    for ticker, p in sorted(live_pos.items()):
+        cur_value  = float(p["market_value"])
+        unreal_pnl = float(p["unrealized_pl"])
         positions_out.append({
-            "ticker":           ticker,
-            "weight":           weight,
-            "entry_price":      round(entry_price, 4),
-            "current_price":    round(cur_price, 4),
-            "cost_basis":       round(cost_basis, 2),
-            "current_value":    round(cur_value, 2),
-            "unrealised_pnl":   round(unreal_pnl, 2),
-            "unrealised_pct":   round(unreal_pct * 100, 2),
-            "score":            pos.get("score"),
-            "signals":          pos.get("signals", {}),
+            "ticker":         ticker,
+            "qty":            float(p["qty"]),
+            "weight":         round(cur_value / equity, 6) if equity else 0,
+            "entry_price":    round(float(p["avg_entry_price"]), 4),
+            "current_price":  round(float(p["current_price"]), 4),
+            "cost_basis":     round(float(p["cost_basis"]), 2),
+            "current_value":  round(cur_value, 2),
+            "unrealised_pnl": round(unreal_pnl, 2),
+            "unrealised_pct": round(float(p["unrealized_plpc"]) * 100, 2),
         })
         portfolio_value += cur_value
 
-    # ── Closed / realised P&L from stop-loss log ─────────────────────────
-    stop_log = _load_json(STOP_LOSS_LOG_FILE, [])
-    realised_pnl = 0.0
+    # Realised P&L = everything the equity change isn't explained by open
+    # positions. No deposits/withdrawals on a paper account, so this is exact
+    # and needs no log file that stops may or may not have written to.
+    unrealised_total = sum(p["unrealised_pnl"] for p in positions_out)
+    total_value      = equity
+    realised_pnl     = equity - total_capital - unrealised_total
     closed_positions = []
-    for entry in stop_log:
-        if entry.get("breached") and entry.get("executed"):
-            ep  = float(entry.get("entry_price", 0))
-            cp  = float(entry.get("current_price", 0))
-            wt  = next((p.get("weight", 0) for p in portfolio if p["ticker"] == entry["ticker"]), 0)
-            cost = total_capital * float(wt)
-            shares = cost / ep if ep > 0 else 0
-            pnl  = shares * (cp - ep)
-            realised_pnl += pnl
-            closed_positions.append({
-                "ticker": entry["ticker"],
-                "exit_price": cp,
-                "entry_price": ep,
-                "pnl": round(pnl, 2),
-                "exit_date": entry.get("timestamp", ""),
-            })
 
-    total_value    = portfolio_value + realised_pnl
-    total_return   = (total_value - total_capital) / total_capital
+    total_return = (total_value - total_capital) / total_capital if total_capital else 0.0
 
     # ── Benchmark (SPY) return since start ───────────────────────────────
     benchmark_return = None
@@ -205,9 +206,21 @@ def take_snapshot() -> dict:
 
     # ── Load prior snapshots for rolling metrics ─────────────────────────
     prior_log = _load_json(PAPER_LOG_FILE, [])
-    prior_values = [s.get("total_portfolio_value") for s in prior_log
-                    if s.get("total_portfolio_value") is not None]
+
+    # Only snapshots from the CURRENT baseline period are comparable.
+    # Before 2026-08-01 this mixed the old simulated ~1,000 series with real
+    # account equity of ~114,000. The scale jump was read as a return, giving
+    # a Sharpe of 1.537 and a drawdown of -2.09% that described nothing.
+    # A snapshot is comparable only if it carries the same baseline_date.
+    comparable = [s for s in prior_log
+                  if s.get("baseline_date") == baseline.get("start_date")
+                  and s.get("total_portfolio_value") is not None]
+    prior_values = [s["total_portfolio_value"] for s in comparable]
     prior_values.append(total_value)
+    if len(prior_log) > len(comparable):
+        log.info("Rolling metrics use %d comparable snapshot(s); %d older "
+                 "snapshot(s) from a previous baseline excluded",
+                 len(prior_values), len(prior_log) - len(comparable))
 
     # Weekly returns (approx: each snapshot is ~weekly)
     if len(prior_values) >= 2:
@@ -244,7 +257,13 @@ def take_snapshot() -> dict:
         "timestamp":             ts,
         "run_date":              run_date,
         "regime":                regime,
+        "currency":              currency,
+        "equity":                round(equity, 2),
+        "cash":                  round(cash, 2),
+        "invested_pct":          round((equity - cash) / equity * 100, 2) if equity else 0,
+        "position_count":        len(positions_out),
         "total_capital":         total_capital,
+        "baseline_date":         baseline.get("start_date"),
         "portfolio_value":       round(portfolio_value, 2),
         "realised_pnl":          round(realised_pnl, 2),
         "total_portfolio_value": round(total_value, 2),
@@ -280,7 +299,11 @@ def take_snapshot() -> dict:
 
 def print_report(snapshot: dict) -> None:
     """Print a human-readable performance report to stdout."""
-    pt = snapshot.get("paper_trading", {})
+    if snapshot.get("status") in ("broker_unavailable", "no_positions"):
+        print(f"\n  Performance snapshot skipped: {snapshot['status']}")
+        return
+    pt  = snapshot.get("paper_trading", {})
+    cur = "$" if snapshot.get("currency", "USD") == "USD" else "€"
     print("\n" + "=" * 65)
     print("  INVESTMENT ALPHA — PAPER TRADING PERFORMANCE REPORT")
     print("=" * 65)
@@ -289,9 +312,13 @@ def print_report(snapshot: dict) -> None:
           f"{VALIDATION_MONTHS * 30}  ({pt.get('days_remaining', '?')} days remaining)")
     print(f"  Regime         : {snapshot.get('regime', '?').upper()}")
     print()
-    print(f"  Starting capital  : €{snapshot['total_capital']:,.2f}")
-    print(f"  Portfolio value   : €{snapshot['total_portfolio_value']:,.2f}  "
+    print(f"  Baseline equity   : {cur}{snapshot['total_capital']:,.2f}"
+          f"  (from {snapshot.get('baseline_date', '?')})")
+    print(f"  Account equity    : {cur}{snapshot['total_portfolio_value']:,.2f}  "
           f"({snapshot['total_return_pct']:+.2f}%)")
+    print(f"  Cash / invested   : {cur}{snapshot.get('cash', 0):,.2f}  /  "
+          f"{snapshot.get('invested_pct', 0):.1f}% invested "
+          f"({snapshot.get('position_count', 0)} positions)")
     if snapshot.get("benchmark_return_pct") is not None:
         print(f"  {BENCHMARK_TICKER} return       : {snapshot['benchmark_return_pct']:+.2f}%")
     if snapshot.get("alpha_pct") is not None:
@@ -312,14 +339,14 @@ def print_report(snapshot: dict) -> None:
         print(f"  {pos['ticker']:<6}  entry={pos['entry_price']:.2f}  "
               f"current={pos['current_price']:.2f}  "
               f"P&L={pnl_arrow} {pos['unrealised_pct']:+.2f}%  "
-              f"(€{pos['unrealised_pnl']:+.2f})")
+              f"({cur}{pos['unrealised_pnl']:+.2f})")
     if snapshot.get("closed_positions"):
         print()
         print("  CLOSED (stop-loss exits)")
         print("  " + "-" * 60)
         for pos in snapshot["closed_positions"]:
             print(f"  {pos['ticker']:<6}  entry={pos['entry_price']:.2f}  "
-                  f"exit={pos['exit_price']:.2f}  P&L=€{pos['pnl']:+.2f}")
+                  f"exit={pos['exit_price']:.2f}  P&L={cur}{pos['pnl']:+.2f}")
     print("=" * 65)
 
     if not pt.get("in_validation", True):

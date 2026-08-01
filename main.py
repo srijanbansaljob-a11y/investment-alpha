@@ -347,7 +347,7 @@ def run_pipeline(
             snap = perf_tracker.run()
             if snap and snap.get("status") != "no_positions":
                 log.info(
-                    "  Portfolio value: €%.2f | Return: %+.2f%% | Alpha vs benchmark: %+.2f%%",
+                    "  Account equity: $%.2f | Return: %+.2f%% | Alpha vs benchmark: %+.2f%%",
                     snap.get("total_portfolio_value", 0),
                     snap.get("total_return_pct", 0),
                     snap.get("alpha_pct", 0) or 0,

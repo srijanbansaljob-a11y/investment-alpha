@@ -367,6 +367,45 @@ class TestStopLevelsComeFromBroker(unittest.TestCase):
                 "(ARCHITECTURE §4)")
 
 
+class TestPerformanceReportingIsReal(unittest.TestCase):
+    """
+    ARCHITECTURE §4: numbers shown to the user must come from the broker.
+
+    Until 2026-08-01 performance_tracker simulated a EUR 1,000 portfolio —
+    total_capital fell back to 1000 because config.TOTAL_CAPITAL never
+    existed, share counts were 1000 x weight / entry_price, and realised P&L
+    came from a log that broker-side stops never write to. It reported
+    "EUR 990.65, alpha -4.14%" for a $113,884 account.
+    """
+
+    def test_snapshot_reads_the_broker(self):
+        src = _src(ROOT / "pipeline" / "performance_tracker.py")
+        self.assertIn("get_account_summary", src,
+                      "performance tracker does not read real account equity")
+        self.assertIn("get_positions", src,
+                      "performance tracker does not read real broker positions")
+
+    def test_no_hardcoded_starting_capital(self):
+        src = _src(ROOT / "pipeline" / "performance_tracker.py")
+        self.assertNotIn('getattr(config, "TOTAL_CAPITAL", 1000)', src,
+                         "starting capital falls back to a hardcoded 1000 — the "
+                         "report describes a portfolio that does not exist")
+
+    def test_rolling_metrics_exclude_other_baselines(self):
+        """Sharpe/drawdown across a baseline change reads a unit switch as a
+        return. That produced a fabricated Sharpe of 1.537."""
+        src = _src(ROOT / "pipeline" / "performance_tracker.py")
+        self.assertIn("baseline_date", src,
+                      "snapshots are not tagged with their baseline, so rolling "
+                      "metrics can mix incomparable series")
+
+    def test_report_currency_matches_account(self):
+        body = _src(ROOT / "pipeline" / "performance_tracker.py")
+        report = body.split("def print_report")[1].split("\ndef ")[0]
+        self.assertNotIn("€{snapshot", report,
+                         "report hardcodes EUR while the account is USD")
+
+
 class TestCloudParity(unittest.TestCase):
     """ARCHITECTURE §2.3: nothing critical may live only in gitignored paths."""
 
