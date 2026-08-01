@@ -134,6 +134,41 @@ def _admin_exits() -> dict:
     return {}
 
 
+def _retag_admin_exits(outcomes: list) -> int:
+    """
+    Repair pass: tag any ALREADY-LOGGED outcome that matches admin_exits.json.
+
+    Why this is idempotent and runs every time (2026-07-31): the scheduled
+    workflow ran this logger from a commit that predated admin tagging, and
+    recorded 7 liquidation exits as genuine model trades — BMY +15.3%,
+    MRK +14.1%, MTCH +12.2% — inflating the win rate with P&L that says
+    nothing about the strategy. Tagging only at insert time loses that race
+    whenever the cloud runs older code or admin_exits.json lands afterwards.
+    Reconciling on every run closes it permanently.
+
+    Returns the number of records repaired.
+    """
+    admin = _admin_exits()
+    if not admin:
+        return 0
+    fixed = 0
+    for rec in outcomes:
+        entry = admin.get(rec.get("ticker"))
+        if not entry or rec.get("exit_date") != entry.get("date"):
+            continue
+        if rec.get("exclude_from_learning"):
+            continue
+        rec["exit_type"]             = "administrative"
+        rec["exclude_from_learning"] = True
+        rec["admin_reason"]          = entry.get("reason", "administrative")
+        rec["retagged"]              = True
+        fixed += 1
+        log.info("  RETAG %s (%s): was counted as a model trade at %+.2f%% — "
+                 "now excluded from learning",
+                 rec["ticker"], rec["exit_date"], rec.get("pnl_pct", 0))
+    return fixed
+
+
 def _detect_exits(prev: dict, curr: dict) -> list[dict]:
     """
     Compare yesterday → today to find full or partial exits.
@@ -292,8 +327,14 @@ def main():
                 signals["earnings_beat"], signals["regime"],
             )
 
+    # Repair pass — see _retag_admin_exits for why this runs unconditionally.
+    repaired = _retag_admin_exits(outcomes)
+
     _save_outcomes(outcomes)
-    log.info("Done — %d new exits logged (total %d outcomes)", new_count, len(outcomes))
+    model = [o for o in outcomes if not o.get("exclude_from_learning")]
+    log.info("Done — %d new exits logged, %d retagged administrative "
+             "(total %d outcomes, %d count as MODEL trades)",
+             new_count, repaired, len(outcomes), len(model))
 
 
 if __name__ == "__main__":

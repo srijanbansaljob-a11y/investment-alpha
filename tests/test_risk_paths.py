@@ -169,6 +169,51 @@ class TestEmptyAccountIsAuthoritative(unittest.TestCase):
                       "caller must branch on `is not None`, not truthiness")
 
 
+class TestAdminExitsExcludedFromEvidence(unittest.TestCase):
+    """
+    Administrative exits (owner liquidation) must never count as model trades.
+
+    Real incident 2026-07-31: the scheduled workflow ran the outcome logger
+    from a commit predating admin tagging and recorded 7 liquidation exits as
+    genuine wins (BMY +15.3%, MRK +14.1%, ...). Tagging only at insert time
+    loses that race; the repair pass must be able to fix records after the fact.
+    """
+
+    def test_retag_repairs_already_logged_records(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "tol", ROOT / "scripts" / "trade_outcome_logger.py")
+        tol = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(tol)
+
+        tol._admin_exits = lambda: {"BMY": {"date": "2026-07-31", "reason": "liquidation"}}
+        outcomes = [
+            {"ticker": "BMY", "exit_date": "2026-07-31", "pnl_pct": 15.31, "exit_type": "full"},
+            {"ticker": "AAPL", "exit_date": "2026-07-31", "pnl_pct": 4.0, "exit_type": "full"},
+            {"ticker": "BMY", "exit_date": "2026-06-01", "pnl_pct": 2.0, "exit_type": "full"},
+        ]
+        fixed = tol._retag_admin_exits(outcomes)
+        self.assertEqual(fixed, 1)
+        self.assertTrue(outcomes[0]["exclude_from_learning"])
+        self.assertFalse(outcomes[1].get("exclude_from_learning"),
+                         "unrelated ticker wrongly tagged")
+        self.assertFalse(outcomes[2].get("exclude_from_learning"),
+                         "same ticker on a DIFFERENT date wrongly tagged")
+        self.assertEqual(tol._retag_admin_exits(outcomes), 0, "repair pass is not idempotent")
+
+    def test_factor_analysis_drops_administrative(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "fa", ROOT / "scripts" / "factor_analysis.py")
+        fa = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fa)
+        kept = fa._model_outcomes([
+            {"ticker": "A", "win": True, "exclude_from_learning": True},
+            {"ticker": "B", "win": True},
+        ])
+        self.assertEqual([o["ticker"] for o in kept], ["B"])
+
+
 class TestSizing(unittest.TestCase):
     def test_calc_shares_whole(self):
         self.assertEqual(calc_shares(11_000, 100.0), 110.0)
