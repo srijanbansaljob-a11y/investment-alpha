@@ -67,6 +67,10 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_BOT_TOKEN:   ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_CHANNEL_ID:  ${{ secrets.DISCORD_CHANNEL_ID }}
+          # Required for the /pausetrading kill switch (KV key trading_paused).
+          CF_ACCOUNT_ID:       ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE:     ${{ secrets.CF_KV_NAMESPACE }}
+          CF_API_TOKEN:        ${{ secrets.CF_API_TOKEN }}
           FINNHUB_API_KEY:     ${{ secrets.FINNHUB_API_KEY }}
           FRED_API_KEY:        ${{ secrets.FRED_API_KEY }}
           COMMAND_PAYLOAD:     '{"command": "pipeline_dry", "scheduled": true}'

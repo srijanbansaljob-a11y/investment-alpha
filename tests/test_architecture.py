@@ -279,6 +279,37 @@ class TestKillSwitchIsWired(unittest.TestCase):
         self.assertIn("trading_paused", kv,
                       "Python reads a different KV key than /pausetrading writes")
 
+    def test_kill_switch_does_not_expire(self):
+        """A kill switch that un-presses itself is worse than none.
+        The worker set expirationTtl: 7 days — pause silently lifted after a
+        week, with no notification."""
+        worker = _src(ROOT / "worker" / "index.js")
+        block = worker.split('KV.put("trading_paused"')[1][:300]
+        self.assertNotIn("expirationTtl", block,
+                         "trading_paused has a TTL — the pause will expire on its own "
+                         "(ARCHITECTURE §2.2)")
+
+    def test_trading_workflows_pass_cf_credentials(self):
+        """
+        The executor can only honour /pausetrading if the workflow gives it
+        Cloudflare credentials. Found 2026-08-01: command.yml and
+        pipeline_scheduled.yml — the two workflows that place orders — passed
+        none, so the kill switch was inert in the cloud even after being wired.
+        """
+        for wf in ("command.yml", "pipeline_scheduled.yml"):
+            src = _src(ROOT / ".github" / "workflows" / wf)
+            for var in ("CF_ACCOUNT_ID", "CF_KV_NAMESPACE", "CF_API_TOKEN"):
+                self.assertIn(var, src,
+                              f"{wf} does not pass {var} — the /pausetrading kill "
+                              "switch cannot be verified and execution proceeds")
+
+    def test_status_surfaces_pause_state(self):
+        src = _src(ROOT / "broker" / "remote_commands.py")
+        body = src.split("def cmd_status(")[1].split("\ndef ")[0]
+        self.assertIn("is_trading_paused", body,
+                      "/status does not show whether trading is paused — the kill "
+                      "switch state is unobservable (ARCHITECTURE §4)")
+
 
 class TestStopLevelsComeFromBroker(unittest.TestCase):
     """ARCHITECTURE §1/§4: display the level that will actually fire."""

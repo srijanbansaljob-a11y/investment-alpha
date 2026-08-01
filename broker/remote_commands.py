@@ -172,6 +172,18 @@ def cmd_status(payload):
             f"{', '.join(unprotected)} — levels shown are advisory only."
         )
     desc = "\n".join(lines) if lines else "_No open positions._"
+    # Kill-switch state must be visible. Without this you cannot answer
+    # "am I currently stopped?" without scrolling Discord history — and an
+    # unobservable control is the failure mode this whole audit kept finding.
+    try:
+        from broker.kv_lock import is_trading_paused
+        paused = is_trading_paused()
+    except Exception:
+        paused = None
+    trading_state = ("🔴 PAUSED" if paused is True
+                     else "🟢 Active" if paused is False
+                     else "⚠️ Unknown")
+
     fields = [
         {"name": "Portfolio", "value": port_label,                                            "inline": True},
         {"name": "Equity",    "value": f"${acct['equity']:,.2f}",                             "inline": True},
@@ -179,7 +191,20 @@ def cmd_status(payload):
         {"name": "Regime",    "value": regime.upper(),                                         "inline": True},
         {"name": "Market",    "value": "🟢 Open" if is_market_open(client) else "🔴 Closed", "inline": True},
         {"name": "Positions", "value": str(len(positions)),                                    "inline": True},
+        {"name": "Trading",   "value": trading_state,                                          "inline": True},
     ]
+    if paused is True:
+        fields.append({"name": "⚠️ Note",
+                       "value": "Trading is PAUSED — no new orders will be placed. "
+                                "Resting stops still protect open positions. "
+                                "Use `/resumetrading` to re-enable.",
+                       "inline": False})
+    elif paused is None:
+        fields.append({"name": "⚠️ Note",
+                       "value": "Could not verify the kill switch (Cloudflare KV "
+                                "unreachable or CF_* secrets missing) — treat trading "
+                                "as ACTIVE.",
+                       "inline": False})
     _reply(payload, [_embed(f"📊 Portfolio Status — {port_label}", desc, _BLUE, fields)])
 
 

@@ -1927,8 +1927,14 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
     }
 
     if (name === "pausetrading") {
-      await env.KV.put("trading_paused", "1", { expirationTtl: 7 * 24 * 3600 });
-      return ephemeral("🔴 **Auto-trading paused.**\nWebhook buys + auto-sells are disabled.\nAlpaca brackets and manual /buy /sell still work.\nResume with `/resumetrading`.");
+      // NO expirationTtl (fixed 2026-08-01). It was 7 days, so a pause silently
+      // lifted itself after a week with no notification — a kill switch that
+      // un-presses itself. It now persists until /resumetrading, and /status
+      // shows the state so you can always answer "am I stopped?".
+      await env.KV.put("trading_paused", JSON.stringify({
+        paused_at: new Date().toISOString(),
+      }));
+      return ephemeral("🔴 **Trading paused.**\nThe pipeline executor, webhook buys and auto-sells are all disabled.\nAlpaca's resting stops still protect open positions.\n**This does not expire** — resume with `/resumetrading`.\nCheck state any time with `/status`.");
     }
 
     if (name === "resumetrading") {
