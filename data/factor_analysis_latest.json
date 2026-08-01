@@ -1,33 +1,33 @@
 {
-  "total": 4,
-  "wins": 4,
-  "win_rate": 100.0,
-  "avg_pl": 7.43,
-  "avg_duration": 0.0,
+  "total": 13,
+  "wins": 12,
+  "win_rate": 92.3,
+  "avg_pl": 8.48,
+  "avg_duration": 14.4,
   "signals": {
     "insider_buy": {
       "with_n": 0,
-      "without_n": 4,
+      "without_n": 13,
       "with_wr": 0,
-      "without_wr": 100.0,
+      "without_wr": 92.3,
       "with_avg_pl": 0,
-      "edge": -100.0
+      "edge": -92.3
     },
     "congress_buy": {
       "with_n": 0,
-      "without_n": 4,
+      "without_n": 13,
       "with_wr": 0,
-      "without_wr": 100.0,
+      "without_wr": 92.3,
       "with_avg_pl": 0,
-      "edge": -100.0
+      "edge": -92.3
     },
     "earnings_beat": {
       "with_n": 0,
-      "without_n": 4,
+      "without_n": 13,
       "with_wr": 0,
-      "without_wr": 100.0,
+      "without_wr": 92.3,
       "with_avg_pl": 0,
-      "edge": -100.0
+      "edge": -92.3
     }
   },
   "rs_vs_spy": {
@@ -39,38 +39,52 @@
   "by_regime": [
     {
       "label": "UNKNOWN",
-      "trades": 4,
-      "wins": 4,
-      "win_rate": 100.0,
-      "avg_pl": 7.43
+      "trades": 13,
+      "wins": 12,
+      "win_rate": 92.3,
+      "avg_pl": 8.48
     }
   ],
   "by_bucket": [
     {
       "label": "unknown",
-      "trades": 4,
-      "wins": 4,
-      "win_rate": 100.0,
-      "avg_pl": 7.43
+      "trades": 13,
+      "wins": 12,
+      "win_rate": 92.3,
+      "avg_pl": 8.48
     }
   ],
   "by_portfolio": [
     {
+      "label": "screener",
+      "trades": 8,
+      "wins": 7,
+      "win_rate": 87.5,
+      "avg_pl": 8.42
+    },
+    {
       "label": "pipeline",
-      "trades": 4,
-      "wins": 4,
+      "trades": 5,
+      "wins": 5,
       "win_rate": 100.0,
-      "avg_pl": 7.43
+      "avg_pl": 8.58
     }
   ],
   "by_exit_type": [
     {
       "label": "full",
-      "trades": 4,
-      "wins": 4,
+      "trades": 12,
+      "wins": 11,
+      "win_rate": 91.7,
+      "avg_pl": 8.09
+    },
+    {
+      "label": "partial",
+      "trades": 1,
+      "wins": 1,
       "win_rate": 100.0,
-      "avg_pl": 7.43
+      "avg_pl": 13.21
     }
   ],
-  "generated_at": "2026-07-25T15:06:25.828330+00:00"
+  "generated_at": "2026-08-01T14:26:52.358243+00:00"
 }
