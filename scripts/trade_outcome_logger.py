@@ -243,6 +243,30 @@ def _find_entry_date(ticker: str, portfolio: str) -> str | None:
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
+def _run_repair_only(reason: str) -> None:
+    """
+    Run the administrative-exit repair pass on its own.
+
+    The repair diffs nothing and needs no snapshots — it only reconciles
+    already-logged outcomes against admin_exits.json. It therefore must NOT be
+    skipped when snapshot files are missing.
+
+    BUG FIX 2026-08-01: the repair lived at the end of main(), after two early
+    returns for missing snapshots. The day after a liquidation the snapshot for
+    "today" didn't exist yet, main() returned at that guard, and the 7
+    mislogged liquidation exits stayed counted as model trades — the repair
+    reported success while never having run.
+    """
+    log.info("%s — running administrative-exit repair only", reason)
+    outcomes = _load_outcomes()
+    repaired = _retag_admin_exits(outcomes)
+    if repaired:
+        _save_outcomes(outcomes)
+    model = [o for o in outcomes if not o.get("exclude_from_learning")]
+    log.info("Repair pass: %d retagged (total %d outcomes, %d count as MODEL trades)",
+             repaired, len(outcomes), len(model))
+
+
 def main():
     today     = datetime.now(timezone.utc).date()
     yesterday = today - timedelta(days=1)
@@ -253,10 +277,11 @@ def main():
     curr_path = _SNAP_DIR / f"positions_{today.isoformat()}.json"
 
     if not prev_path.exists():
-        log.info("No yesterday snapshot (%s) — skipping", prev_path.name)
+        _run_repair_only(f"No yesterday snapshot ({prev_path.name})")
         return
     if not curr_path.exists():
-        log.info("No today snapshot (%s) — run snapshot_positions.py first", curr_path.name)
+        _run_repair_only(f"No today snapshot ({curr_path.name}) — "
+                         "run snapshot_positions.py for new exits")
         return
 
     prev_snap = json.loads(prev_path.read_text(encoding="utf-8"))

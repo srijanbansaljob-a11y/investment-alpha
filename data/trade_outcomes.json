@@ -300,7 +300,7 @@
       "exit_date": "2026-07-31",
       "entry_date": "2026-07-08",
       "duration_days": 23,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 198.8,
       "exit_price": 205.2686,
       "pnl_pct": 3.25,
@@ -314,7 +314,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
+      "retagged": true
     },
     {
       "ticker": "BMY",
@@ -322,7 +325,7 @@
       "exit_date": "2026-07-31",
       "entry_date": "2026-07-08",
       "duration_days": 23,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 56.3518,
       "exit_price": 64.98,
       "pnl_pct": 15.31,
@@ -336,7 +339,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
+      "retagged": true
     },
     {
       "ticker": "DAL",
@@ -344,7 +350,7 @@
       "exit_date": "2026-07-31",
       "entry_date": "2026-07-27",
       "duration_days": 4,
-      "exit_type": "partial",
+      "exit_type": "administrative",
       "entry_price": 85.9021,
       "exit_price": 88.59,
       "pnl_pct": 3.13,
@@ -358,7 +364,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
+      "retagged": true
     },
     {
       "ticker": "DE",
@@ -366,7 +375,7 @@
       "exit_date": "2026-07-31",
       "entry_date": "2026-07-13",
       "duration_days": 18,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 588.1619,
       "exit_price": 599.47,
       "pnl_pct": 1.92,
@@ -380,7 +389,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
+      "retagged": true
     },
     {
       "ticker": "EIX",
@@ -388,7 +400,7 @@
       "exit_date": "2026-07-31",
       "entry_date": "2026-07-08",
       "duration_days": 23,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 70.699,
       "exit_price": 78.73,
       "pnl_pct": 11.36,
@@ -402,7 +414,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
+      "retagged": true
     },
     {
       "ticker": "MRK",
@@ -410,7 +425,7 @@
       "exit_date": "2026-07-31",
       "entry_date": "2026-07-08",
       "duration_days": 23,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 113.8036,
       "exit_price": 129.79,
       "pnl_pct": 14.05,
@@ -424,7 +439,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
+      "retagged": true
     },
     {
       "ticker": "MTCH",
@@ -432,7 +450,7 @@
       "exit_date": "2026-07-31",
       "entry_date": "2026-07-08",
       "duration_days": 23,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 35.0526,
       "exit_price": 39.31,
       "pnl_pct": 12.15,
@@ -446,8 +464,11 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
+      "retagged": true
     }
   ],
-  "last_updated": "2026-07-31T22:32:50.057721+00:00"
+  "last_updated": "2026-08-01T13:46:43.113875+00:00"
 }

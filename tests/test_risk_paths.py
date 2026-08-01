@@ -201,6 +201,22 @@ class TestAdminExitsExcludedFromEvidence(unittest.TestCase):
                          "same ticker on a DIFFERENT date wrongly tagged")
         self.assertEqual(tol._retag_admin_exits(outcomes), 0, "repair pass is not idempotent")
 
+    def test_repair_runs_even_without_snapshots(self):
+        """
+        The repair must not sit behind the snapshot guards. Found 2026-08-01:
+        with no snapshot for 'today', main() returned early and the 7
+        mislogged liquidation exits stayed counted as model trades — while the
+        command appeared to succeed.
+        """
+        src = (ROOT / "scripts" / "trade_outcome_logger.py").read_text(encoding="utf-8")
+        head = src.split("def main(")[1].split("prev_snap =")[0]
+        for guard in ("No yesterday snapshot", "No today snapshot"):
+            idx = head.find(guard)
+            self.assertGreater(idx, -1, f"guard '{guard}' missing")
+            window = head[max(0, idx - 200): idx + 200]
+            self.assertIn("_run_repair_only", window,
+                          f"early return on '{guard}' skips the admin-exit repair")
+
     def test_factor_analysis_drops_administrative(self):
         import importlib.util
         spec = importlib.util.spec_from_file_location(
