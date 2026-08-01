@@ -248,6 +248,38 @@ class TestRiskGatesHaveAnOwner(unittest.TestCase):
                               "(ARCHITECTURE §1)")
 
 
+class TestKillSwitchIsWired(unittest.TestCase):
+    """
+    ARCHITECTURE §2.2: the kill switch must stop the thing that places orders.
+
+    Found 2026-08-01 while preparing the UAT drill: `/pausetrading` wrote the
+    KV key `trading_paused`, and NOTHING in the Python order path read it. The
+    executor checked only EXECUTION_ENABLED and `execution_lock` — a different
+    key for concurrency. Pressing the documented kill switch and then running
+    the pipeline would have placed every order.
+    """
+
+    def test_executor_reads_the_pause_flag(self):
+        src = _src(ROOT / "broker" / "executor.py")
+        self.assertIn("is_trading_paused", src,
+                      "executor does not read the /pausetrading kill switch — "
+                      "the switch stops nothing (ARCHITECTURE §2.2)")
+
+    def test_pause_check_distinguishes_unknown_from_running(self):
+        src = _src(ROOT / "broker" / "kv_lock.py")
+        self.assertIn("def is_trading_paused", src)
+        self.assertIn("return None", src.split("def is_trading_paused")[1][:1600],
+                      "is_trading_paused must return None when it cannot verify, so "
+                      "callers can distinguish 'confirmed running' from 'unknown'")
+
+    def test_worker_and_python_use_the_same_key(self):
+        worker = _src(ROOT / "worker" / "index.js")
+        kv     = _src(ROOT / "broker" / "kv_lock.py")
+        self.assertIn("trading_paused", worker)
+        self.assertIn("trading_paused", kv,
+                      "Python reads a different KV key than /pausetrading writes")
+
+
 class TestStopLevelsComeFromBroker(unittest.TestCase):
     """ARCHITECTURE §1/§4: display the level that will actually fire."""
 

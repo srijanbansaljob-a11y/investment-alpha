@@ -75,6 +75,43 @@ def check_lock(key: str = "execution_lock") -> dict | None:
         return None
 
 
+def is_trading_paused() -> bool | None:
+    """
+    Is the `/pausetrading` kill switch engaged?
+
+    Returns True (paused), False (not paused), or None (could not verify —
+    Cloudflare credentials absent or KV unreachable).
+
+    BUG FIX 2026-08-01: `/pausetrading` writes the KV key `trading_paused`,
+    but NOTHING in the Python order path read it. The executor checked only
+    config.EXECUTION_ENABLED and `execution_lock` (a concurrency lock, a
+    different key entirely). So the documented kill switch did not stop
+    `main.py --execute`, locally or in the cloud — it only disabled the
+    worker's webhook buys and take-profit auto-sells. Pressing it and then
+    running the pipeline would have placed every order.
+
+    None vs False matters: the caller must be able to tell "confirmed running"
+    from "couldn't check", and say so out loud.
+    """
+    creds = _cf_creds()
+    if not creds:
+        return None
+    account_id, namespace_id, token = creds
+    url = (f"{CF_API}/accounts/{account_id}/storage/kv/namespaces/"
+           f"{namespace_id}/values/trading_paused")
+    try:
+        r = requests.get(url, headers=_headers(token), timeout=8)
+        if r.status_code == 200:
+            return bool((r.text or "").strip())
+        if r.status_code == 404:
+            return False          # key absent => not paused
+        log.warning("KV pause check failed HTTP %s", r.status_code)
+        return None
+    except Exception as e:
+        log.warning("KV pause check error: %s", e)
+        return None
+
+
 def acquire_lock(key: str = "execution_lock", owner: str = "executor",
                  ttl: int = LOCK_TTL) -> bool:
     """

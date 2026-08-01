@@ -322,10 +322,31 @@ def execute_signals(
         log.error("  Cannot connect to Alpaca: %s", e)
         return {"status": "failed", "error": str(e)}
 
-    # -- Kill switch --
+    # -- Kill switch 1: local config flag --
     if not getattr(config, "EXECUTION_ENABLED", True) and not dry_run:
         log.warning("  EXECUTION_ENABLED=False -- forcing dry-run; NO orders will be placed")
         dry_run = True
+
+    # -- Kill switch 2: /pausetrading (Cloudflare KV) --
+    # Until 2026-08-01 nothing in this path read the flag, so the documented
+    # kill switch did not stop the pipeline. It does now.
+    if not dry_run:
+        try:
+            from broker.kv_lock import is_trading_paused
+            paused = is_trading_paused()
+        except Exception as exc:
+            log.warning("  Could not import pause check (%s)", exc)
+            paused = None
+        if paused is True:
+            log.warning("  🔴 TRADING PAUSED via /pausetrading -- forcing dry-run; "
+                        "NO orders will be placed. Use /resumetrading to re-enable.")
+            dry_run = True
+        elif paused is None:
+            log.warning("  ⚠️  Could not verify the /pausetrading kill switch "
+                        "(Cloudflare KV unreachable or CF_* credentials not set). "
+                        "Proceeding — but the remote kill switch is NOT protecting "
+                        "this run. Set EXECUTION_ENABLED=False in config.py to stop "
+                        "execution locally.")
 
     # -- Execution lock (prevents simultaneous local + cloud runs) --
     lock_acquired = True
