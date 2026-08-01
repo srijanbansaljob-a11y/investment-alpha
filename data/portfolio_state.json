@@ -1,0 +1,168 @@
+{
+  "schema_version": 2,
+  "run_date": "2026-07-31",
+  "regime": "bull",
+  "regime_detail": {
+    "regime": "bull",
+    "vix_current": 17.09,
+    "spx_price": 7433.29,
+    "spx_200ma": 7023.82,
+    "spx_vs_200ma_pct": 5.83,
+    "yield_curve_spread": 1.055,
+    "credit_spread_momentum": 0.021068,
+    "active_top_n": 10,
+    "active_stop_loss": 0.85,
+    "timestamp": "2026-07-31T15:43:36.272014+00:00",
+    "notes": "SPX 5.8% above 200MA, VIX=17.1 (benign)"
+  },
+  "signal_summary": {
+    "total_signals": 10,
+    "buy": 10,
+    "hold": 0,
+    "exit": 0,
+    "run_date": "2026-07-31",
+    "regime": "bull"
+  },
+  "portfolio": [
+    {
+      "ticker": "HST",
+      "name": "Host Hotels & Resorts, Inc.",
+      "action": "BUY",
+      "weight": 0.13836,
+      "score": 0.6522,
+      "entry_price": 25.09,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "APA",
+      "name": "APA Corporation",
+      "action": "BUY",
+      "weight": 0.069103,
+      "score": 0.6068,
+      "entry_price": 36.33,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "CVS",
+      "name": "CVS Health Corporation",
+      "action": "BUY",
+      "weight": 0.104123,
+      "score": 0.606,
+      "entry_price": 105.22,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "EIX",
+      "name": "Edison International",
+      "action": "BUY",
+      "weight": 0.141462,
+      "score": 0.6058,
+      "entry_price": 78.73,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "moderate",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "INCY",
+      "name": "Incyte Corporation",
+      "action": "BUY",
+      "weight": 0.080417,
+      "score": 0.6023,
+      "entry_price": 122.99,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "ALL",
+      "name": "The Allstate Corporation",
+      "action": "BUY",
+      "weight": 0.10568,
+      "score": 0.5849,
+      "entry_price": 265.38,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "moderate",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "VTRS",
+      "name": "Viatris Inc.",
+      "action": "BUY",
+      "weight": 0.090284,
+      "score": 0.5832,
+      "entry_price": 17.76,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "DAL",
+      "name": "Delta Air Lines, Inc.",
+      "action": "BUY",
+      "weight": 0.076644,
+      "score": 0.5784,
+      "entry_price": 88.59,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "MATX",
+      "name": "Matson, Inc.",
+      "action": "BUY",
+      "weight": 0.082806,
+      "score": 0.578,
+      "entry_price": 203.65,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "TRV",
+      "name": "The Travelers Companies, Inc.",
+      "action": "BUY",
+      "weight": 0.111121,
+      "score": 0.5767,
+      "entry_price": 375.99,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "moderate",
+        "above_ma200": true
+      }
+    }
+  ]
+}

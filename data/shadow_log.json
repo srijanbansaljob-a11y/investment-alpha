@@ -733,5 +733,299 @@
         }
       }
     ]
+  },
+  {
+    "date": "2026-07-31",
+    "regime": "bull",
+    "evaluated": false,
+    "stocks": [
+      {
+        "ticker": "HST",
+        "rank": 1,
+        "composite": 0.6522,
+        "price": 25.09,
+        "scores": {
+          "momentum": 0.7162,
+          "trend": 0.6261,
+          "quality": 0.6832,
+          "valuation": 0.8669,
+          "sentiment": 0.4483,
+          "volatility": 0.1152
+        }
+      },
+      {
+        "ticker": "APA",
+        "rank": 2,
+        "composite": 0.6068,
+        "price": 36.33,
+        "scores": {
+          "momentum": 0.6859,
+          "trend": 0.6553,
+          "quality": 0.8191,
+          "valuation": 0.8729,
+          "sentiment": 0.4361,
+          "volatility": 0.7086
+        }
+      },
+      {
+        "ticker": "CVS",
+        "rank": 3,
+        "composite": 0.606,
+        "price": 105.22,
+        "scores": {
+          "momentum": 0.7567,
+          "trend": 0.6924,
+          "quality": 0.5221,
+          "valuation": 0.7315,
+          "sentiment": 0.5365,
+          "volatility": 0.3298
+        }
+      },
+      {
+        "ticker": "EIX",
+        "rank": 4,
+        "composite": 0.6058,
+        "price": 78.73,
+        "scores": {
+          "momentum": 0.5913,
+          "trend": 0.6174,
+          "quality": 0.694,
+          "valuation": 0.8589,
+          "sentiment": 0.3793,
+          "volatility": 0.0925
+        }
+      },
+      {
+        "ticker": "INCY",
+        "rank": 5,
+        "composite": 0.6023,
+        "price": 122.99,
+        "scores": {
+          "momentum": 0.6946,
+          "trend": 0.7301,
+          "quality": 0.7487,
+          "valuation": 0.7177,
+          "sentiment": 0.4122,
+          "volatility": 0.6073
+        }
+      },
+      {
+        "ticker": "ALL",
+        "rank": 6,
+        "composite": 0.5849,
+        "price": 265.38,
+        "scores": {
+          "momentum": 0.5682,
+          "trend": 0.733,
+          "quality": 0.6533,
+          "valuation": 0.7704,
+          "sentiment": 0.3926,
+          "volatility": 0.3194
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "rank": 7,
+        "composite": 0.5832,
+        "price": 17.76,
+        "scores": {
+          "momentum": 0.7106,
+          "trend": 0.6363,
+          "quality": 0.5034,
+          "valuation": 0.9522,
+          "sentiment": 0.4281,
+          "volatility": 0.4921
+        }
+      },
+      {
+        "ticker": "DAL",
+        "rank": 8,
+        "composite": 0.5784,
+        "price": 88.59,
+        "scores": {
+          "momentum": 0.7899,
+          "trend": 0.6795,
+          "quality": 0.4056,
+          "valuation": 0.9357,
+          "sentiment": 0.6092,
+          "volatility": 0.637
+        }
+      },
+      {
+        "ticker": "MATX",
+        "rank": 9,
+        "composite": 0.578,
+        "price": 203.65,
+        "scores": {
+          "momentum": 0.814,
+          "trend": 0.541,
+          "quality": 0.4375,
+          "valuation": 0.8819,
+          "sentiment": 0.605,
+          "volatility": 0.5846
+        }
+      },
+      {
+        "ticker": "TRV",
+        "rank": 10,
+        "composite": 0.5767,
+        "price": 375.99,
+        "scores": {
+          "momentum": 0.5871,
+          "trend": 0.7613,
+          "quality": 0.6909,
+          "valuation": 0.5674,
+          "sentiment": 0.3671,
+          "volatility": 0.2862
+        }
+      }
+    ]
+  },
+  {
+    "date": "2026-07-31",
+    "regime": "bull",
+    "evaluated": false,
+    "stocks": [
+      {
+        "ticker": "HST",
+        "rank": 1,
+        "composite": 0.6522,
+        "price": 25.09,
+        "scores": {
+          "momentum": 0.7162,
+          "trend": 0.6261,
+          "quality": 0.6832,
+          "valuation": 0.8669,
+          "sentiment": 0.4483,
+          "volatility": 0.1152
+        }
+      },
+      {
+        "ticker": "APA",
+        "rank": 2,
+        "composite": 0.6068,
+        "price": 36.33,
+        "scores": {
+          "momentum": 0.6859,
+          "trend": 0.6553,
+          "quality": 0.8191,
+          "valuation": 0.8729,
+          "sentiment": 0.4361,
+          "volatility": 0.7086
+        }
+      },
+      {
+        "ticker": "CVS",
+        "rank": 3,
+        "composite": 0.606,
+        "price": 105.22,
+        "scores": {
+          "momentum": 0.7567,
+          "trend": 0.6924,
+          "quality": 0.5221,
+          "valuation": 0.7315,
+          "sentiment": 0.5365,
+          "volatility": 0.3298
+        }
+      },
+      {
+        "ticker": "EIX",
+        "rank": 4,
+        "composite": 0.6058,
+        "price": 78.73,
+        "scores": {
+          "momentum": 0.5913,
+          "trend": 0.6174,
+          "quality": 0.694,
+          "valuation": 0.8589,
+          "sentiment": 0.3793,
+          "volatility": 0.0925
+        }
+      },
+      {
+        "ticker": "INCY",
+        "rank": 5,
+        "composite": 0.6023,
+        "price": 122.99,
+        "scores": {
+          "momentum": 0.6946,
+          "trend": 0.7301,
+          "quality": 0.7487,
+          "valuation": 0.7177,
+          "sentiment": 0.4122,
+          "volatility": 0.6073
+        }
+      },
+      {
+        "ticker": "ALL",
+        "rank": 6,
+        "composite": 0.5849,
+        "price": 265.38,
+        "scores": {
+          "momentum": 0.5682,
+          "trend": 0.733,
+          "quality": 0.6533,
+          "valuation": 0.7704,
+          "sentiment": 0.3926,
+          "volatility": 0.3194
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "rank": 7,
+        "composite": 0.5832,
+        "price": 17.76,
+        "scores": {
+          "momentum": 0.7106,
+          "trend": 0.6363,
+          "quality": 0.5034,
+          "valuation": 0.9522,
+          "sentiment": 0.4281,
+          "volatility": 0.4921
+        }
+      },
+      {
+        "ticker": "DAL",
+        "rank": 8,
+        "composite": 0.5784,
+        "price": 88.59,
+        "scores": {
+          "momentum": 0.7899,
+          "trend": 0.6795,
+          "quality": 0.4056,
+          "valuation": 0.9357,
+          "sentiment": 0.6092,
+          "volatility": 0.637
+        }
+      },
+      {
+        "ticker": "MATX",
+        "rank": 9,
+        "composite": 0.578,
+        "price": 203.65,
+        "scores": {
+          "momentum": 0.814,
+          "trend": 0.541,
+          "quality": 0.4375,
+          "valuation": 0.8819,
+          "sentiment": 0.605,
+          "volatility": 0.5846
+        }
+      },
+      {
+        "ticker": "TRV",
+        "rank": 10,
+        "composite": 0.5767,
+        "price": 375.99,
+        "scores": {
+          "momentum": 0.5871,
+          "trend": 0.7613,
+          "quality": 0.6909,
+          "valuation": 0.5674,
+          "sentiment": 0.3671,
+          "volatility": 0.2862
+        }
+      }
+    ]
   }
 ]

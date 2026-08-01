@@ -1,0 +1,46 @@
+{
+  "DE": {
+    "date": "2026-07-31",
+    "reason": "full_liquidation_clean_restart_on_fixed_code"
+  },
+  "APA": {
+    "date": "2026-07-31",
+    "reason": "full_liquidation_clean_restart_on_fixed_code"
+  },
+  "BIIB": {
+    "date": "2026-07-31",
+    "reason": "full_liquidation_clean_restart_on_fixed_code"
+  },
+  "BMY": {
+    "date": "2026-07-31",
+    "reason": "full_liquidation_clean_restart_on_fixed_code"
+  },
+  "DAL": {
+    "date": "2026-07-31",
+    "reason": "full_liquidation_clean_restart_on_fixed_code"
+  },
+  "EIX": {
+    "date": "2026-07-31",
+    "reason": "full_liquidation_clean_restart_on_fixed_code"
+  },
+  "HST": {
+    "date": "2026-07-31",
+    "reason": "full_liquidation_clean_restart_on_fixed_code"
+  },
+  "MATX": {
+    "date": "2026-07-31",
+    "reason": "full_liquidation_clean_restart_on_fixed_code"
+  },
+  "MRK": {
+    "date": "2026-07-31",
+    "reason": "full_liquidation_clean_restart_on_fixed_code"
+  },
+  "MTCH": {
+    "date": "2026-07-31",
+    "reason": "full_liquidation_clean_restart_on_fixed_code"
+  },
+  "VTRS": {
+    "date": "2026-07-31",
+    "reason": "full_liquidation_clean_restart_on_fixed_code"
+  }
+}

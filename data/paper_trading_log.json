@@ -3706,5 +3706,379 @@
       "start_date": "2026-05-01",
       "end_date": "2026-07-30"
     }
+  },
+  {
+    "timestamp": "2026-07-31T15:43:01.852215+00:00",
+    "run_date": "2026-07-31",
+    "regime": "bull",
+    "total_capital": 1000.0,
+    "portfolio_value": 990.52,
+    "realised_pnl": 0.0,
+    "total_portfolio_value": 990.52,
+    "total_return_pct": -0.9477,
+    "benchmark_return_pct": 3.1207,
+    "alpha_pct": -4.0684,
+    "sharpe_ratio": -0.4184,
+    "max_drawdown_pct": -2.0903,
+    "win_rate_pct": 50.0,
+    "avg_gain_pct": 0.52,
+    "avg_loss_pct": -2.17,
+    "positions": [
+      {
+        "ticker": "HST",
+        "weight": 0.13836,
+        "entry_price": 25.09,
+        "current_price": 25.175,
+        "cost_basis": 138.36,
+        "current_value": 138.83,
+        "unrealised_pnl": 0.47,
+        "unrealised_pct": 0.34,
+        "score": 0.6522,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "APA",
+        "weight": 0.069103,
+        "entry_price": 36.33,
+        "current_price": 36.58,
+        "cost_basis": 69.1,
+        "current_value": 69.58,
+        "unrealised_pnl": 0.48,
+        "unrealised_pct": 0.69,
+        "score": 0.6068,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "CVS",
+        "weight": 0.104123,
+        "entry_price": 105.22,
+        "current_price": 105.4,
+        "cost_basis": 104.12,
+        "current_value": 104.3,
+        "unrealised_pnl": 0.18,
+        "unrealised_pct": 0.17,
+        "score": 0.606,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "EIX",
+        "weight": 0.141462,
+        "entry_price": 78.73,
+        "current_price": 74.515,
+        "cost_basis": 141.46,
+        "current_value": 133.89,
+        "unrealised_pnl": -7.57,
+        "unrealised_pct": -5.35,
+        "score": 0.6058,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "moderate",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "INCY",
+        "weight": 0.080417,
+        "entry_price": 122.99,
+        "current_price": 119.465,
+        "cost_basis": 80.42,
+        "current_value": 78.11,
+        "unrealised_pnl": -2.3,
+        "unrealised_pct": -2.87,
+        "score": 0.6023,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "ALL",
+        "weight": 0.10568,
+        "entry_price": 265.38,
+        "current_price": 267.0,
+        "cost_basis": 105.68,
+        "current_value": 106.33,
+        "unrealised_pnl": 0.65,
+        "unrealised_pct": 0.61,
+        "score": 0.5849,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "moderate",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "weight": 0.090284,
+        "entry_price": 17.76,
+        "current_price": 17.5,
+        "cost_basis": 90.28,
+        "current_value": 88.96,
+        "unrealised_pnl": -1.32,
+        "unrealised_pct": -1.46,
+        "score": 0.5832,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "DAL",
+        "weight": 0.076644,
+        "entry_price": 88.59,
+        "current_price": 87.87,
+        "cost_basis": 76.64,
+        "current_value": 76.02,
+        "unrealised_pnl": -0.62,
+        "unrealised_pct": -0.81,
+        "score": 0.5784,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "MATX",
+        "weight": 0.082806,
+        "entry_price": 203.65,
+        "current_price": 202.875,
+        "cost_basis": 82.81,
+        "current_value": 82.49,
+        "unrealised_pnl": -0.32,
+        "unrealised_pct": -0.38,
+        "score": 0.578,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "TRV",
+        "weight": 0.111121,
+        "entry_price": 375.99,
+        "current_price": 379.015,
+        "cost_basis": 111.12,
+        "current_value": 112.02,
+        "unrealised_pnl": 0.89,
+        "unrealised_pct": 0.8,
+        "score": 0.5767,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "moderate",
+          "above_ma200": true
+        }
+      }
+    ],
+    "closed_positions": [],
+    "paper_trading": {
+      "in_validation": false,
+      "days_elapsed": 91,
+      "days_remaining": 0,
+      "start_date": "2026-05-01",
+      "end_date": "2026-07-30"
+    }
+  },
+  {
+    "timestamp": "2026-07-31T15:46:20.269246+00:00",
+    "run_date": "2026-07-31",
+    "regime": "bull",
+    "total_capital": 1000.0,
+    "portfolio_value": 990.65,
+    "realised_pnl": 0.0,
+    "total_portfolio_value": 990.65,
+    "total_return_pct": -0.9354,
+    "benchmark_return_pct": 3.2083,
+    "alpha_pct": -4.1437,
+    "sharpe_ratio": -0.4032,
+    "max_drawdown_pct": -2.0906,
+    "win_rate_pct": 50.0,
+    "avg_gain_pct": 0.54,
+    "avg_loss_pct": -2.17,
+    "positions": [
+      {
+        "ticker": "HST",
+        "weight": 0.13836,
+        "entry_price": 25.09,
+        "current_price": 25.155,
+        "cost_basis": 138.36,
+        "current_value": 138.72,
+        "unrealised_pnl": 0.36,
+        "unrealised_pct": 0.26,
+        "score": 0.6522,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "APA",
+        "weight": 0.069103,
+        "entry_price": 36.33,
+        "current_price": 36.62,
+        "cost_basis": 69.1,
+        "current_value": 69.65,
+        "unrealised_pnl": 0.55,
+        "unrealised_pct": 0.8,
+        "score": 0.6068,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "CVS",
+        "weight": 0.104123,
+        "entry_price": 105.22,
+        "current_price": 105.4,
+        "cost_basis": 104.12,
+        "current_value": 104.3,
+        "unrealised_pnl": 0.18,
+        "unrealised_pct": 0.17,
+        "score": 0.606,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "EIX",
+        "weight": 0.141462,
+        "entry_price": 78.73,
+        "current_price": 74.565,
+        "cost_basis": 141.46,
+        "current_value": 133.98,
+        "unrealised_pnl": -7.48,
+        "unrealised_pct": -5.29,
+        "score": 0.6058,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "moderate",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "INCY",
+        "weight": 0.080417,
+        "entry_price": 122.99,
+        "current_price": 119.57,
+        "cost_basis": 80.42,
+        "current_value": 78.18,
+        "unrealised_pnl": -2.24,
+        "unrealised_pct": -2.78,
+        "score": 0.6023,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "ALL",
+        "weight": 0.10568,
+        "entry_price": 265.38,
+        "current_price": 266.96,
+        "cost_basis": 105.68,
+        "current_value": 106.31,
+        "unrealised_pnl": 0.63,
+        "unrealised_pct": 0.6,
+        "score": 0.5849,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "moderate",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "weight": 0.090284,
+        "entry_price": 17.76,
+        "current_price": 17.525,
+        "cost_basis": 90.28,
+        "current_value": 89.09,
+        "unrealised_pnl": -1.19,
+        "unrealised_pct": -1.32,
+        "score": 0.5832,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "DAL",
+        "weight": 0.076644,
+        "entry_price": 88.59,
+        "current_price": 87.7175,
+        "cost_basis": 76.64,
+        "current_value": 75.89,
+        "unrealised_pnl": -0.75,
+        "unrealised_pct": -0.98,
+        "score": 0.5784,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "MATX",
+        "weight": 0.082806,
+        "entry_price": 203.65,
+        "current_price": 202.71,
+        "cost_basis": 82.81,
+        "current_value": 82.42,
+        "unrealised_pnl": -0.38,
+        "unrealised_pct": -0.46,
+        "score": 0.578,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "strong",
+          "above_ma200": true
+        }
+      },
+      {
+        "ticker": "TRV",
+        "weight": 0.111121,
+        "entry_price": 375.99,
+        "current_price": 379.305,
+        "cost_basis": 111.12,
+        "current_value": 112.1,
+        "unrealised_pnl": 0.98,
+        "unrealised_pct": 0.88,
+        "score": 0.5767,
+        "signals": {
+          "trend": "bullish",
+          "momentum": "moderate",
+          "above_ma200": true
+        }
+      }
+    ],
+    "closed_positions": [],
+    "paper_trading": {
+      "in_validation": false,
+      "days_elapsed": 91,
+      "days_remaining": 0,
+      "start_date": "2026-05-01",
+      "end_date": "2026-07-30"
+    }
   }
 ]

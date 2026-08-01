@@ -108,6 +108,32 @@ def _get_signals(ticker: str) -> dict:
 
 # ── Exit detection ─────────────────────────────────────────────────────────
 
+_ADMIN_EXITS_FILE = _DATA_DIR / "admin_exits.json"
+
+
+def _admin_exits() -> dict:
+    """
+    {ticker: {"date", "reason"}} for exits that were ADMINISTRATIVE, not model
+    decisions — e.g. the 2026-07-31 full liquidation to rebuild the book on
+    fixed code.
+
+    Why this matters (audit follow-up): outcomes are detected by diffing
+    position snapshots, so the logger cannot tell "the model exited this" from
+    "the owner liquidated everything". Untagged, a bulk liquidation injects a
+    dozen fake trades with real P&L into the evidence base that decides whether
+    the strategy works — and pushes MIN_FEEDBACK_OBSERVATIONS toward its
+    threshold with noise. Tagged records stay in the file for the audit trail
+    but carry exclude_from_learning=True.
+    """
+    try:
+        if _ADMIN_EXITS_FILE.exists():
+            raw = _ADMIN_EXITS_FILE.read_bytes().rstrip(b"\x00")
+            return json.loads(raw) if raw else {}
+    except Exception as exc:
+        log.warning("Could not read admin_exits.json (%s)", exc)
+    return {}
+
+
 def _detect_exits(prev: dict, curr: dict) -> list[dict]:
     """
     Compare yesterday → today to find full or partial exits.
@@ -245,6 +271,17 @@ def main():
                 "signals":       signals,
                 "win":           ex["pnl_pct"] > 0,
             }
+
+            # Administrative exits (owner liquidation, migrations) are recorded
+            # for the audit trail but must NOT count as model evidence.
+            admin = _admin_exits().get(ticker)
+            if admin and admin.get("date") == today_iso:
+                record["exit_type"]            = "administrative"
+                record["exclude_from_learning"] = True
+                record["admin_reason"]          = admin.get("reason", "administrative")
+                log.info("  %s tagged ADMINISTRATIVE (%s) — excluded from learning",
+                         ticker, record["admin_reason"])
+
             outcomes.append(record)
             new_count += 1
             log.info(

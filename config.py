@@ -217,7 +217,11 @@ MIN_FEEDBACK_OBSERVATIONS = 25
 
 # ── Paper Trading Validation (Phase 4 — 3-month trial) ───────────────────
 PAPER_TRADING_VALIDATION    = True   # enables performance_tracker logging
-PAPER_TRADING_START_DATE    = "2026-05-01"
+# RESET 2026-07-31: the book was fully liquidated and rebuilt on audit-fixed
+# code. The 2026-05-01 window measured a system with no cloud exits, no
+# broker-side stops, and bypassed blackout/cooldown — evidence about a system
+# that no longer exists. The clock restarts with the rebuilt book.
+PAPER_TRADING_START_DATE    = "2026-07-31"
 PAPER_TRADING_MONTHS        = 3
 BENCHMARK_TICKER            = "SPY"  # benchmark for alpha calculation
 

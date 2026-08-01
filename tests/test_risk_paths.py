@@ -133,6 +133,42 @@ class TestStopReconciler(unittest.TestCase):
         self.assertIn(("B", 5), [(t, q) for t, q, s in self.placed if t == "B"])
 
 
+class TestEmptyAccountIsAuthoritative(unittest.TestCase):
+    """
+    An empty Alpaca account must NOT be treated as "Alpaca unavailable".
+
+    Found live 2026-07-31, immediately after a full liquidation: with 0
+    positions, _load_alpaca_holdings() returned {} (falsy), the caller fell
+    back to a stale state file, and the checker logged phantom stop-loss
+    breaches for NEM and FDX — names the account did not hold. Those phantom
+    breaches feed the re-entry cooldown, so they would have blocked legitimate
+    buys on the very next run.
+    """
+
+    def setUp(self):
+        self._orig = stop_loss._load_alpaca_holdings
+
+    def tearDown(self):
+        stop_loss._load_alpaca_holdings = self._orig
+
+    def test_flat_account_returns_no_checks_not_state_file_fallback(self):
+        stop_loss._load_alpaca_holdings = lambda: {}          # genuinely flat
+        result = stop_loss.check_and_execute(regime="bull", dry_run=True)
+        self.assertEqual(result["checked"], [],
+                         "flat account fell back to the state file and evaluated "
+                         "positions that are not held")
+        self.assertEqual(result["triggered"], [],
+                         "phantom stop-loss triggered on an empty account")
+
+    def test_unavailable_broker_is_distinguishable_from_flat(self):
+        src = (ROOT / "broker" / "stop_loss.py").read_text(encoding="utf-8")
+        self.assertIn("return None", src,
+                      "_load_alpaca_holdings must return None on failure so an "
+                      "empty account ({}) stays distinguishable from an outage")
+        self.assertIn("alpaca_holdings is not None", src,
+                      "caller must branch on `is not None`, not truthiness")
+
+
 class TestSizing(unittest.TestCase):
     def test_calc_shares_whole(self):
         self.assertEqual(calc_shares(11_000, 100.0), 110.0)

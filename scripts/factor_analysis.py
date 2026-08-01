@@ -79,7 +79,22 @@ def _signal_comparison(outcomes: list, signal_key: str) -> dict:
     }
 
 
+def _model_outcomes(outcomes: list) -> list:
+    """
+    Only trades the MODEL decided. Drops administrative exits (owner
+    liquidations, migrations) which carry real P&L but zero information about
+    whether the strategy works — see trade_outcome_logger._admin_exits.
+    """
+    kept = [o for o in outcomes if not o.get("exclude_from_learning")]
+    dropped = len(outcomes) - len(kept)
+    if dropped:
+        log.info("Factor analysis: excluded %d administrative exit(s) from %d outcomes",
+                 dropped, len(outcomes))
+    return kept
+
+
 def analyze(outcomes: list) -> dict:
+    outcomes = _model_outcomes(outcomes)
     if not outcomes:
         return {}
 

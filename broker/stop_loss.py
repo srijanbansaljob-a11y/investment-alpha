@@ -131,11 +131,25 @@ def _exit_via_alpaca(ticker: str) -> bool:
         return False
 
 
-def _load_alpaca_holdings() -> dict:
-    """Live positions from Alpaca as {ticker: avg_entry_price}. {} if unavailable.
+def _load_alpaca_holdings() -> dict | None:
+    """
+    Live positions from Alpaca as {ticker: avg_entry_price}.
 
-    Alpaca's avg_entry_price is the REAL cost basis — the correct baseline for a
-    stop-loss. The state file's entry_price can be stale, so we prefer this.
+    Returns:
+        dict  — the live holdings. An EMPTY dict means the account is genuinely
+                flat, which is authoritative information, not a failure.
+        None  — Alpaca could not be reached; caller may fall back to the file.
+
+    BUG FIX 2026-07-31: this used to return {} in BOTH cases, and the caller
+    treated falsy as "unavailable". So a legitimately empty account silently
+    fell back to a stale state file and the checker evaluated positions that
+    had been sold weeks earlier — logging phantom stop-loss breaches for names
+    the account did not hold (observed live: NEM and FDX "triggered" on an
+    empty book right after a full liquidation). Those phantom breaches also
+    feed the re-entry cooldown, so they would have blocked real buys.
+
+    Alpaca's avg_entry_price is the REAL cost basis — the correct baseline for
+    a stop-loss. The state file's entry_price can be stale, so we prefer this.
     """
     try:
         from broker.alpaca_client import get_client, get_positions
@@ -148,7 +162,7 @@ def _load_alpaca_holdings() -> dict:
         return out
     except Exception as exc:
         logger.warning("Could not load Alpaca holdings (%s) — using state file", exc)
-        return {}
+        return None
 
 
 # ── Shared stop-price calculation ───────────────────────────────────────────
@@ -378,7 +392,14 @@ def check_and_execute(regime: str = None, dry_run: bool = True) -> dict:
 
     held = []
     skipped = []
-    if alpaca_holdings:
+    # `is not None` — an empty dict is Alpaca telling us the account is FLAT,
+    # which is authoritative. Only a genuine connection failure (None) may fall
+    # back to the state file. See _load_alpaca_holdings.
+    if alpaca_holdings is not None:
+        if not alpaca_holdings:
+            logger.info("Holdings source: Alpaca — account is FLAT (0 positions), "
+                        "nothing to check")
+            return {"checked": [], "triggered": [], "skipped": [], "log": []}
         logger.info("Holdings source: Alpaca (%d positions, real avg_entry_price)",
                     len(alpaca_holdings))
         for ticker, entry_price in alpaca_holdings.items():

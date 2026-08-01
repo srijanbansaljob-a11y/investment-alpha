@@ -1,0 +1,88 @@
+{
+  "captured": "2026-07-31",
+  "reason": "full_liquidation_clean_restart_on_fixed_code",
+  "equity": 114314.74,
+  "cash": 25999.94,
+  "positions": {
+    "APA": {
+      "qty": 213.2037,
+      "avg_entry_price": 35.43,
+      "current_price": 36.57,
+      "market_value": 7796.859309,
+      "unrealized_pl": 243.052218,
+      "unrealized_plpc": 3.22
+    },
+    "BIIB": {
+      "qty": 40.7623,
+      "avg_entry_price": 198.8,
+      "current_price": 204.44,
+      "market_value": 8333.444612,
+      "unrealized_pl": 229.899372,
+      "unrealized_plpc": 2.84
+    },
+    "BMY": {
+      "qty": 217.9933,
+      "avg_entry_price": 56.351794,
+      "current_price": 64.73,
+      "market_value": 14110.706309,
+      "unrealized_pl": 1826.392774,
+      "unrealized_plpc": 14.87
+    },
+    "DAL": {
+      "qty": 99.2019,
+      "avg_entry_price": 85.902118,
+      "current_price": 87.85,
+      "market_value": 8714.886915,
+      "unrealized_pl": 193.233595,
+      "unrealized_plpc": 2.27
+    },
+    "EIX": {
+      "qty": 0.754,
+      "avg_entry_price": 70.698977,
+      "current_price": 74.67,
+      "market_value": 56.30118,
+      "unrealized_pl": 2.994151,
+      "unrealized_plpc": 5.62
+    },
+    "HST": {
+      "qty": 538.0941,
+      "avg_entry_price": 22.550405,
+      "current_price": 25.225,
+      "market_value": 13573.423673,
+      "unrealized_pl": 1439.18379,
+      "unrealized_plpc": 11.86
+    },
+    "MATX": {
+      "qty": 41.7178,
+      "avg_entry_price": 205.9,
+      "current_price": 203.76,
+      "market_value": 8500.418928,
+      "unrealized_pl": -89.276092,
+      "unrealized_plpc": -1.04
+    },
+    "MRK": {
+      "qty": 61.6446,
+      "avg_entry_price": 113.803596,
+      "current_price": 130.45,
+      "market_value": 8041.53807,
+      "unrealized_pl": 1026.160916,
+      "unrealized_plpc": 14.63
+    },
+    "MTCH": {
+      "qty": 246.7415,
+      "avg_entry_price": 35.052593,
+      "current_price": 39.13,
+      "market_value": 9654.994895,
+      "unrealized_pl": 1006.065519,
+      "unrealized_plpc": 11.63
+    },
+    "VTRS": {
+      "qty": 542.3743,
+      "avg_entry_price": 15.942453,
+      "current_price": 17.575,
+      "market_value": 9532.228323,
+      "unrealized_pl": 885.451537,
+      "unrealized_plpc": 10.24
+    }
+  }
+}
