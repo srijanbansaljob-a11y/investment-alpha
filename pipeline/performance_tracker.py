@@ -48,6 +48,10 @@ PAPER_LOG_FILE        = DATA_DIR   / "paper_trading_log.json"
 BENCHMARK_TICKER      = getattr(config, "BENCHMARK_TICKER", "SPY")
 START_DATE            = getattr(config, "PAPER_TRADING_START_DATE", None)
 VALIDATION_MONTHS     = getattr(config, "PAPER_TRADING_MONTHS", 3)
+# Closed trades needed before a win rate is reported at all. Below this the
+# number swings double digits on a single outcome and misleads more than a
+# blank would. Matches the feature-freeze threshold in docs/ARCHITECTURE.md.
+MIN_TRADES_FOR_WIN_RATE = 30
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -354,24 +358,27 @@ def print_report(snapshot: dict) -> None:
         arrow = "▲" if alpha_pct > 0 else "▼"
         print(f"  Alpha vs {BENCHMARK_TICKER}    : {arrow} {alpha_pct:+.2f}%")
     print()
-    print(f"  Sharpe ratio      : {snapshot.get('sharpe_ratio', float('nan')):.3f}")
-    print(f"  Max drawdown      : {snapshot.get('max_drawdown_pct', 0):.2f}%")
-    # This counts OPEN positions currently in profit — it is not a win rate.
-    # Labelled as one, "22%" read as "the strategy loses 78% of the time" when
-    # it meant "most positions are a fraction of a percent down on day one".
-    n_up = snapshot.get("positions_in_profit")
+    # Only print what the data supports. A metric shown with a caveat is still
+    # a metric someone will read — Sharpe on 2 snapshots and a win rate on 4
+    # trades are not weak evidence, they are no evidence, and they belong
+    # absent rather than asterisked.
+    sharpe = snapshot.get("sharpe_ratio")
+    if sharpe is not None and sharpe == sharpe:      # not NaN
+        print(f"  Sharpe ratio      : {sharpe:.3f}")
+        print(f"  Max drawdown      : {snapshot.get('max_drawdown_pct', 0):.2f}%")
+
+    n_up  = snapshot.get("positions_in_profit")
     n_tot = snapshot.get("position_count", len(snapshot.get("positions", [])))
     if n_up is not None and n_tot:
-        print(f"  Positions in profit: {n_up}/{n_tot} ({n_up / n_tot * 100:.0f}%)  "
-              f"[unrealised — not a win rate]")
+        print(f"  Positions in profit: {n_up}/{n_tot}  (unrealised, today)")
+
     cw = snapshot.get("closed_trade_stats") or {}
-    if cw.get("n"):
+    if cw.get("n", 0) >= MIN_TRADES_FOR_WIN_RATE:
         print(f"  Closed model trades: {cw['n']}  ·  win rate {cw['win_rate_pct']:.0f}%  "
               f"·  avg P&L {cw['avg_pnl_pct']:+.2f}%")
-        if cw["n"] < 30:
-            print(f"                       ({cw['n']}/30 before the record means much)")
     else:
-        print("  Closed model trades: none yet — no win rate to report")
+        print(f"  Closed model trades: {cw.get('n', 0)} "
+              f"(need {MIN_TRADES_FOR_WIN_RATE} before a win rate means anything)")
     print()
     print("  POSITIONS")
     print("  " + "-" * 60)

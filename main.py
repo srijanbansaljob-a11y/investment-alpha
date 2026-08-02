@@ -231,7 +231,11 @@ def run_pipeline(
     # bought-only feedback, including the stocks the model skipped.
     try:
         from pipeline import shadow as shadow_module
-        shadow_module.record(filter_result, regime_result=regime_result, top_k=30)
+        # Pass the SCORED universe (~570 names), not the 10-name shortlist:
+        # the learner needs stocks the model disliked in order to tell whether
+        # its ranking works. See pipeline/shadow.record.
+        shadow_module.record(filter_result, regime_result=regime_result,
+                             scored_result=score_result)
     except Exception as exc:
         log.warning("Shadow snapshot failed (non-fatal): %s", exc)
 

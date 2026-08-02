@@ -463,6 +463,88 @@ class TestEvidenceThresholds(unittest.TestCase):
                       "including buy approvals that can never be scored — that is "
                       "how '4/18' appeared next to 9 listed decisions")
 
+    def test_shadow_records_broad_cross_section(self):
+        """
+        The learner needs stocks the model DISLIKED. Recording only the
+        post-filter shortlist meant 10 near-identical names and an IC that
+        measured nothing.
+        """
+        src = _src(ROOT / "pipeline" / "shadow.py")
+        self.assertIn("scored_result", src,
+                      "shadow.record still samples the filtered shortlist only")
+        main = _src(ROOT / "main.py")
+        self.assertIn("scored_result=score_result", main,
+                      "main.py does not pass the scored universe to shadow.record")
+
+    def test_shadow_uses_fixed_horizon(self):
+        src = _src(ROOT / "pipeline" / "shadow.py")
+        self.assertIn("HORIZON_DAYS", src,
+                      "shadow evaluation has no fixed horizon — returns spanned "
+                      "38-51 days and were correlated as if comparable")
+        # Check CODE only: the comment explaining the old bug legitimately
+        # contains the old call, and matching raw text flags it as a relapse.
+        code = "\n".join(_code_lines_from_text(src))
+        self.assertNotIn("yf.download(tickers, period=", code,
+                         "still measuring 'snapshot to today' instead of a fixed window")
+        self.assertIn("start=start.isoformat()", code,
+                      "evaluation does not anchor to the snapshot date")
+
+    def test_learner_has_no_scipy_dependency(self):
+        src = _src(ROOT / "pipeline" / "learning.py")
+        self.assertNotIn("from scipy", src,
+                         "learner imports scipy, which is not installed — it would "
+                         "crash the moment it had enough data")
+        self.assertIn("def _spearman", src)
+
+    def test_learner_tests_significance_across_periods(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("lrn", ROOT / "pipeline" / "learning.py")
+        lrn = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(lrn)
+        # A consistent small edge should register; noise should not.
+        _, t_real  = lrn._ic_tstat([0.05, 0.06, 0.04, 0.05, 0.07, 0.05,
+                                    0.04, 0.06, 0.05, 0.05, 0.06, 0.04])
+        _, t_noise = lrn._ic_tstat([0.30, -0.28, 0.25, -0.31, 0.29, -0.27,
+                                    0.26, -0.30, 0.28, -0.25, 0.27, -0.29])
+        self.assertGreater(abs(t_real), lrn.IC_TSTAT_MIN,
+                           "a consistent edge fails the significance bar — the guard "
+                           "is so strict it is an off switch")
+        self.assertLess(abs(t_noise), lrn.IC_TSTAT_MIN,
+                        "large but sign-flipping ICs pass as skill")
+
+    def test_drift_step_is_material_when_evidence_qualifies(self):
+        """
+        A guard that passes but does nothing is an off switch in disguise.
+        The step used to be scaled by the raw IC (~0.04), so a factor that
+        cleared significance moved its weight 0.02pp/week — 28.0% to 28.0%.
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("lrn", ROOT / "pipeline" / "learning.py")
+        lrn = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(lrn)
+        base = dict(config.FACTOR_WEIGHTS_WITH_SENTIMENT)
+        after = lrn._drift(base, {"momentum": 0.04},
+                           confidence={"momentum": lrn.IC_TSTAT_MIN}, baseline=base)
+        step = abs(after["momentum"] - base["momentum"])
+        self.assertGreater(step, 0.002,
+                           "qualifying evidence moves the weight by less than "
+                           "0.2pp — the learner cannot act even when it is right")
+
+    def test_drift_is_leashed_to_baseline(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("lrn", ROOT / "pipeline" / "learning.py")
+        lrn = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(lrn)
+        base = dict(config.FACTOR_WEIGHTS_WITH_SENTIMENT)
+        w = dict(base)
+        for _ in range(200):    # a sustained false positive, forever
+            w = lrn._drift(w, {"valuation": -0.07},
+                           confidence={"valuation": -3.0}, baseline=base)
+        drift = abs(w["valuation"] - base["valuation"])
+        self.assertLessEqual(round(drift, 4), lrn.MAX_DRIFT_FROM_BASELINE + 1e-6,
+                             "a sustained false positive can drag a weight "
+                             "arbitrarily far from the chosen baseline")
+
     def test_performance_report_separates_open_from_closed(self):
         src = _src(ROOT / "pipeline" / "performance_tracker.py")
         self.assertIn("positions_in_profit", src,

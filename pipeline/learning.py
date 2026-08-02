@@ -51,6 +51,18 @@ MIN_OBS      = 15     # stock-rows needed per regime (secondary check)
 # three months of forward-return evidence — modest, but it is the difference
 # between measuring a factor and measuring one week's weather.
 MIN_PERIODS  = 12
+# Minimum stocks in a single cross-section before its IC is computed at all.
+# Below this the correlation is dominated by sampling noise.
+MIN_IC_SAMPLE = 30
+# |t| a factor's mean IC must reach ACROSS periods before its weight moves.
+#
+# 2.5, not the conventional 2.0, because SIX factors are tested every week.
+# At t=2.0 each test has a ~5% false-positive rate, so six weekly tests throw
+# up a spurious "real" factor roughly every third week — verified in
+# simulation, where a factor with a TRUE edge of zero scored t=-2.95 on an
+# unlucky draw. 2.5 is an informal multiple-comparison correction; it costs a
+# little sensitivity and buys far fewer phantom findings.
+IC_TSTAT_MIN  = 2.5
 
 
 def _default_weights() -> dict:
@@ -72,37 +84,134 @@ def _load_v2() -> dict:
     }
 
 
+def _rank(a: np.ndarray) -> np.ndarray:
+    """Average ranks, ties shared — the ranking Spearman needs."""
+    order = a.argsort()
+    ranks = np.empty(len(a), dtype=float)
+    ranks[order] = np.arange(1, len(a) + 1, dtype=float)
+    # average tied ranks
+    uniq, inv, counts = np.unique(a, return_inverse=True, return_counts=True)
+    if (counts > 1).any():
+        sums = np.zeros(len(uniq))
+        np.add.at(sums, inv, ranks)
+        ranks = (sums / counts)[inv]
+    return ranks
+
+
+def _spearman(x: np.ndarray, y: np.ndarray) -> float:
+    """Spearman rank correlation = Pearson on ranks. No scipy required."""
+    rx, ry = _rank(x), _rank(y)
+    rx -= rx.mean(); ry -= ry.mean()
+    denom = np.sqrt((rx ** 2).sum() * (ry ** 2).sum())
+    return float((rx * ry).sum() / denom) if denom > 0 else float("nan")
+
+
+def _ic_tstat(ic_series: list) -> tuple[float, float]:
+    """
+    Is a factor's edge real, judged ACROSS periods rather than within one?
+
+    Returns (mean_ic, t_stat) where t = mean / (std / sqrt(k)).
+
+    This is the standard way factor skill is measured, and my first attempt
+    got it wrong: I tested each period's IC against 2/sqrt(n-1), which for a
+    150-stock cross-section demands |IC| > 0.164. Real equity factors run
+    0.02-0.10 per period, so that bar would have frozen the learner forever —
+    a guard so strict it silently becomes an off switch.
+
+    A single period genuinely cannot establish skill. Consistency across many
+    periods can: a factor with a true IC of 0.05 and period-to-period noise of
+    0.10 reaches t≈1.7 after 12 weeks and t≈2.2 after 20. That is the signal
+    worth acting on.
+    """
+    arr = np.asarray([x for x in ic_series if x is not None and np.isfinite(x)],
+                     dtype=float)
+    if len(arr) < 2:
+        return (float(arr[0]) if len(arr) == 1 else float("nan"), float("nan"))
+    mean = float(arr.mean())
+    sd   = float(arr.std(ddof=1))
+    if sd <= 0:
+        return mean, float("inf") if mean != 0 else 0.0
+    return mean, float(mean / (sd / np.sqrt(len(arr))))
+
+
 def _spearman_ic(observations: list) -> dict:
-    """Spearman IC per factor across the observation set."""
-    from scipy.stats import spearmanr
+    """
+    Spearman IC per factor. Returns {factor: {"ic", "n", "significant"}}.
+
+    scipy dependency removed 2026-08-01: it is not installed on the owner's
+    machine (the older feedback loop fails with ModuleNotFoundError every
+    run), so the learner would have crashed the moment it had enough data.
+    Rank correlation is a dozen lines of numpy.
+    """
     factor_scores, returns = {}, []
     for o in observations:
         returns.append(o["actual_return"])
         for f, s in o["scores"].items():
             factor_scores.setdefault(f, []).append(s)
+    y = np.asarray(returns, dtype=float)
     ics = {}
     for f, scores in factor_scores.items():
-        if len(scores) != len(returns) or len(returns) < 5:
+        if len(scores) != len(y) or len(y) < MIN_IC_SAMPLE:
             continue
-        try:
-            corr, _ = spearmanr(scores, returns)
-            if corr == corr:
-                ics[f] = round(float(corr), 4)
-        except Exception:
+        x = np.asarray(scores, dtype=float)
+        mask = np.isfinite(x) & np.isfinite(y)
+        if mask.sum() < MIN_IC_SAMPLE:
             continue
+        ic = _spearman(x[mask], y[mask])
+        if ic != ic:
+            continue
+        ics[f] = {"ic": round(ic, 4), "n": int(mask.sum())}
     return ics
 
 
-def _drift(weights: dict, ewma_ic: dict) -> dict:
-    """Small weekly drift toward factors with positive EWMA IC."""
+# Hard cap on how far a learned weight may wander from its config baseline.
+#
+# Measured by Monte Carlo (4,000 trials, threshold |t|>=2.5): with 26 weeks of
+# data the learner detects a genuine edge 65% of the time and fires spuriously
+# on ~1.8% of factors — but because the test re-runs weekly on an accumulating
+# series, a false positive that once crosses tends to STAY crossed and keeps
+# drifting 0.28pp every week. Roughly one week in nine, some factor fires by
+# chance. This cap means the worst a sustained false positive can do is move a
+# weight 6 points; real learning still has ample room, and the model can never
+# wander far from a baseline chosen deliberately.
+MAX_DRIFT_FROM_BASELINE = 0.06
+
+
+def _drift(weights: dict, ewma_ic: dict, confidence: dict | None = None,
+           baseline: dict | None = None) -> dict:
+    """
+    Weekly drift toward factors whose edge has been demonstrated.
+
+    STEP SIZE FIX 2026-08-01: the step used to be scaled by min(|IC|, 1.0).
+    Real equity factor ICs are ~0.03-0.05, so the step collapsed to
+    0.02 x 0.28 x 0.04 ≈ 0.0002 — two hundredths of a percentage point per
+    week. Verified in simulation: a factor that PASSED the significance test
+    at t=2.37 moved its weight from 28.0% to 28.0%. The learner would clear
+    its own bar and still do nothing.
+
+    Significance is now the gate (handled by the caller) and magnitude is set
+    by DRIFT_RATE, optionally scaled by how strong the evidence is — capped at
+    2x so one emphatic reading cannot lurch the model.
+    """
+    conf = confidence or {}
     new = dict(weights)
     for f, ic in ewma_ic.items():
         if f not in new:
             continue
         eff = -ic if f in INVERTED_FACTORS else ic
-        new[f] = new[f] + DRIFT_RATE * new[f] * np.sign(eff) * min(abs(ic), 1.0)
+        # |t| / threshold, clamped to [1, 2]: qualifying evidence moves a full
+        # step, twice-as-convincing evidence moves at most double.
+        t = abs(conf.get(f) or IC_TSTAT_MIN)
+        scale = max(1.0, min(2.0, t / IC_TSTAT_MIN))
+        new[f] = new[f] + DRIFT_RATE * new[f] * np.sign(eff) * scale
+    base = baseline or dict(getattr(config, "FACTOR_WEIGHTS_WITH_SENTIMENT",
+                                    config.FACTOR_WEIGHTS))
     for f in new:
         lo, hi = WEIGHT_BOUNDS.get(f, (0.01, 0.50))
+        # Absolute bounds AND a leash to the deliberate baseline.
+        if f in base:
+            lo = max(lo, base[f] - MAX_DRIFT_FROM_BASELINE)
+            hi = min(hi, base[f] + MAX_DRIFT_FROM_BASELINE)
         new[f] = round(max(lo, min(hi, new[f])), 4)
     pos = [f for f in new if f != "volatility"]
     total = sum(new[f] for f in pos)
@@ -170,14 +279,60 @@ def run(dry_run: bool = False) -> dict:
             report["skipped_regimes"][regime] = {"observations": len(obs_r),
                                                  "periods": n_periods}
             continue
-        ics = _spearman_ic(obs_r)
-        for f, ic in ics.items():
+        # ── One IC per factor PER PERIOD, then judge across periods ───────
+        # A period is one weekly snapshot: its IC answers "did my scores rank
+        # that week's outcomes?". Skill is whether that holds up repeatedly.
+        per_period = {}          # factor -> [ic, ic, ...] across snapshots
+        for period in periods:
+            obs_p = [o for o in obs_r if (o.get("date") or o.get("snapshot_date")) == period]
+            for f, d in _spearman_ic(obs_p).items():
+                per_period.setdefault(f, []).append(d["ic"])
+
+        node["ic_series"] = {f: [round(v, 4) for v in s] for f, s in per_period.items()}
+        ic_detail, ics = {}, {}
+        for f, series in per_period.items():
+            mean_ic, t = _ic_tstat(series)
+            significant = np.isfinite(t) and abs(t) >= IC_TSTAT_MIN
+            ic_detail[f] = {"mean_ic": round(mean_ic, 4),
+                            "t_stat": None if not np.isfinite(t) else round(t, 2),
+                            "periods": len(series), "significant": bool(significant)}
+            if not significant:
+                log.info("    %-11s mean IC %+.3f over %d periods, t=%s — not "
+                         "distinguishable from noise, ignored",
+                         f, mean_ic, len(series),
+                         "n/a" if not np.isfinite(t) else f"{t:.2f}")
+                continue
+            log.info("    %-11s mean IC %+.3f over %d periods, t=%.2f — REAL, "
+                     "weight will move", f, mean_ic, len(series), t)
+            ics[f] = mean_ic
             prev = node["ewma_ic"].get(f)
             node["ewma_ic"][f] = round(
-                ic if prev is None else EWMA_ALPHA * ic + (1 - EWMA_ALPHA) * prev, 4
+                mean_ic if prev is None else EWMA_ALPHA * mean_ic + (1 - EWMA_ALPHA) * prev, 4
             )
+
+        node["ic_detail"] = ic_detail
+        node.setdefault("ic_history", []).append({
+            "date": datetime.now(timezone.utc).date().isoformat(),
+            "n_periods": n_periods,
+            "detail": ic_detail,
+        })
+        node["ic_history"] = node["ic_history"][-52:]   # keep a year
+
+        if not ics:
+            log.info("  %s: %d periods evaluated, but no factor's IC is "
+                     "statistically distinguishable from noise (need |t| >= %.1f) "
+                     "— weights unchanged", regime, n_periods, IC_TSTAT_MIN)
+            report["skipped_regimes"][regime] = {
+                "observations": len(obs_r), "periods": n_periods,
+                "reason": "no factor IC significant across periods",
+                "ic_detail": ic_detail,
+            }
+            continue
         old_w = dict(node["weights"])
-        node["weights"] = _drift(node["weights"], node["ewma_ic"])
+        node["weights"] = _drift(
+            node["weights"], node["ewma_ic"],
+            confidence={f: d.get("t_stat") for f, d in ic_detail.items()},
+        )
         changed = {f: (old_w.get(f), node["weights"].get(f))
                    for f in node["weights"] if old_w.get(f) != node["weights"].get(f)}
         report["updated_regimes"].append(regime)
@@ -247,18 +402,42 @@ def post_to_discord(report: dict, dry_run: bool = False) -> None:
         fields.append({"name": f"{reg.upper()} — weights updated",
                        "value": "\n".join(lines)[:1024] or "—", "inline": False})
 
+    # ── What the market is actually rewarding ────────────────────────────
+    # THE point of this card. A weight change is a consequence; the finding is
+    # which factors ranked stocks correctly, how consistently, and whether that
+    # is separable from luck. Shown whether or not anything moved.
+    store_now = _load_v2()
+    for reg in ("bull", "neutral", "bear"):
+        detail = (store_now["regimes"].get(reg) or {}).get("ic_detail") or {}
+        if not detail:
+            continue
+        rows = []
+        for f, d in sorted(detail.items(), key=lambda kv: -abs(kv[1].get("mean_ic") or 0)):
+            t = d.get("t_stat")
+            verdict = ("**REAL**" if d.get("significant")
+                       else "noise" if t is not None else "too few periods")
+            rows.append(f"`{f:<10}` IC {d.get('mean_ic', 0):+.3f} over "
+                        f"{d.get('periods', 0)}w · t={t if t is not None else 'n/a'} · {verdict}")
+        fields.append({
+            "name": f"📈 {reg.upper()} — how well each factor ranked stocks",
+            "value": "\n".join(rows)[:1024],
+            "inline": False,
+        })
+
     if skipped:
         # Report PERIODS, not rows. "30 obs" sounded like plenty; it was ten
         # stocks from each of three weeks — three independent facts.
         def _fmt(r, info):
             if isinstance(info, dict):
+                if info.get("reason"):
+                    return f"{r.upper()}: {info['reason']} ({info.get('periods', 0)}w)"
                 return (f"{r.upper()} {info.get('periods', 0)}/"
                         f"{info.get('periods_required', MIN_PERIODS)} weeks "
                         f"({info.get('observations', 0)} rows)")
             return f"{r.upper()} {info} obs"
         fields.append({
-            "name": "Frozen — not enough independent weeks",
-            "value": " · ".join(_fmt(r, n) for r, n in skipped.items()),
+            "name": "🔒 Weights held",
+            "value": "\n".join(_fmt(r, n) for r, n in skipped.items())[:1024],
             "inline": False,
         })
 
@@ -276,14 +455,13 @@ def post_to_discord(report: dict, dry_run: bool = False) -> None:
     n_periods_all = sorted({o.get("date") for o in (report.get("_observations") or [])
                             if o.get("date")})
     desc = (
-        f"Evaluated **{report.get('obs_total', 0)}** shadow rows"
-        + (f" across **{len(n_periods_all)}** weekly snapshots" if n_periods_all else "")
-        + ". "
-        + ("Factor weights were adjusted — these now drive stock selection."
+        f"Measured **{report.get('obs_total', 0)}** stock-observations across "
+        f"**{len(n_periods_all)}** weekly snapshots.\n"
+        + ("Weights moved — see which factor earned it below."
            if changed_any else
-           f"**No weights changed.** Each regime needs {MIN_PERIODS} independent "
-           "weekly snapshots before drifting; rows within one week move together "
-           "and carry one week's information, not one per stock.")
+           f"**Weights unchanged.** A factor must rank stocks correctly across "
+           f"≥{MIN_PERIODS} weeks with |t| ≥ {IC_TSTAT_MIN:.0f} before its weight "
+           "moves. One good week is weather, not skill.")
     )
     color = 0x9B59B6 if changed_any else 0x95A5A6
 

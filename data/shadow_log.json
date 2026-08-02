@@ -155,7 +155,9 @@
         "actual_return": 0.182412
       }
     ],
-    "evaluated_at": "2026-08-01"
+    "evaluated_at": "2026-08-01",
+    "horizon_days": null,
+    "excluded_reason": "variable horizon \u2014 evaluated before the fixed 30-day window existed; returns spanned 38-51 days"
   },
   {
     "date": "2026-06-20",
@@ -313,7 +315,9 @@
         "actual_return": 0.223495
       }
     ],
-    "evaluated_at": "2026-08-01"
+    "evaluated_at": "2026-08-01",
+    "horizon_days": null,
+    "excluded_reason": "variable horizon \u2014 evaluated before the fixed 30-day window existed; returns spanned 38-51 days"
   },
   {
     "date": "2026-06-24",
@@ -471,7 +475,9 @@
         "actual_return": 0.202677
       }
     ],
-    "evaluated_at": "2026-08-01"
+    "evaluated_at": "2026-08-01",
+    "horizon_days": null,
+    "excluded_reason": "variable horizon \u2014 evaluated before the fixed 30-day window existed; returns spanned 38-51 days"
   },
   {
     "date": "2026-07-27",
