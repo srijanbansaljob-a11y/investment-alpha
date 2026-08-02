@@ -406,6 +406,71 @@ class TestPerformanceReportingIsReal(unittest.TestCase):
                          "report hardcodes EUR while the account is USD")
 
 
+class TestEvidenceThresholds(unittest.TestCase):
+    """
+    ARCHITECTURE §4: a claim must be backed by evidence that actually exists.
+
+    All three of these reported confidently on 2026-08-01:
+      - the learner "evaluated 30 observations" (10 stocks x 3 weeks = 3 facts)
+        and drifted the weights that choose stocks;
+      - factor analysis reported a "-92pp edge" for signals present on ZERO
+        trades, under a footer advising weight tuning;
+      - a "92% win rate" that was mostly a screener account wind-down.
+    """
+
+    def test_learner_counts_independent_periods(self):
+        src = _src(ROOT / "pipeline" / "learning.py")
+        self.assertIn("MIN_PERIODS", src,
+                      "learner has no independent-period guard — rows within one "
+                      "week are correlated and must not count as separate evidence")
+        self.assertIn("n_periods", src)
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("lrn", ROOT / "pipeline" / "learning.py")
+        lrn = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(lrn)
+        self.assertGreaterEqual(lrn.MIN_PERIODS, 8,
+                                "fewer than ~8 weekly snapshots cannot distinguish a "
+                                "factor from a week's weather")
+
+    def test_factor_analysis_refuses_zero_sample_edges(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("fa", ROOT / "scripts" / "factor_analysis.py")
+        fa = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fa)
+        # A signal present on no trades must not produce an edge.
+        d = fa._signal_comparison(
+            [{"signals": {}, "win": True, "pnl_pct": 5.0} for _ in range(13)],
+            "insider_buy")
+        self.assertEqual(d["with_n"], 0)
+        self.assertIsNone(d["edge"],
+                          "edge computed from an empty group — this produced the "
+                          "bogus '-92pp' verdict against insider signals")
+        self.assertFalse(d["sufficient"])
+
+    def test_learned_weights_not_gitignored(self):
+        ignored = _src(ROOT / ".gitignore")
+        active = [l.strip() for l in ignored.splitlines()
+                  if l.strip() and not l.strip().startswith("#")]
+        self.assertNotIn("data/learned_weights.json", active,
+                         "learned weights are gitignored — the cloud would score "
+                         "with drifted weights while local runs use config defaults "
+                         "(ARCHITECTURE §2.3)")
+
+    def test_decision_review_denominator_is_scoreable_only(self):
+        src = _src(ROOT / "pipeline" / "postmortem.py")
+        self.assertIn('"scored"', src,
+                      "decision review divides wins by ALL reviewed decisions, "
+                      "including buy approvals that can never be scored — that is "
+                      "how '4/18' appeared next to 9 listed decisions")
+
+    def test_performance_report_separates_open_from_closed(self):
+        src = _src(ROOT / "pipeline" / "performance_tracker.py")
+        self.assertIn("positions_in_profit", src,
+                      "unrealised open-position count is still labelled 'win rate'")
+        self.assertIn("_closed_trade_stats", src,
+                      "no real win rate sourced from closed model trades")
+
+
 class TestCloudParity(unittest.TestCase):
     """ARCHITECTURE §2.3: nothing critical may live only in gitignored paths."""
 

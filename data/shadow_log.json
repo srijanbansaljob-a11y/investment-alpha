@@ -2,7 +2,7 @@
   {
     "date": "2026-06-11",
     "regime": "neutral",
-    "evaluated": false,
+    "evaluated": true,
     "stocks": [
       {
         "ticker": "HST",
@@ -16,7 +16,8 @@
           "valuation": 0.8585,
           "sentiment": 0.4469,
           "volatility": 0.2066
-        }
+        },
+        "actual_return": 0.049269
       },
       {
         "ticker": "VTRS",
@@ -30,7 +31,8 @@
           "valuation": 0.9494,
           "sentiment": 0.4906,
           "volatility": 0.5122
-        }
+        },
+        "actual_return": 0.113507
       },
       {
         "ticker": "BIIB",
@@ -44,7 +46,8 @@
           "valuation": 0.7542,
           "sentiment": 0.5006,
           "volatility": 0.5382
-        }
+        },
+        "actual_return": 0.044841
       },
       {
         "ticker": "MATX",
@@ -58,7 +61,8 @@
           "valuation": 0.8738,
           "sentiment": 0.3674,
           "volatility": 0.5156
-        }
+        },
+        "actual_return": 0.047356
       },
       {
         "ticker": "CHRD",
@@ -72,7 +76,8 @@
           "valuation": 0.8385,
           "sentiment": 0.5943,
           "volatility": 0.7257
-        }
+        },
+        "actual_return": 0.015407
       },
       {
         "ticker": "MRK",
@@ -86,7 +91,8 @@
           "valuation": 0.6697,
           "sentiment": 0.4954,
           "volatility": 0.3316
-        }
+        },
+        "actual_return": 0.093291
       },
       {
         "ticker": "EIX",
@@ -100,7 +106,8 @@
           "valuation": 0.8562,
           "sentiment": 0.3574,
           "volatility": 0.2014
-        }
+        },
+        "actual_return": 0.026154
       },
       {
         "ticker": "EOG",
@@ -114,7 +121,8 @@
           "valuation": 0.7577,
           "sentiment": 0.479,
           "volatility": 0.434
-        }
+        },
+        "actual_return": 0.059952
       },
       {
         "ticker": "VLO",
@@ -128,7 +136,8 @@
           "valuation": 0.494,
           "sentiment": 0.4101,
           "volatility": 0.6545
-        }
+        },
+        "actual_return": 0.212838
       },
       {
         "ticker": "ALL",
@@ -142,14 +151,16 @@
           "valuation": 0.8282,
           "sentiment": 0.4438,
           "volatility": 0.2049
-        }
+        },
+        "actual_return": 0.182412
       }
-    ]
+    ],
+    "evaluated_at": "2026-08-01"
   },
   {
     "date": "2026-06-20",
     "regime": "bull",
-    "evaluated": false,
+    "evaluated": true,
     "stocks": [
       {
         "ticker": "MATX",
@@ -163,7 +174,8 @@
           "valuation": 0.8921,
           "sentiment": 0.5925,
           "volatility": 0.5183
-        }
+        },
+        "actual_return": 0.059349
       },
       {
         "ticker": "HST",
@@ -177,7 +189,8 @@
           "valuation": 0.8322,
           "sentiment": 0.4388,
           "volatility": 0.1652
-        }
+        },
+        "actual_return": 0.004798
       },
       {
         "ticker": "MTCH",
@@ -191,7 +204,8 @@
           "valuation": 0.8592,
           "sentiment": 0.4642,
           "volatility": 0.4678
-        }
+        },
+        "actual_return": 0.111707
       },
       {
         "ticker": "VTRS",
@@ -205,7 +219,8 @@
           "valuation": 0.9527,
           "sentiment": 0.4932,
           "volatility": 0.5304
-        }
+        },
+        "actual_return": 0.142485
       },
       {
         "ticker": "ALL",
@@ -219,7 +234,8 @@
           "valuation": 0.8193,
           "sentiment": 0.4557,
           "volatility": 0.2052
-        }
+        },
+        "actual_return": 0.194014
       },
       {
         "ticker": "KIM",
@@ -233,7 +249,8 @@
           "valuation": 0.693,
           "sentiment": 0.4267,
           "volatility": 0.0417
-        }
+        },
+        "actual_return": 0.045119
       },
       {
         "ticker": "FRT",
@@ -247,7 +264,8 @@
           "valuation": 0.4788,
           "sentiment": 0.4636,
           "volatility": 0.0139
-        }
+        },
+        "actual_return": 0.030733
       },
       {
         "ticker": "BIIB",
@@ -261,7 +279,8 @@
           "valuation": 0.7708,
           "sentiment": 0.5038,
           "volatility": 0.5548
-        }
+        },
+        "actual_return": 0.032404
       },
       {
         "ticker": "NUE",
@@ -275,7 +294,8 @@
           "valuation": 0.5732,
           "sentiment": 0.4959,
           "volatility": 0.4417
-        }
+        },
+        "actual_return": 0.055202
       },
       {
         "ticker": "EXPE",
@@ -289,14 +309,16 @@
           "valuation": 0.7976,
           "sentiment": 0.5154,
           "volatility": 0.6852
-        }
+        },
+        "actual_return": 0.223495
       }
-    ]
+    ],
+    "evaluated_at": "2026-08-01"
   },
   {
     "date": "2026-06-24",
     "regime": "bull",
-    "evaluated": false,
+    "evaluated": true,
     "stocks": [
       {
         "ticker": "HST",
@@ -310,7 +332,8 @@
           "valuation": 0.8456,
           "sentiment": 0.442,
           "volatility": 0.1496
-        }
+        },
+        "actual_return": 0.01249
       },
       {
         "ticker": "VTRS",
@@ -324,7 +347,8 @@
           "valuation": 0.9496,
           "sentiment": 0.48,
           "volatility": 0.5235
-        }
+        },
+        "actual_return": 0.114921
       },
       {
         "ticker": "MATX",
@@ -338,7 +362,8 @@
           "valuation": 0.8845,
           "sentiment": 0.5857,
           "volatility": 0.5217
-        }
+        },
+        "actual_return": 0.03489
       },
       {
         "ticker": "QRVO",
@@ -352,7 +377,8 @@
           "valuation": 0.8381,
           "sentiment": 0.3807,
           "volatility": 0.7652
-        }
+        },
+        "actual_return": -0.090663
       },
       {
         "ticker": "MTCH",
@@ -366,7 +392,8 @@
           "valuation": 0.8781,
           "sentiment": 0.471,
           "volatility": 0.4609
-        }
+        },
+        "actual_return": 0.116114
       },
       {
         "ticker": "BIIB",
@@ -380,7 +407,8 @@
           "valuation": 0.7677,
           "sentiment": 0.5043,
           "volatility": 0.5409
-        }
+        },
+        "actual_return": 0.02921
       },
       {
         "ticker": "DAL",
@@ -394,7 +422,8 @@
           "valuation": 0.9238,
           "sentiment": 0.5022,
           "volatility": 0.6696
-        }
+        },
+        "actual_return": 0.008303
       },
       {
         "ticker": "MO",
@@ -408,7 +437,8 @@
           "valuation": 0.7179,
           "sentiment": 0.3538,
           "volatility": 0.313
-        }
+        },
+        "actual_return": -0.045804
       },
       {
         "ticker": "MRK",
@@ -422,7 +452,8 @@
           "valuation": 0.6893,
           "sentiment": 0.508,
           "volatility": 0.3583
-        }
+        },
+        "actual_return": 0.088629
       },
       {
         "ticker": "EXPE",
@@ -436,9 +467,11 @@
           "valuation": 0.7822,
           "sentiment": 0.5053,
           "volatility": 0.6852
-        }
+        },
+        "actual_return": 0.202677
       }
-    ]
+    ],
+    "evaluated_at": "2026-08-01"
   },
   {
     "date": "2026-07-27",

@@ -68,7 +68,10 @@ def _record_admin_exits(tickers, reason=REASON):
         existing = {}
     today = date.today().isoformat()
     for t in tickers:
-        existing[t] = {"date": today, "reason": reason}
+        # Date-scoped key: a ticker can be administratively exited more than
+        # once (EIX was, on 2026-07-27 and again on 2026-07-31). A plain
+        # ticker key would hold only the latest and silently untag the rest.
+        existing[f"{t}@{today}"] = {"date": today, "reason": reason}
     ADMIN_EXITS_FILE.parent.mkdir(parents=True, exist_ok=True)
     ADMIN_EXITS_FILE.write_text(json.dumps(existing, indent=2), encoding="utf-8")
     log.info("Tagged %d ticker(s) as administrative exits -> %s",

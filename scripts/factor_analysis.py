@@ -59,23 +59,46 @@ def _group_stats(outcomes: list, key_fn) -> list[dict]:
     return results
 
 
+# Minimum trades in EACH group before a comparison means anything.
+# Below this the "edge" is an artefact of sample size, not a finding.
+MIN_GROUP_N = 3
+
+
 def _signal_comparison(outcomes: list, signal_key: str) -> dict:
+    """
+    Win rate with vs without a signal.
+
+    BUG FIX 2026-08-01: the empty-group win rate used to fall back to 0, so a
+    signal present on ZERO trades reported "0% with vs 92% without = -92pp
+    edge". That reads as devastating evidence against the signal when it is
+    simply an absence of data — and the card advised tuning factor weights on
+    it. An edge is now reported only when BOTH groups have at least
+    MIN_GROUP_N trades; otherwise it is None and the caller must say
+    "insufficient data".
+    """
     with_sig    = [o for o in outcomes if (o.get("signals") or {}).get(signal_key)]
     without_sig = [o for o in outcomes if not (o.get("signals") or {}).get(signal_key)]
 
     def _wr(lst):
-        return round(sum(1 for o in lst if o.get("win")) / len(lst) * 100, 1) if lst else 0
+        return round(sum(1 for o in lst if o.get("win")) / len(lst) * 100, 1) if lst else None
 
     def _avg(lst):
-        return round(sum(o.get("pnl_pct", 0) for o in lst) / len(lst), 2) if lst else 0
+        return round(sum(o.get("pnl_pct", 0) for o in lst) / len(lst), 2) if lst else None
+
+    with_wr, without_wr = _wr(with_sig), _wr(without_sig)
+    sufficient = len(with_sig) >= MIN_GROUP_N and len(without_sig) >= MIN_GROUP_N
 
     return {
         "with_n":      len(with_sig),
         "without_n":   len(without_sig),
-        "with_wr":     _wr(with_sig),
-        "without_wr":  _wr(without_sig),
+        "with_wr":     with_wr,
+        "without_wr":  without_wr,
         "with_avg_pl": _avg(with_sig),
-        "edge":        round(_wr(with_sig) - _wr(without_sig), 1),
+        "sufficient":  sufficient,
+        "edge":        round(with_wr - without_wr, 1) if sufficient else None,
+        "note":        None if sufficient else
+                       f"insufficient data (need {MIN_GROUP_N}+ trades in each group; "
+                       f"have {len(with_sig)} with / {len(without_sig)} without)",
     }
 
 
@@ -148,17 +171,28 @@ def _group_table(groups: list[dict], max_rows: int = 6) -> str:
     return "```\n" + "\n".join(lines) + "\n```"
 
 
+def _fmt_wr(wr, n):
+    """'92% (13)' — or 'n/a  (0)' when the group is empty. Never 0%."""
+    return f"{'  n/a' if wr is None else format(wr, '5.0f') + '%'} ({n:2d})"
+
+
 def _signal_table(signals: dict, rs: dict) -> str:
     lines = ["Signal             WITH         WITHOUT     Edge"]
     for key, d in signals.items():
         if d["with_n"] == 0 and d["without_n"] == 0:
             continue
         label = key.replace("_", " ").title()
+        # An edge is only shown when both groups are big enough. Printing
+        # "-92pp" off an empty group is not a finding, it is arithmetic on
+        # nothing — and it previously sat under a footer advising weight tuning.
+        edge = (f"{d['edge']:+.0f}pp" if d.get("sufficient") and d.get("edge") is not None
+                else "  n/a")
         lines.append(
-            f"{label:<18} {d['with_wr']:5.0f}% ({d['with_n']:2d})  "
-            f"{d['without_wr']:5.0f}% ({d['without_n']:2d})  "
-            f"{d['edge']:+.0f}pp"
+            f"{label:<18} {_fmt_wr(d['with_wr'], d['with_n'])}  "
+            f"{_fmt_wr(d['without_wr'], d['without_n'])}  {edge}"
         )
+    if any(not s.get("sufficient") for s in signals.values()):
+        lines.append(f"  (n/a = fewer than {MIN_GROUP_N} trades in a group — no conclusion)")
     if rs["positive_n"] > 0 or rs["negative_n"] > 0:
         lines.append(
             f"{'RS > SPY':<18} {rs['positive_wr']:5.0f}% ({rs['positive_n']:2d})  "
@@ -219,9 +253,14 @@ def post_to_discord(analysis: dict):
             },
         ],
         "footer": {
+            # Advice must scale with evidence. Recommending weight changes off
+            # a handful of trades is how noise becomes strategy.
             "text": (
-                f"Investment Alpha · {analysis['total']} closed trades · "
-                "Tune factor weights in config.py based on signal edge"
+                f"Investment Alpha · {analysis['total']} model trades · "
+                + ("Tune factor weights in config.py based on signal edge"
+                   if analysis["total"] >= 30 else
+                   f"Too few trades to conclude anything — {analysis['total']}/30 "
+                   "before weights should change")
             )
         },
         "timestamp": datetime.now(timezone.utc).isoformat(),

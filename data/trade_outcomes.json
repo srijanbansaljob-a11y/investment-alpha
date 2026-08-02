@@ -102,7 +102,7 @@
       "exit_date": "2026-07-27",
       "entry_date": "2026-07-08",
       "duration_days": 19,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 278.5747,
       "exit_price": 333.547,
       "pnl_pct": 19.73,
@@ -116,7 +116,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "screener_account_retirement_bulk_exit",
+      "retagged": true
     },
     {
       "ticker": "ABBV",
@@ -124,7 +127,7 @@
       "exit_date": "2026-07-27",
       "entry_date": "2026-07-08",
       "duration_days": 19,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 242.02,
       "exit_price": 259.36,
       "pnl_pct": 7.17,
@@ -138,7 +141,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "screener_account_retirement_bulk_exit",
+      "retagged": true
     },
     {
       "ticker": "ABT",
@@ -146,7 +152,7 @@
       "exit_date": "2026-07-27",
       "entry_date": "2026-07-08",
       "duration_days": 19,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 93.21,
       "exit_price": 103.06,
       "pnl_pct": 10.57,
@@ -160,7 +166,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "screener_account_retirement_bulk_exit",
+      "retagged": true
     },
     {
       "ticker": "BAC",
@@ -168,7 +177,7 @@
       "exit_date": "2026-07-27",
       "entry_date": "2026-07-08",
       "duration_days": 19,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 58.05,
       "exit_price": 62.0036,
       "pnl_pct": 6.81,
@@ -182,7 +191,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "screener_account_retirement_bulk_exit",
+      "retagged": true
     },
     {
       "ticker": "MSFT",
@@ -190,7 +202,7 @@
       "exit_date": "2026-07-27",
       "entry_date": "2026-07-08",
       "duration_days": 19,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 356.22,
       "exit_price": 381.7801,
       "pnl_pct": 7.17,
@@ -204,7 +216,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "screener_account_retirement_bulk_exit",
+      "retagged": true
     },
     {
       "ticker": "REGN",
@@ -212,7 +227,7 @@
       "exit_date": "2026-07-27",
       "entry_date": "2026-07-08",
       "duration_days": 19,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 626.02,
       "exit_price": 656.01,
       "pnl_pct": 4.79,
@@ -226,7 +241,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "screener_account_retirement_bulk_exit",
+      "retagged": true
     },
     {
       "ticker": "TMO",
@@ -234,7 +252,7 @@
       "exit_date": "2026-07-27",
       "entry_date": "2026-07-08",
       "duration_days": 19,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 508.43,
       "exit_price": 568.26,
       "pnl_pct": 11.77,
@@ -248,7 +266,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "screener_account_retirement_bulk_exit",
+      "retagged": true
     },
     {
       "ticker": "VRTX",
@@ -256,7 +277,7 @@
       "exit_date": "2026-07-27",
       "entry_date": "2026-07-08",
       "duration_days": 19,
-      "exit_type": "full",
+      "exit_type": "administrative",
       "entry_price": 482.03,
       "exit_price": 478.98,
       "pnl_pct": -0.63,
@@ -270,7 +291,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": false
+      "win": false,
+      "exclude_from_learning": true,
+      "admin_reason": "screener_account_retirement_bulk_exit",
+      "retagged": true
     },
     {
       "ticker": "EIX",
@@ -278,7 +302,7 @@
       "exit_date": "2026-07-27",
       "entry_date": "2026-07-08",
       "duration_days": 19,
-      "exit_type": "partial",
+      "exit_type": "administrative",
       "entry_price": 70.4409,
       "exit_price": 79.75,
       "pnl_pct": 13.21,
@@ -292,7 +316,10 @@
         "earnings_beat": false,
         "rs_vs_spy": 0
       },
-      "win": true
+      "win": true,
+      "exclude_from_learning": true,
+      "admin_reason": "screener_account_retirement_bulk_exit",
+      "retagged": true
     },
     {
       "ticker": "BIIB",
@@ -470,5 +497,5 @@
       "retagged": true
     }
   ],
-  "last_updated": "2026-08-01T13:46:43.113875+00:00"
+  "last_updated": "2026-08-01T18:15:54.720982+00:00"
 }

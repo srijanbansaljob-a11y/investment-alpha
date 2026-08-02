@@ -110,6 +110,32 @@ def _max_drawdown(values: list) -> float:
 
 # ── Core snapshot function ──────────────────────────────────────────────────
 
+def _closed_trade_stats() -> dict:
+    """
+    The REAL win rate: closed trades the MODEL decided.
+
+    Administrative exits (liquidations, account retirements) are excluded —
+    they carry real P&L and zero information. Before those were tagged, this
+    figure read 92% off what was mostly a portfolio wind-down.
+    """
+    path = DATA_DIR / "trade_outcomes.json"
+    try:
+        raw = path.read_bytes().rstrip(b"\x00")
+        outcomes = json.loads(raw).get("outcomes", [])
+    except Exception:
+        return {}
+    model = [o for o in outcomes if not o.get("exclude_from_learning")]
+    if not model:
+        return {"n": 0}
+    wins = sum(1 for o in model if o.get("win"))
+    return {
+        "n":            len(model),
+        "win_rate_pct": round(wins / len(model) * 100, 1),
+        "avg_pnl_pct":  round(sum(o.get("pnl_pct", 0) for o in model) / len(model), 2),
+        "excluded_admin": len(outcomes) - len(model),
+    }
+
+
 def take_snapshot() -> dict:
     """
     Capture a performance snapshot of the current portfolio.
@@ -262,6 +288,8 @@ def take_snapshot() -> dict:
         "cash":                  round(cash, 2),
         "invested_pct":          round((equity - cash) / equity * 100, 2) if equity else 0,
         "position_count":        len(positions_out),
+        "positions_in_profit":   sum(1 for p in positions_out if p["unrealised_pct"] > 0),
+        "closed_trade_stats":    _closed_trade_stats(),
         "total_capital":         total_capital,
         "baseline_date":         baseline.get("start_date"),
         "portfolio_value":       round(portfolio_value, 2),
@@ -328,9 +356,22 @@ def print_report(snapshot: dict) -> None:
     print()
     print(f"  Sharpe ratio      : {snapshot.get('sharpe_ratio', float('nan')):.3f}")
     print(f"  Max drawdown      : {snapshot.get('max_drawdown_pct', 0):.2f}%")
-    print(f"  Win rate          : {snapshot.get('win_rate_pct', 0):.0f}%  "
-          f"(avg gain {snapshot.get('avg_gain_pct', 0):+.2f}% / "
-          f"avg loss {snapshot.get('avg_loss_pct', 0):+.2f}%)")
+    # This counts OPEN positions currently in profit — it is not a win rate.
+    # Labelled as one, "22%" read as "the strategy loses 78% of the time" when
+    # it meant "most positions are a fraction of a percent down on day one".
+    n_up = snapshot.get("positions_in_profit")
+    n_tot = snapshot.get("position_count", len(snapshot.get("positions", [])))
+    if n_up is not None and n_tot:
+        print(f"  Positions in profit: {n_up}/{n_tot} ({n_up / n_tot * 100:.0f}%)  "
+              f"[unrealised — not a win rate]")
+    cw = snapshot.get("closed_trade_stats") or {}
+    if cw.get("n"):
+        print(f"  Closed model trades: {cw['n']}  ·  win rate {cw['win_rate_pct']:.0f}%  "
+              f"·  avg P&L {cw['avg_pnl_pct']:+.2f}%")
+        if cw["n"] < 30:
+            print(f"                       ({cw['n']}/30 before the record means much)")
+    else:
+        print("  Closed model trades: none yet — no win rate to report")
     print()
     print("  POSITIONS")
     print("  " + "-" * 60)

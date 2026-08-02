@@ -44,7 +44,13 @@ FLAT_FILE    = Path(getattr(config, "LEARNED_WEIGHTS_FILE", config.BASE_DIR / "d
 
 EWMA_ALPHA   = 0.30   # weight of the newest IC reading
 DRIFT_RATE   = 0.02   # weekly step (gentler than the old monthly 5%)
-MIN_OBS      = 15     # observations needed per regime before weights move
+MIN_OBS      = 15     # stock-rows needed per regime (secondary check)
+# Independent weekly snapshots needed per regime before ANY weight moves.
+# This is the binding constraint: rows within one week are correlated, so
+# only the number of distinct periods carries information. 12 weeks is about
+# three months of forward-return evidence — modest, but it is the difference
+# between measuring a factor and measuring one week's weather.
+MIN_PERIODS  = 12
 
 
 def _default_weights() -> dict:
@@ -114,16 +120,55 @@ def run(dry_run: bool = False) -> dict:
 
     store = _load_v2()
     report = {"updated_regimes": [], "exported": None, "obs_total": len(observations),
-              "weight_changes": {}, "skipped_regimes": {}}
+              "weight_changes": {}, "skipped_regimes": {},
+              "_observations": observations}
 
     # 2. Per-regime IC + EWMA + drift
     for regime in ("bull", "neutral", "bear"):
         obs_r = [o for o in observations if o["regime"] == regime]
         node = store["regimes"][regime]
         node["n_obs"] = len(obs_r)
+
+        # Count INDEPENDENT PERIODS, not rows (fixed 2026-08-01).
+        #
+        # Ten stocks ranked in the same week are not ten independent facts —
+        # they all rode the same market move. The old guard compared
+        # len(obs_r) >= 15 and passed on "30 observations" that were really
+        # 10 stocks x 3 weekly snapshots: three data points. Weights were then
+        # drifted on noise and, because scoring.py prefers the learned file,
+        # that noise chose your stocks.
+        #
+        # An information coefficient computed on one cross-section is one
+        # estimate. You need many of them before the average means anything.
+        periods = sorted({o.get("date") or o.get("snapshot_date") for o in obs_r
+                          if (o.get("date") or o.get("snapshot_date"))})
+        n_periods = len(periods)
+        node["n_periods"] = n_periods
+        if n_periods < MIN_PERIODS:
+            # Reset rather than merely skip. Any drift already applied happened
+            # under the old row-counting guard and was fitted to noise; leaving
+            # it in place would let that noise keep choosing stocks now that
+            # learned_weights.json is no longer gitignored.
+            baseline = dict(getattr(config, "FACTOR_WEIGHTS_WITH_SENTIMENT",
+                                    config.FACTOR_WEIGHTS))
+            if node.get("weights") != baseline:
+                log.warning("  %s: resetting weights to config defaults "
+                            "(previous values were drifted on insufficient evidence)",
+                            regime)
+                node["weights"] = baseline
+                node["ewma_ic"] = {}
+            log.info("  %s: %d observation(s) across only %d independent period(s) "
+                     "(need %d) — weights held at config defaults",
+                     regime, len(obs_r), n_periods, MIN_PERIODS)
+            report["skipped_regimes"][regime] = {
+                "observations": len(obs_r), "periods": n_periods,
+                "periods_required": MIN_PERIODS,
+            }
+            continue
         if len(obs_r) < MIN_OBS:
             log.info("  %s: %d obs (< %d) — weights unchanged", regime, len(obs_r), MIN_OBS)
-            report["skipped_regimes"][regime] = len(obs_r)
+            report["skipped_regimes"][regime] = {"observations": len(obs_r),
+                                                 "periods": n_periods}
             continue
         ics = _spearman_ic(obs_r)
         for f, ic in ics.items():
@@ -203,9 +248,17 @@ def post_to_discord(report: dict, dry_run: bool = False) -> None:
                        "value": "\n".join(lines)[:1024] or "—", "inline": False})
 
     if skipped:
+        # Report PERIODS, not rows. "30 obs" sounded like plenty; it was ten
+        # stocks from each of three weeks — three independent facts.
+        def _fmt(r, info):
+            if isinstance(info, dict):
+                return (f"{r.upper()} {info.get('periods', 0)}/"
+                        f"{info.get('periods_required', MIN_PERIODS)} weeks "
+                        f"({info.get('observations', 0)} rows)")
+            return f"{r.upper()} {info} obs"
         fields.append({
-            "name": "Not enough data (unchanged)",
-            "value": " · ".join(f"{r.upper()} {n} obs" for r, n in skipped.items()),
+            "name": "Frozen — not enough independent weeks",
+            "value": " · ".join(_fmt(r, n) for r, n in skipped.items()),
             "inline": False,
         })
 
@@ -220,11 +273,17 @@ def post_to_discord(report: dict, dry_run: bool = False) -> None:
 
     title = "🧠 Weekly Learning" + (" — DRY RUN (nothing saved)" if dry_run else "")
     changed_any = any(changes.values())
+    n_periods_all = sorted({o.get("date") for o in (report.get("_observations") or [])
+                            if o.get("date")})
     desc = (
-        f"Evaluated **{report.get('obs_total', 0)}** shadow observations. "
+        f"Evaluated **{report.get('obs_total', 0)}** shadow rows"
+        + (f" across **{len(n_periods_all)}** weekly snapshots" if n_periods_all else "")
+        + ". "
         + ("Factor weights were adjusted — these now drive stock selection."
            if changed_any else
-           "No weights changed this week.")
+           f"**No weights changed.** Each regime needs {MIN_PERIODS} independent "
+           "weekly snapshots before drifting; rows within one week move together "
+           "and carry one week's information, not one per stock.")
     )
     color = 0x9B59B6 if changed_any else 0x95A5A6
 

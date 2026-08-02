@@ -154,7 +154,15 @@ def decision_review(min_age_days: int = 14) -> dict:
         if (today - ts).days >= min_age_days:
             pending.append(d)
 
-    report = {"reviewed": 0, "reject_right": 0, "reject_wrong": 0,
+    # `reviewed`  = decisions examined (any type)
+    # `scored`    = decisions that can actually be right or wrong
+    #
+    # These were conflated: every examined decision incremented `reviewed`,
+    # but only rejects and approve_sells were ever categorised. The card then
+    # read "4/18 aged well" while listing 9 decisions — the other 9 were
+    # buy approvals and stop executions that cannot be scored this way, so
+    # they could only ever drag the fraction down.
+    report = {"reviewed": 0, "scored": 0, "reject_right": 0, "reject_wrong": 0,
               "sell_saved": 0, "sell_cost": 0, "lines": []}
     if not pending:
         return report
@@ -170,6 +178,7 @@ def decision_review(min_age_days: int = 14) -> dict:
         if d["decision"] == "reject":
             # You kept it. Up since = you were right.
             right = move > 0
+            report["scored"] += 1
             report["reject_right" if right else "reject_wrong"] += 1
             report["lines"].append(
                 f"{'🏆 You' if right else '🤖 Model'} — {d['ticker']}: you rejected the sell at "
@@ -177,6 +186,7 @@ def decision_review(min_age_days: int = 14) -> dict:
         elif d["decision"] == "approve_sell":
             # You sold. Down since = selling saved you money.
             saved = move < 0
+            report["scored"] += 1
             report["sell_saved" if saved else "sell_cost"] += 1
             report["lines"].append(
                 f"{'✅ Good exit' if saved else '💸 Early exit'} — {d['ticker']}: sold at "
@@ -209,7 +219,10 @@ def post_report(stop_rep: dict, dec_rep: dict) -> None:
             desc, _ORANGE if stop_rep["suggestions"] else _BLUE))
     if dec_rep["reviewed"]:
         you = dec_rep["reject_right"] + dec_rep["sell_saved"]
-        desc = (f"**Your decisions, scored:** {you}/{dec_rep['reviewed']} aged well\n"
+        scored = dec_rep.get("scored") or (
+            dec_rep["reject_right"] + dec_rep["reject_wrong"]
+            + dec_rep["sell_saved"] + dec_rep["sell_cost"])
+        desc = (f"**Your decisions, scored:** {you}/{scored} aged well\n"
                 f"Rejects: {dec_rep['reject_right']} right / {dec_rep['reject_wrong']} wrong · "
                 f"Sells: {dec_rep['sell_saved']} saved money / {dec_rep['sell_cost']} sold too early\n\n"
                 + "\n".join(dec_rep["lines"][:15]))

@@ -42,5 +42,41 @@
   "VTRS": {
     "date": "2026-07-31",
     "reason": "full_liquidation_clean_restart_on_fixed_code"
+  },
+  "AAPL@2026-07-27": {
+    "date": "2026-07-27",
+    "reason": "screener_account_retirement_bulk_exit"
+  },
+  "ABBV@2026-07-27": {
+    "date": "2026-07-27",
+    "reason": "screener_account_retirement_bulk_exit"
+  },
+  "ABT@2026-07-27": {
+    "date": "2026-07-27",
+    "reason": "screener_account_retirement_bulk_exit"
+  },
+  "BAC@2026-07-27": {
+    "date": "2026-07-27",
+    "reason": "screener_account_retirement_bulk_exit"
+  },
+  "MSFT@2026-07-27": {
+    "date": "2026-07-27",
+    "reason": "screener_account_retirement_bulk_exit"
+  },
+  "REGN@2026-07-27": {
+    "date": "2026-07-27",
+    "reason": "screener_account_retirement_bulk_exit"
+  },
+  "TMO@2026-07-27": {
+    "date": "2026-07-27",
+    "reason": "screener_account_retirement_bulk_exit"
+  },
+  "VRTX@2026-07-27": {
+    "date": "2026-07-27",
+    "reason": "screener_account_retirement_bulk_exit"
+  },
+  "EIX@2026-07-27": {
+    "date": "2026-07-27",
+    "reason": "screener_account_retirement_bulk_exit"
   }
 }

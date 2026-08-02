@@ -111,6 +111,28 @@ def _get_signals(ticker: str) -> dict:
 _ADMIN_EXITS_FILE = _DATA_DIR / "admin_exits.json"
 
 
+def _admin_entry(admin: dict, ticker: str, exit_date: str) -> dict | None:
+    """
+    Look up an administrative-exit tag for (ticker, date).
+
+    Two key forms are supported:
+      "TICKER"             — most recent administrative exit for that name
+      "TICKER@YYYY-MM-DD"  — a specific one
+
+    The date-scoped form exists because a ticker can be administratively
+    exited more than once: EIX left in the 2026-07-27 screener wind-down AND
+    again in the 2026-07-31 pipeline liquidation. A ticker-only key would tag
+    whichever date it happened to hold and silently miss the other.
+    """
+    scoped = admin.get(f"{ticker}@{exit_date}")
+    if scoped and scoped.get("date") == exit_date:
+        return scoped
+    plain = admin.get(ticker)
+    if plain and plain.get("date") == exit_date:
+        return plain
+    return None
+
+
 def _admin_exits() -> dict:
     """
     {ticker: {"date", "reason"}} for exits that were ADMINISTRATIVE, not model
@@ -153,8 +175,8 @@ def _retag_admin_exits(outcomes: list) -> int:
         return 0
     fixed = 0
     for rec in outcomes:
-        entry = admin.get(rec.get("ticker"))
-        if not entry or rec.get("exit_date") != entry.get("date"):
+        entry = _admin_entry(admin, rec.get("ticker"), rec.get("exit_date"))
+        if not entry:
             continue
         if rec.get("exclude_from_learning"):
             continue
@@ -334,8 +356,8 @@ def main():
 
             # Administrative exits (owner liquidation, migrations) are recorded
             # for the audit trail but must NOT count as model evidence.
-            admin = _admin_exits().get(ticker)
-            if admin and admin.get("date") == today_iso:
+            admin = _admin_entry(_admin_exits(), ticker, today_iso)
+            if admin:
                 record["exit_type"]            = "administrative"
                 record["exclude_from_learning"] = True
                 record["admin_reason"]          = admin.get("reason", "administrative")
