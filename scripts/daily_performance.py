@@ -211,14 +211,13 @@ def _post_discord(sc: dict, pc: dict, spy_ret, win: dict):
 
 def main():
     log.info("=== Daily Performance Tracker ===")
-    sc      = _get_portfolio_stats("screener")
     pc      = _get_portfolio_stats("pipeline")
     spy_ret = _get_spy_return()
     win     = _get_win_stats()
 
     snapshot = {
         "date":      datetime.now(timezone.utc).date().isoformat(),
-        "screener":  sc,
+        # "screener" removed 2026-08-03 — account retired, book liquidated.
         "pipeline":  pc,
         "spy_daily": spy_ret,
         "win_stats": win,

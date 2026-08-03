@@ -15,9 +15,13 @@ resting at the broker for every position.
 **Current status**: paper only, ~$114k equity, 4 closed trades. The strategy
 has no proven edge yet. Treat every parameter as provisional.
 
-**Direction of travel**: pipeline-only. The `screener/` half of the repo is
-being retired (plan: `docs/FABLE_AUDIT_2026-07-27.md` §4). Do not add features
-to screener code.
+**Screener: RETIRED 2026-08-03.** The `screener/` half of the repo, its three
+workflows, the `/screener` command and the second Alpaca account are all gone.
+The account was liquidated first, then the pipeline was made self-sufficient
+for the data the screener used to publish (regime and stop/target levels now
+come from `scripts/publish_pipeline_kv.py`), then the code was deleted — in
+that order, per `docs/FABLE_AUDIT_2026-07-27.md` §4. If you find a reference
+to a `screener/*` file, it is a leftover: the file does not exist.
 
 ---
 

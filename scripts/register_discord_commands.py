@@ -38,7 +38,6 @@ COMMANDS = [
             "name": "portfolio", "type": 3, "required": True,
             "description": "Which account to check",
             "choices": [
-                {"name": "Screener", "value": "screener"},
                 {"name": "Pipeline", "value": "pipeline"},
             ],
         }],
@@ -54,7 +53,6 @@ COMMANDS = [
             "name": "portfolio", "type": 3, "required": True,
             "description": "Which account to monitor",
             "choices": [
-                {"name": "Screener", "value": "screener"},
                 {"name": "Pipeline", "value": "pipeline"},
             ],
         }],
@@ -75,7 +73,6 @@ COMMANDS = [
                 "name": "portfolio", "type": 3, "required": True,
                 "description": "Which account to check",
                 "choices": [
-                    {"name": "Screener", "value": "screener"},
                     {"name": "Pipeline", "value": "pipeline"},
                 ],
             },
@@ -105,10 +102,10 @@ COMMANDS = [
             "description": "Ticker (e.g. AAPL) or 'portfolio' for equity curve + P&L",
         }],
     },
-    {
-        "name": "screener",
-        "description": "Latest screener results: top picks, regime, stock buckets (from KV cache)",
-    },
+    # /screener REMOVED 2026-08-03 — the screener is retired (audit §4).
+    # Regime and top picks now come from the pipeline: use /regime and
+    # /pipeline mode:dry. Re-registering this command would surface a
+    # command whose data source no longer exists.
     {
         "name": "help",
         "description": "Show all Investment Alpha commands and what they do",
@@ -125,7 +122,6 @@ COMMANDS = [
                 "name": "portfolio", "type": 3, "required": True,
                 "description": "Which portfolio account to buy in",
                 "choices": [
-                    {"name": "Screener", "value": "screener"},
                     {"name": "Pipeline", "value": "pipeline"},
                 ],
             },
@@ -143,7 +139,6 @@ COMMANDS = [
                 "name": "portfolio", "type": 3, "required": True,
                 "description": "Which portfolio account to sell from",
                 "choices": [
-                    {"name": "Screener", "value": "screener"},
                     {"name": "Pipeline", "value": "pipeline"},
                 ],
             },
@@ -186,7 +181,6 @@ COMMANDS = [
             "choices": [
                 {"name": "Both (default)", "value": "both"},
                 {"name": "Pipeline",       "value": "pipeline"},
-                {"name": "Screener",       "value": "screener"},
             ],
         }],
     },
@@ -200,7 +194,6 @@ COMMANDS = [
             "description": "Which account to review (default: pipeline)",
             "choices": [
                 {"name": "Pipeline (default)", "value": "pipeline"},
-                {"name": "Screener",           "value": "screener"},
             ],
         }],
     },

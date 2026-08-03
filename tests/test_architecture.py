@@ -656,6 +656,47 @@ class TestEvidenceThresholds(unittest.TestCase):
                       "no real win rate sourced from closed model trades")
 
 
+class TestScreenerStaysRetired(unittest.TestCase):
+    """
+    The screener was retired 2026-08-03 in the order the audit prescribed:
+    liquidate the account, make the pipeline self-sufficient for the KV data
+    the Worker needs, remove the surfaces, then delete. These guard the last
+    step from being quietly undone.
+    """
+
+    def test_no_live_code_imports_screener(self):
+        offenders = []
+        for p in _py_files():
+            rel = p.relative_to(ROOT).as_posix()
+            if rel.startswith("screener/"):
+                continue
+            for i, line in enumerate(_code_lines(p), 1):
+                if "from screener" in line or "import screener" in line:
+                    offenders.append(f"{rel}:{i}: {line.strip()}")
+        self.assertEqual(offenders, [],
+                         "live code imports the retired screener\n" + "\n".join(offenders))
+
+    def test_kv_publisher_exists(self):
+        """Deleting the screener without this breaks /brief, the webhook regime
+        gate and /buy stop targets — the exact failure the audit warned of."""
+        self.assertTrue((ROOT / "scripts" / "publish_pipeline_kv.py").exists(),
+                        "the pipeline KV publisher is missing; the Worker's "
+                        "regime_signal / stock_buckets / pipeline_summary keys "
+                        "would go stale")
+
+    def test_screener_command_deregistered(self):
+        src = _src(ROOT / "scripts" / "register_discord_commands.py")
+        code = "\n".join(_code_lines_from_text(src))
+        self.assertNotIn('"name": "screener"', code,
+                         "/screener is still registered but its data source is gone")
+
+    def test_health_check_is_pipeline_only(self):
+        src = _src(ROOT / "scripts" / "health_check.py")
+        code = "\n".join(_code_lines_from_text(src))
+        self.assertNotIn('"both"', code,
+                         "health check still loops over a retired second account")
+
+
 class TestCloudParity(unittest.TestCase):
     """ARCHITECTURE §2.3: nothing critical may live only in gitignored paths."""
 

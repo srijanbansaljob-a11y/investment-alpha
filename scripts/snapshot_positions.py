@@ -48,7 +48,7 @@ def main():
     today = datetime.now(timezone.utc).date().isoformat()
     _SNAP_DIR.mkdir(parents=True, exist_ok=True)
 
-    sc = _snapshot_portfolio("screener")
+    sc = {}   # screener retired 2026-08-03
     pc = _snapshot_portfolio("pipeline")
 
     snapshot = {

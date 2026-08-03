@@ -25,9 +25,9 @@
  *   ALPACA_BASE_URL     — https://paper-api.alpaca.markets
  *
  * KV namespace (bind as `KV` in wrangler.toml):
- *   regime_signal   — written daily by screener_daily.yml workflow
- *   stock_buckets   — written daily by screener_daily.yml workflow
- *   screener_summary— top picks for /screener command
+ *   regime_signal   — written daily by scripts/publish_pipeline_kv.py
+ *   stock_buckets   — written daily by scripts/publish_pipeline_kv.py
+ *   pipeline_summary— top picks + stop/target levels (screener_summary = legacy fallback)
  */
 
 // ── Discord interaction constants ──────────────────────────────────────────
@@ -165,10 +165,12 @@ function portfolioHeaders(env, portfolio) {
 }
 
 async function getAlpacaPrice(env, symbol) {
-  // Use screener account credentials for price (both accounts see same market data)
+  // Pipeline credentials. This used to prefer ALPACA_KEY_SCREENER — harmless
+  // while both accounts existed, but once the screener secrets are removed
+  // (2026-08-03 retirement) that would leave price lookups unauthenticated.
   const headers = {
-    "APCA-API-KEY-ID":     (env.ALPACA_KEY_SCREENER || env.ALPACA_KEY    || "").trim(),
-    "APCA-API-SECRET-KEY": (env.ALPACA_SECRET_SCREENER || env.ALPACA_SECRET || "").trim(),
+    "APCA-API-KEY-ID":     (env.ALPACA_KEY    || env.ALPACA_KEY_SCREENER    || "").trim(),
+    "APCA-API-SECRET-KEY": (env.ALPACA_SECRET || env.ALPACA_SECRET_SCREENER || "").trim(),
   };
   try {
     const r = await fetch(
@@ -205,7 +207,10 @@ async function placeBracketOrder(env, symbol, customQty = null, portfolio = "pip
   let atrPct = null;
   try {
     const [summaryRaw, bucketsRaw] = await Promise.all([
-      env.KV.get("screener_summary"),
+      // pipeline_summary is written by scripts/publish_pipeline_kv.py.
+      // screener_summary is the retired screener's key, kept as a fallback
+      // until the screener workflows are deleted (audit §4 ordering).
+      env.KV.get("pipeline_summary").then(v => v || env.KV.get("screener_summary")),
       env.KV.get("stock_buckets"),
     ]);
     let pick = null;
@@ -442,7 +447,7 @@ async function handleTradingViewWebhook(request, env) {
     if (bucket === "avoid") {
       await postDiscordWebhook(env.DISCORD_WEBHOOK_URL, [{
         title: `🚫 ${ticker} — Blocked (avoid bucket)`,
-        description: `${ticker} is classified as **avoid** by today's screener. Signal ignored.`,
+        description: `${ticker} is not in today's pipeline ranking. Signal ignored.`,
         color: C_RED,
         fields: [
           { name: "Strategy", value: strategy || "—", inline: true },
@@ -698,7 +703,10 @@ async function buildBuyPreview(env, ticker, customQty = null, portfolio = "pipel
   let stopPct = STOP_LOSS_PCT, tpAlpacaPct = TAKE_PROFIT_PCT, tpMonitorPct = TAKE_PROFIT_PCT * 0.8, atrPct = null;
   try {
     const [summaryRaw, bucketsRaw] = await Promise.all([
-      env.KV.get("screener_summary"),
+      // pipeline_summary is written by scripts/publish_pipeline_kv.py.
+      // screener_summary is the retired screener's key, kept as a fallback
+      // until the screener workflows are deleted (audit §4 ordering).
+      env.KV.get("pipeline_summary").then(v => v || env.KV.get("screener_summary")),
       env.KV.get("stock_buckets"),
     ]);
     let pick = null;
@@ -1212,7 +1220,10 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
               "Content-Type": "application/json",
               "User-Agent": "investment-alpha-worker",
             },
-            body: JSON.stringify({ event_type: "screener-refresh", client_payload: {} }),
+            // Was "screener-refresh" (screener_daily.yml). That workflow is deleted;
+            // this now runs the pipeline dry, which is where picks come from.
+            body: JSON.stringify({ event_type: "discord-command",
+                                   client_payload: { command: "pipeline_dry" } }),
           }
         );
         const ok = ghR.status === 204;
@@ -1221,12 +1232,12 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             embeds: [{
-              title: ok ? "🔄 Fresh Screener Triggered" : "❌ Screener Trigger Failed",
+              title: ok ? "🔄 Fresh Pipeline Run Triggered" : "❌ Pipeline Trigger Failed",
               description: ok
-                ? "Screener is running on GitHub Actions (~5 min).\nRun `/brief` again once it completes to see updated picks."
-                : `Failed to trigger screener (HTTP ${ghR.status}). Try from GitHub Actions manually.`,
+                ? "Pipeline is scoring ~574 stocks on GitHub Actions (~5 min).\nIt will post the ranked picks when it finishes."
+                : `Failed to trigger the pipeline (HTTP ${ghR.status}). Try from GitHub Actions manually.`,
               color: ok ? 0x2ECC71 : 0xE74C3C,
-              footer: { text: "GitHub → Actions → Daily Screener → Run workflow" },
+              footer: { text: "GitHub → Actions → Scheduled Pipeline Proposal → Run workflow" },
             }],
             components: [],
           }),
@@ -1344,7 +1355,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
             inline: false,
           },
           {
-            name: "Alternative signals (screener scoring bonuses)",
+            name: "Alternative signals (scoring bonuses)",
             value: [
               "```",
               "Insider buying     +5pt   C-suite/director net purchase",
@@ -1478,7 +1489,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
         fields: [
           {
             name: "\U0001f4ca Daily Screener",
-            value: "`/screener` Top 5 picks + conviction badges\n`/buy symbol:X portfolio:Screener|Pipeline` Preview & confirm bracket order\n`/sell symbol:X portfolio:Screener|Pipeline` See P&L then confirm close",
+            value: "`/buy symbol:X` Preview & confirm a bracket order\n`/sell symbol:X` See P&L then confirm close\n_(screener retired 2026-08-03 — pipeline is the only book)_",
             inline: false,
           },
           {
@@ -1541,7 +1552,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
           },
           {
             name: "\U0001f4a1 Morning routine",
-            value: "`/brief` → `/health` → `/regime` → `/screener` → `/buy symbol:X portfolio:Screener`\nMonthly (1st): `/pipeline mode:dry` review · `/pipeline mode:execute` rebalance\nOver-invested? `/rebalance` to trim winners manually.",
+            value: "`/brief` → `/health` → `/regime` → `/pipeline mode:dry`\nWeekly (Mon): review the proposal, then `/pipeline mode:execute`\nOver-invested? `/rebalance` to trim winners manually.",
             inline: false,
           },
         ],
@@ -1556,60 +1567,16 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
 
     // /screener — served directly from KV (no GitHub round-trip needed)
     if (name === "screener") {
-      try {
-        const raw = await env.KV.get("screener_summary");
-        if (!raw) {
-          return json({ type: R_CHANNEL_MESSAGE, data: {
-            flags: EPHEMERAL,
-            content: "No screener data yet — runs at 8 AM ET on weekdays.",
-          }});
-        }
-        const s = JSON.parse(raw);
-        const picks = s.top_picks || [];
-        const highConviction = s.high_conviction_count ?? picks.filter(p => p.conviction_ok).length;
-        const allBelowThreshold = picks.length > 0 && highConviction === 0;
-
-        const pickLines = picks.map((p, idx) => {
-          const badge = p.conviction_ok ? "✅" : "⚠️";
-          return `${badge} ${idx + 1}. **${p.ticker}** — score ${p.score}/100 (${p.bucket})`;
-        }).join("\n");
-
-        let description = pickLines || "_No stocks passed the regime gate today._";
-        let convictionNote = "";
-        if (allBelowThreshold) {
-          convictionNote = "⚠️ **Regime is healthy but no stocks cleared the 55-pt conviction bar.** " +
-            "These are the best available — consider reduced position size or wait for a stronger setup. " +
-            "✅ = high conviction (≥55)  ⚠️ = below threshold but regime-permitted.";
-        } else if (picks.length > 0 && highConviction < picks.length) {
-          convictionNote = `✅ ${highConviction} high-conviction pick${highConviction > 1 ? "s" : ""}. ` +
-            "⚠️ stocks are below the 55-pt threshold — viable but lower confidence.";
-        }
-
-        return json({ type: R_CHANNEL_MESSAGE, data: {
-          flags: EPHEMERAL,
-          embeds: [{
-            title: `📊 Screener — ${s.date || "today"}`,
-            description: (convictionNote ? convictionNote + "\n\n" : "") + description,
-            color: allBelowThreshold ? C_ORANGE : C_BLUE,
-            fields: [
-              { name: "Regime",     value: `${s.regime_label} (${s.regime_score}/100)`, inline: true },
-              { name: "Permitted",  value: (s.permitted_strategies || []).join(", ") || "—", inline: true },
-              { name: "Scored",     value: String(s.total_scored || 0), inline: true },
-            ],
-            footer: { text: "Updated 8 AM ET · ✅ ≥55 pts = high conviction · ⚠️ = below threshold" },
-          }],
-          // Buy buttons — one per pick (up to 5)
-          ...(picks.length ? [{ type: 1, components: picks.slice(0, 5).map(p => ({
-            type: 2, style: 1, label: `Buy ${p.ticker}`,
-            custom_id: `ia|screener_buy|${p.ticker}|screener`,
-          })) }] : []),
-        }});
-      } catch (e) {
-        return ephemeral(`Error reading screener: ${e.message}`);
-      }
+      // RETIRED 2026-08-03. The screener is gone (audit §4); its data source
+      // no longer runs. Rather than show stale KV or a silent failure, point
+      // at the pipeline equivalents. Command is also de-registered, so this
+      // only fires for clients with a cached command list.
+      return json({ type: R_CHANNEL_MESSAGE, data: {
+        flags: EPHEMERAL,
+        content: "🗄️ **/screener has been retired.**\nThe screener was decommissioned on 2026-08-03 — the pipeline is now the only strategy.\n\n• `/regime` — current market regime\n• `/pipeline mode:dry` — this week's ranked picks\n• `/status` — live positions and stops",
+      }});
     }
 
-    // /brief — on-demand morning brief from KV + optional fresh screener trigger
     if (name === "brief") {
       const mode = (opts.mode || "cached").toLowerCase();
 
@@ -1627,7 +1594,10 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
                 "Content-Type": "application/json",
                 "User-Agent": "investment-alpha-worker",
               },
-              body: JSON.stringify({ event_type: "screener-refresh", client_payload: {} }),
+              // Was "screener-refresh" (screener_daily.yml). That workflow is deleted;
+            // this now runs the pipeline dry, which is where picks come from.
+            body: JSON.stringify({ event_type: "discord-command",
+                                   client_payload: { command: "pipeline_dry" } }),
             }
           );
           const ok = ghR.status === 204;
@@ -1636,12 +1606,12 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               embeds: [{
-                title: ok ? "🔄 Fresh Screener Triggered" : "❌ Screener Trigger Failed",
+                title: ok ? "🔄 Fresh Pipeline Run Triggered" : "❌ Pipeline Trigger Failed",
                 description: ok
                   ? "Screener is running on GitHub Actions (~5 min).\nRun `/brief` again once it completes to see updated picks with buy buttons."
                   : `Failed to trigger screener (HTTP ${ghR.status}). Try from GitHub Actions manually.`,
                 color: ok ? 0x2ECC71 : 0xE74C3C,
-                footer: { text: "GitHub → Actions → Daily Screener → Run workflow" },
+                footer: { text: "GitHub → Actions → Scheduled Pipeline Proposal → Run workflow" },
               }],
             }),
           });
@@ -2141,7 +2111,8 @@ async function runTakeProfitMonitor(env) {
   if (paused) { console.log("TP monitor: paused, skipping"); return; }
 
   const alpacaBase  = "https://paper-api.alpaca.markets";
-  const portfolios  = ["screener", "pipeline"];
+  // Screener retired 2026-08-03 — the pipeline is the only book.
+  const portfolios  = ["pipeline"];
   let allPositions  = [];
   for (const port of portfolios) {
     try {

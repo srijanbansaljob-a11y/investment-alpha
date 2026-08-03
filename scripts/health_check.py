@@ -454,8 +454,9 @@ def post_to_discord(f: Findings, summary_lines: list):
 
 def main():
     parser = argparse.ArgumentParser(description="Daily system health check")
-    parser.add_argument("--portfolio", default="both",
-                        choices=["both", "pipeline", "screener"])
+    parser.add_argument("--portfolio", default="pipeline",
+                        choices=["pipeline"],
+                        help="screener retired 2026-08-03 — pipeline only")
     parser.add_argument("--no-discord", action="store_true")
     args = parser.parse_args()
 
@@ -465,7 +466,8 @@ def main():
     regime_label, cap = _regime_label_and_cap()
     log.info("Regime: %s · exposure cap %.0f%%", regime_label, cap * 100)
 
-    portfolios = ["pipeline", "screener"] if args.portfolio == "both" else [args.portfolio]
+    # Screener retired 2026-08-03 (audit §4). Pipeline is the only book.
+    portfolios = ["pipeline"]
     summary_lines = []
 
     for pf in portfolios:

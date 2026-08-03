@@ -144,5 +144,21 @@ Recorded so they aren't re-litigated, or "fixed" by a future session:
   The system already has 7 factors, 4 alternative signals, 2 learning loops and
   13 workflows supporting 4 closed trades. The machinery-to-evidence ratio is
   the project's main risk; deletion is a feature.
-- **No features added to `screener/`** — it is being retired
-  (`docs/FABLE_AUDIT_2026-07-27.md` §4).
+- **The screener is gone** (retired 2026-08-03). One strategy, one account,
+  one book. Do not reintroduce a second trading system until the first has a
+  demonstrated edge — the audit's five P0 bugs all lived in the seams between
+  two half-owned systems.
+
+## 7. Cloudflare KV keys
+
+The Worker depends on these; `scripts/publish_pipeline_kv.py` writes them
+daily from `daily_summary.yml`. Nothing else may write them.
+
+| Key | Written by | Consumed by |
+|---|---|---|
+| `regime_signal` | publish_pipeline_kv | webhook gate, `/brief`, buy previews |
+| `stock_buckets` | publish_pipeline_kv | per-ticker stop/target percentages |
+| `pipeline_summary` | publish_pipeline_kv | top picks + ATR targets |
+| `screener_summary` | *legacy fallback only* | drop once the Worker is confirmed on `pipeline_summary` |
+| `trading_paused` | `/pausetrading` (Worker) | executor kill switch, TP monitor, webhook |
+| `execution_lock` | `broker/kv_lock.py` | prevents concurrent execute runs |

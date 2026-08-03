@@ -57,6 +57,23 @@ jobs:
         run: |
           python broker/remote_commands.py
 
+      # Replaces screener_daily.yml's regime_to_kv step. The Worker reads
+      # regime_signal / stock_buckets / pipeline_summary for /brief, the
+      # TradingView webhook gate and /buy stop-target previews. Publishing
+      # from the pipeline is what makes the screener safe to delete.
+      - name: Publish regime + picks to Cloudflare KV
+        if: steps.tz.outputs.go == 'true'
+        env:
+          ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL:   ${{ secrets.ALPACA_BASE_URL }}
+          FINNHUB_API_KEY:   ${{ secrets.FINNHUB_API_KEY }}
+          FRED_API_KEY:      ${{ secrets.FRED_API_KEY }}
+          CF_ACCOUNT_ID:     ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE:   ${{ secrets.CF_KV_NAMESPACE }}
+          CF_API_TOKEN:      ${{ secrets.CF_API_TOKEN }}
+        run: python scripts/publish_pipeline_kv.py
+
       - name: Alert Discord on failure
         if: failure() && steps.tz.outputs.go == 'true'
         env:

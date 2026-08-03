@@ -47,11 +47,16 @@ _GREY   = 0x95A5A6
 def _get_regime_info() -> tuple[str, float]:
     """Return (label, target_pct) from daily_sentiment_data.json."""
     try:
-        candidate = Path(__file__).parent.parent / "screener" / "daily_sentiment_data.json"
+        # Screener data file retired 2026-08-03 — it is no longer produced.
+        candidate = Path(__file__).parent.parent / "data" / "pipeline_run_latest.json"
         if not candidate.exists():
             return "", getattr(config, "MAX_INVESTED_DEFAULT", 0.80)
         data = json.loads(candidate.read_text(encoding="utf-8"))
-        label = ((data.get("macro_score") or {}).get("label", "") or "").upper().strip()
+        # Pipeline shape: {"regime": {"label": "BULL", ...}}.
+        # The screener's old shape was {"macro_score": {"label": ...}} — kept
+        # as a fallback only so a stale file doesn't crash the command.
+        label = ((data.get("regime") or data.get("macro_score") or {})
+                 .get("label", "") or "").upper().strip()
         # Strip emoji prefix if present (e.g. "🟢 STRONG BULL" → "STRONG BULL")
         for prefix in ["🟢 ", "🟡 ", "🟠 ", "🔴 "]:
             label = label.replace(prefix, "")
