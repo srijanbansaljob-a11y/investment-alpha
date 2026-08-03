@@ -4893,5 +4893,144 @@
       "start_date": "2026-07-31",
       "end_date": "2026-10-29"
     }
+  },
+  {
+    "timestamp": "2026-08-03T11:56:17.542700+00:00",
+    "run_date": "2026-08-03",
+    "regime": "bull",
+    "currency": "USD",
+    "equity": 113950.74,
+    "cash": 17023.48,
+    "invested_pct": 85.06,
+    "position_count": 9,
+    "positions_in_profit": 2,
+    "closed_trade_stats": {
+      "n": 4,
+      "win_rate_pct": 100.0,
+      "avg_pnl_pct": 7.43,
+      "excluded_admin": 16
+    },
+    "total_capital": 113884.3,
+    "baseline_date": "2026-07-31",
+    "portfolio_value": 96927.26,
+    "realised_pnl": 346.48,
+    "total_portfolio_value": 113950.74,
+    "total_return_pct": 0.0583,
+    "benchmark_return_pct": null,
+    "alpha_pct": null,
+    "sharpe_ratio": 4.3769,
+    "max_drawdown_pct": 0.0,
+    "win_rate_pct": 22.22,
+    "avg_gain_pct": 0.88,
+    "avg_loss_pct": -0.55,
+    "positions": [
+      {
+        "ticker": "ALL",
+        "qty": 45.0,
+        "weight": 0.104287,
+        "entry_price": 267.1616,
+        "current_price": 264.08,
+        "cost_basis": 12022.27,
+        "current_value": 11883.6,
+        "unrealised_pnl": -138.67,
+        "unrealised_pct": -1.15
+      },
+      {
+        "ticker": "APA",
+        "qty": 217.0,
+        "weight": 0.069451,
+        "entry_price": 36.62,
+        "current_price": 36.47,
+        "cost_basis": 7946.54,
+        "current_value": 7913.99,
+        "unrealised_pnl": -32.55,
+        "unrealised_pct": -0.41
+      },
+      {
+        "ticker": "CVS",
+        "qty": 113.0,
+        "weight": 0.103688,
+        "entry_price": 105.5018,
+        "current_price": 104.56,
+        "cost_basis": 11921.7,
+        "current_value": 11815.28,
+        "unrealised_pnl": -106.42,
+        "unrealised_pct": -0.89
+      },
+      {
+        "ticker": "DAL",
+        "qty": 98.0,
+        "weight": 0.076267,
+        "entry_price": 87.79,
+        "current_price": 88.68,
+        "cost_basis": 8603.42,
+        "current_value": 8690.64,
+        "unrealised_pnl": 87.22,
+        "unrealised_pct": 1.01
+      },
+      {
+        "ticker": "HST",
+        "qty": 629.0,
+        "weight": 0.138716,
+        "entry_price": 25.18,
+        "current_price": 25.13,
+        "cost_basis": 15838.22,
+        "current_value": 15806.77,
+        "unrealised_pnl": -31.45,
+        "unrealised_pct": -0.2
+      },
+      {
+        "ticker": "INCY",
+        "qty": 74.0,
+        "weight": 0.077617,
+        "entry_price": 119.61,
+        "current_price": 119.52,
+        "cost_basis": 8851.14,
+        "current_value": 8844.48,
+        "unrealised_pnl": -6.66,
+        "unrealised_pct": -0.07
+      },
+      {
+        "ticker": "MATX",
+        "qty": 46.0,
+        "weight": 0.081544,
+        "entry_price": 203.03,
+        "current_price": 202.0,
+        "cost_basis": 9339.38,
+        "current_value": 9292.0,
+        "unrealised_pnl": -47.38,
+        "unrealised_pct": -0.51
+      },
+      {
+        "ticker": "TRV",
+        "qty": 33.0,
+        "weight": 0.10915,
+        "entry_price": 379.31,
+        "current_price": 376.9,
+        "cost_basis": 12517.23,
+        "current_value": 12437.7,
+        "unrealised_pnl": -79.53,
+        "unrealised_pct": -0.64
+      },
+      {
+        "ticker": "VTRS",
+        "qty": 580.0,
+        "weight": 0.089888,
+        "entry_price": 17.53,
+        "current_price": 17.66,
+        "cost_basis": 10167.4,
+        "current_value": 10242.8,
+        "unrealised_pnl": 75.4,
+        "unrealised_pct": 0.74
+      }
+    ],
+    "closed_positions": [],
+    "paper_trading": {
+      "in_validation": true,
+      "days_elapsed": 3,
+      "days_remaining": 87,
+      "start_date": "2026-07-31",
+      "end_date": "2026-10-29"
+    }
   }
 ]

@@ -12,24 +12,24 @@
     "credit_spread_momentum": 0.02088,
     "active_top_n": 10,
     "active_stop_loss": 0.85,
-    "timestamp": "2026-08-03T10:31:31.690235+00:00",
+    "timestamp": "2026-08-03T11:40:49.239608+00:00",
     "notes": "SPX 6.6% above 200MA, VIX=16.0 (benign)"
   },
   "signal_summary": {
-    "total_signals": 11,
+    "total_signals": 10,
     "buy": 2,
     "hold": 8,
-    "exit": 1,
+    "exit": 0,
     "run_date": "2026-08-03",
     "regime": "bull"
   },
   "portfolio": [
     {
       "ticker": "HST",
-      "name": "Host Hotels & Resorts, Inc.",
+      "name": "HST",
       "action": "HOLD",
       "weight": 0.148092,
-      "score": 0.6534,
+      "score": 0.6528,
       "entry_price": 25.18,
       "entry_date": "2026-07-31",
       "signals": {
@@ -43,7 +43,7 @@
       "name": "Incyte Corporation",
       "action": "HOLD",
       "weight": 0.083682,
-      "score": 0.6213,
+      "score": 0.6214,
       "entry_price": 119.61,
       "entry_date": "2026-07-31",
       "signals": {
@@ -82,7 +82,7 @@
     },
     {
       "ticker": "APA",
-      "name": "APA Corporation",
+      "name": "APA",
       "action": "HOLD",
       "weight": 0.07243,
       "score": 0.5977,
@@ -99,7 +99,7 @@
       "name": "CVS Health Corporation",
       "action": "HOLD",
       "weight": 0.110709,
-      "score": 0.5946,
+      "score": 0.5943,
       "entry_price": 105.5018,
       "entry_date": "2026-07-31",
       "signals": {
@@ -110,7 +110,7 @@
     },
     {
       "ticker": "DAL",
-      "name": "Delta Air Lines, Inc.",
+      "name": "DAL",
       "action": "HOLD",
       "weight": 0.081581,
       "score": 0.5904,
@@ -127,7 +127,7 @@
       "name": "Stanley Black & Decker, Inc.",
       "action": "BUY",
       "weight": 0.086185,
-      "score": 0.5858,
+      "score": 0.5854,
       "entry_price": 94.58,
       "entry_date": "2026-08-03",
       "signals": {
@@ -138,7 +138,7 @@
     },
     {
       "ticker": "TRV",
-      "name": "The Travelers Companies, Inc.",
+      "name": "TRV",
       "action": "HOLD",
       "weight": 0.117199,
       "score": 0.5818,
@@ -152,7 +152,7 @@
     },
     {
       "ticker": "NUE",
-      "name": "Nucor Corporation",
+      "name": "NUE",
       "action": "BUY",
       "weight": 0.092858,
       "score": 0.5685,
