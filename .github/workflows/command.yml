@@ -47,8 +47,6 @@ jobs:
         env:
           ALPACA_API_KEY:             ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY:          ${{ secrets.ALPACA_SECRET_KEY }}
-          ALPACA_API_KEY_SCREENER:    ${{ secrets.ALPACA_API_KEY_SCREENER }}
-          ALPACA_SECRET_KEY_SCREENER: ${{ secrets.ALPACA_SECRET_KEY_SCREENER }}
           ALPACA_BASE_URL:            ${{ secrets.ALPACA_BASE_URL }}
           DISCORD_WEBHOOK_URL:        ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_BOT_TOKEN:          ${{ secrets.DISCORD_BOT_TOKEN }}

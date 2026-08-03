@@ -90,8 +90,10 @@ def _get_portfolio_stats(portfolio: str) -> dict:
 
 def _get_spy_return() -> float | None:
     """Get SPY 1-day % return via Alpaca data API."""
-    key    = (os.getenv("ALPACA_API_KEY_SCREENER") or os.getenv("ALPACA_API_KEY", "")).strip()
-    secret = (os.getenv("ALPACA_SECRET_KEY_SCREENER") or os.getenv("ALPACA_SECRET_KEY", "")).strip()
+    # Screener credentials removed 2026-08-03 — preferring them would now
+    # resolve to empty and silently disable the SPY benchmark.
+    key    = os.getenv("ALPACA_API_KEY", "").strip()
+    secret = os.getenv("ALPACA_SECRET_KEY", "").strip()
     if not key:
         return None
     try:

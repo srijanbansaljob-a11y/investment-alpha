@@ -141,7 +141,7 @@ async function postDiscordWebhook(webhookUrl, embeds, components = []) {
 // Two Alpaca accounts:
 //   ALPACA_KEY / ALPACA_SECRET                   → pipeline account (PRIMARY —
 //       TradingView webhook, /buy, /sell, /pipeline, all order routing)
-//   ALPACA_KEY_SCREENER / ALPACA_SECRET_SCREENER → screener account (RETIRING —
+//   (screener account retired 2026-08-03 — its secrets are deleted;
 //       read-only display in /brief and the morning brief so the winding-down
 //       positions stay visible. No new orders should ever route here.)
 //
@@ -158,8 +158,8 @@ function portfolioHeaders(env, portfolio) {
     };
   }
   return {
-    "APCA-API-KEY-ID":     (env.ALPACA_KEY_SCREENER || env.ALPACA_KEY    || "").trim(),
-    "APCA-API-SECRET-KEY": (env.ALPACA_SECRET_SCREENER || env.ALPACA_SECRET || "").trim(),
+    "APCA-API-KEY-ID":     (env.ALPACA_KEY    || "").trim(),
+    "APCA-API-SECRET-KEY": (env.ALPACA_SECRET || "").trim(),
     "Content-Type":        "application/json",
   };
 }
@@ -169,8 +169,8 @@ async function getAlpacaPrice(env, symbol) {
   // while both accounts existed, but once the screener secrets are removed
   // (2026-08-03 retirement) that would leave price lookups unauthenticated.
   const headers = {
-    "APCA-API-KEY-ID":     (env.ALPACA_KEY    || env.ALPACA_KEY_SCREENER    || "").trim(),
-    "APCA-API-SECRET-KEY": (env.ALPACA_SECRET || env.ALPACA_SECRET_SCREENER || "").trim(),
+    "APCA-API-KEY-ID":     (env.ALPACA_KEY    || "").trim(),
+    "APCA-API-SECRET-KEY": (env.ALPACA_SECRET || "").trim(),
   };
   try {
     const r = await fetch(
@@ -190,8 +190,12 @@ async function getAlpacaPrice(env, symbol) {
 // would route a real order into the account we are winding down.
 async function placeBracketOrder(env, symbol, customQty = null, portfolio = "pipeline") {
   const alpacaBase   = "https://paper-api.alpaca.markets";
-  const alpacaKey    = portfolio === "pipeline" ? (env.ALPACA_KEY || "").trim() : (env.ALPACA_KEY_SCREENER || env.ALPACA_KEY || "").trim();
-  const alpacaSecret = portfolio === "pipeline" ? (env.ALPACA_SECRET || "").trim() : (env.ALPACA_SECRET_SCREENER || env.ALPACA_SECRET || "").trim();
+  // 2026-08-03: the screener branch is gone. It used to fall back to PIPELINE
+  // credentials when the screener keys were missing — which, now that those
+  // secrets are deleted, would silently serve the LIVE account to a caller
+  // asking for the retired one. There is one account; use its keys.
+  const alpacaKey    = (env.ALPACA_KEY || "").trim();
+  const alpacaSecret = (env.ALPACA_SECRET || "").trim();
   if (!alpacaKey || !alpacaSecret) return { error: `Alpaca ${portfolio} credentials not set in Cloudflare secrets.` };
 
   const headers = portfolioHeaders(env, portfolio);

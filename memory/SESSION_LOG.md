@@ -562,3 +562,46 @@ PAPER_TRADING_START_DATE reset to 2026-07-31.
 fabricated numbers on a live surface, same category as the 7 bad records.
 Drills 7-8 (/status, /stoploss, /pausetrading kill switch) still unrun.
 Backtest (2015-2024) not yet run — that, not paper time, is the real edge evidence.
+
+---
+
+## SESSION 010 — 2026-08-03 (Screener retired)
+
+Executed the retirement in the audit's prescribed order (§4). Ordering was the
+whole risk: deleting first would have broken /buy stop targets and the
+TradingView regime gate.
+
+**Stage A — pipeline made self-sufficient.** `scripts/publish_pipeline_kv.py`
+replaces `screener/regime_to_kv.py`, publishing the three KV keys the Worker
+depends on (`regime_signal`, `stock_buckets`, `pipeline_summary`, plus
+`screener_summary` as a transitional alias). Scheduled daily in
+`daily_summary.yml`. Worker reads the new key with fallback to the old.
+
+**Stage B — scripts.** health_check / daily_performance / snapshot_positions
+pipeline-only; rebalance_check repointed from the dead
+`screener/daily_sentiment_data.json` to `data/pipeline_run_latest.json` (it had
+been silently returning a 0.80 default instead of the real 95% regime target).
+
+**Stage C — surfaces.** `/screener` de-registered (16 commands → 15) and its
+handler now explains the retirement; `/help` rewritten; `/brief mode:fresh`
+re-pointed from the `screener-refresh` dispatch to a pipeline dry run.
+
+**Stage D — deletion.** `screener/`, three workflows, `Archive/stock_screener.py`.
+
+**THE DANGEROUS ONE.** After the owner deleted the two screener secrets,
+`get_client("screener")` did not fail — it fell back to PIPELINE credentials.
+Any surviving caller asking for the retired account would have been handed the
+LIVE one: a sell intended for a dormant book hitting the real $113.9k account.
+The Worker had the identical fallback in `portfolioHeaders` and in the price
+helper. All three now refuse rather than substitute. Silent substitution of one
+trading account for another is not a graceful fallback.
+
+Also fixed: worker price lookups PREFERRED screener credentials (would have
+gone unauthenticated once deleted); `daily_performance._get_spy_return` same.
+
+**Tests**: 79 (up from 73). Six new guards: no live import of screener, KV
+publisher exists, /screener de-registered, health check pipeline-only,
+get_client refuses "screener", worker has no screener credential fallback.
+
+**Left dormant**: the screener Alpaca account still holds $109,438.88 cash,
+0 positions. Nothing in the system touches it.

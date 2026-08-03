@@ -56,31 +56,35 @@ def get_client(portfolio: str = "pipeline") -> TradingClient:
     Create and return an authenticated Alpaca TradingClient.
 
     Args:
-        portfolio: "screener" → uses ALPACA_API_KEY_SCREENER / ALPACA_SECRET_KEY_SCREENER
-                   "pipeline" (default) → uses ALPACA_API_KEY / ALPACA_SECRET_KEY
+        portfolio: "pipeline" (the only account). Anything else raises.
 
     Reads credentials from environment variables (set via .env file).
     Raises clear errors if keys are missing or invalid.
+
+    SCREENER REFUSED, NOT REDIRECTED (2026-08-03)
+    ---------------------------------------------
+    This used to fall back to PIPELINE credentials whenever the screener keys
+    were absent — convenient while both accounts existed, actively dangerous
+    once the screener secrets were deleted: a caller asking for the retired
+    account would have been handed the live one, and a sell intended for a
+    dormant book would have hit the real one. Silent substitution of one
+    trading account for another is not a graceful fallback; it is the most
+    expensive kind of wrong. Any surviving caller must fail loudly instead.
     """
     portfolio = (portfolio or "pipeline").lower().strip()
     if portfolio == "screener":
-        api_key    = os.getenv("ALPACA_API_KEY_SCREENER", "").strip()
-        secret_key = os.getenv("ALPACA_SECRET_KEY_SCREENER", "").strip()
-        label = "Screener"
-        # Graceful fallback: if screener-specific keys aren't set, use pipeline keys
-        # (happens on local runs where .env only has one set of credentials)
-        if not api_key or api_key.startswith("PASTE_"):
-            api_key    = os.getenv("ALPACA_API_KEY", "").strip()
-            secret_key = os.getenv("ALPACA_SECRET_KEY", "").strip()
-            import logging as _log
-            _log.getLogger(__name__).warning(
-                "ALPACA_API_KEY_SCREENER not set — falling back to pipeline keys for screener portfolio"
-            )
-            label = "Screener (using pipeline keys)"
-    else:
-        api_key    = os.getenv("ALPACA_API_KEY", "").strip()
-        secret_key = os.getenv("ALPACA_SECRET_KEY", "").strip()
-        label = "Pipeline"
+        raise ValueError(
+            "The screener account was retired on 2026-08-03 and its credentials "
+            "have been deleted. This call would otherwise have been served by the "
+            "LIVE pipeline account. Fix the caller to use portfolio='pipeline'."
+        )
+    if portfolio != "pipeline":
+        raise ValueError(
+            f"Unknown portfolio {portfolio!r}. The pipeline is the only account."
+        )
+    api_key    = os.getenv("ALPACA_API_KEY", "").strip()
+    secret_key = os.getenv("ALPACA_SECRET_KEY", "").strip()
+    label = "Pipeline"
 
     if not api_key or api_key.startswith("PASTE_"):
         raise ValueError(

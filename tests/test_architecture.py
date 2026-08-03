@@ -690,6 +690,32 @@ class TestScreenerStaysRetired(unittest.TestCase):
         self.assertNotIn('"name": "screener"', code,
                          "/screener is still registered but its data source is gone")
 
+    def test_screener_request_is_refused_not_redirected(self):
+        """
+        The sharpest hazard of the retirement. get_client("screener") used to
+        fall back to PIPELINE credentials when the screener keys were missing.
+        Once those secrets were deleted (2026-08-03), any surviving caller
+        asking for the retired account would have been handed the LIVE one —
+        a sell meant for a dormant book hitting the real one. Refuse, never
+        substitute.
+        """
+        from broker.alpaca_client import get_client
+        for bad in ("screener", "SCREENER", " Screener "):
+            with self.assertRaises(ValueError, msg=f"get_client({bad!r}) did not refuse"):
+                get_client(bad)
+
+    def test_worker_has_no_screener_credential_fallback(self):
+        # Check the actual property ACCESS, not the bare name: the file's
+        # comments legitimately explain the removed fallback, and Python-style
+        # comment stripping does not understand JavaScript's `//`.
+        src = _src(ROOT / "worker" / "index.js")
+        offenders = [f"line {i}: {l.strip()}" for i, l in enumerate(src.splitlines(), 1)
+                     if "env.ALPACA_KEY_SCREENER" in l or "env.ALPACA_SECRET_SCREENER" in l]
+        self.assertEqual(offenders, [],
+                         "worker still reads screener credentials — with those "
+                         "secrets deleted it would silently use the live account\n"
+                         + "\n".join(offenders))
+
     def test_health_check_is_pipeline_only(self):
         src = _src(ROOT / "scripts" / "health_check.py")
         code = "\n".join(_code_lines_from_text(src))
