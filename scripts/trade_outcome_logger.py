@@ -70,38 +70,91 @@ def _load_json(path: Path) -> dict:
 
 # ── Signal enrichment ──────────────────────────────────────────────────────
 
-def _get_signals(ticker: str) -> dict:
+_SHADOW_LOG      = _DATA_DIR / "shadow_log.json"
+_CONGRESS_PIPE   = _DATA_DIR / "congressional_cache_pipeline.json"
+
+
+def _shadow_snapshot_for(ticker: str, entry_date: str | None) -> dict | None:
     """
-    Build a signals dict for a ticker from today's screener output + cache files.
-    Keys: regime, bucket, score, insider_buy, congress_buy, earnings_beat, rs_vs_spy
+    What the model knew about this ticker when it bought.
+
+    Returns the shadow entry from the snapshot closest to (but not after) the
+    entry date, so the recorded factor scores are the ones that informed the
+    decision rather than today's re-scored values.
+    """
+    try:
+        raw = _SHADOW_LOG.read_bytes().rstrip(b"\x00")
+        entries = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(entries, list):
+        return None
+    candidates = [e for e in entries
+                  if not entry_date or (e.get("date") or "") <= entry_date]
+    for entry in sorted(candidates, key=lambda e: e.get("date") or "", reverse=True):
+        for s in entry.get("stocks", []):
+            if s.get("ticker") == ticker:
+                return {"snapshot_date": entry.get("date"),
+                        "regime": entry.get("regime", "unknown"),
+                        "rank": s.get("rank"), "composite": s.get("composite"),
+                        "scores": s.get("scores") or {}}
+    return None
+
+
+def _get_signals(ticker: str, entry_date: str | None = None) -> dict:
+    """
+    What the model believed about a ticker at entry.
+
+    REWIRED 2026-08-02: this read screener/daily_sentiment_data.json, which is
+    no longer produced — so EVERY trade was logged with regime "UNKNOWN" and
+    all signals False. Factor analysis then had no explanatory variables at
+    all, which is why its signal table compared empty groups and reported a
+    "-92pp edge" for signals no trade possessed.
+
+    Source is now the pipeline's own shadow log, which is richer than the
+    screener ever was: it stores all six factor sub-scores per ticker per
+    snapshot, so "did high-momentum entries win more often?" becomes an
+    answerable question rather than a boolean guess.
     """
     signals = {"regime": "UNKNOWN", "bucket": "unknown", "score": 0,
                "insider_buy": False, "congress_buy": False,
                "earnings_beat": False, "rs_vs_spy": 0}
 
-    screener = _load_json(_SCREENER_DATA)
-    macro    = screener.get("macro_score") or {}
-    signals["regime"] = str(macro.get("label", "UNKNOWN")).upper().strip()
-    # Strip emoji prefix
-    for prefix in ("🟢 ", "🟡 ", "🟠 ", "🔴 "):
-        signals["regime"] = signals["regime"].replace(prefix, "")
+    snap = _shadow_snapshot_for(ticker, entry_date)
+    if snap:
+        signals["regime"] = str(snap.get("regime", "unknown")).upper().strip()
+        signals["score"]  = snap.get("composite") or 0
+        signals["scores"] = snap.get("scores") or {}
+        signals["rank_at_entry"]   = snap.get("rank")
+        signals["scored_on"]       = snap.get("snapshot_date")
+        # Bucket by where the composite sat in the model's own scale.
+        c = signals["score"] or 0
+        signals["bucket"] = ("high" if c >= 0.60 else
+                             "mid" if c >= 0.50 else "low")
 
-    for stock in screener.get("stocks", []):
-        if stock.get("ticker") == ticker:
-            bd = stock.get("breakdown") or {}
-            signals["bucket"]        = stock.get("strategy_bucket", "unknown")
-            signals["score"]         = stock.get("total_score", 0)
-            signals["insider_buy"]   = bool(bd.get("insider_buy"))
-            signals["congress_buy"]  = bool(bd.get("congress_buy"))
-            signals["earnings_beat"] = bool(bd.get("earnings_beat"))
-            signals["rs_vs_spy"]     = bd.get("rs_vs_spy", 0) or 0
-            return signals  # found in screener data
-
-    # Fallback: check cache files directly (ticker may not be in screener universe today)
+    # Alternative signals from the PIPELINE's own caches (the pipeline-scoped
+    # congressional cache first — the shared one was screener-era).
     insider  = _load_json(_INSIDER_CACHE).get(ticker, {})
-    congress = _load_json(_CONGRESS_CACHE).get(ticker, {})
+    congress = (_load_json(_CONGRESS_PIPE).get(ticker)
+                or _load_json(_CONGRESS_CACHE).get(ticker, {}))
     signals["insider_buy"]  = isinstance(insider, dict)  and insider.get("signal", 0) >= 1
-    signals["congress_buy"] = isinstance(congress, dict) and congress.get("recent_buys", 0) > 0
+    signals["congress_buy"] = isinstance(congress, dict) and (
+        congress.get("recent_buys", 0) > 0 or congress.get("signal", 0) >= 1)
+
+    # Regime fallback: the run summary, then the durable ledger.
+    if signals["regime"] in ("UNKNOWN", ""):
+        for path, key in ((_DATA_DIR / "pipeline_run_latest.json", "regime"),
+                          (_DATA_DIR / "portfolio_state.json", "regime")):
+            try:
+                blob = _load_json(path)
+                val = blob.get(key)
+                if isinstance(val, dict):
+                    val = val.get("label")
+                if val:
+                    signals["regime"] = str(val).upper().strip()
+                    break
+            except Exception:
+                continue
 
     return signals
 
@@ -154,6 +207,35 @@ def _admin_exits() -> dict:
     except Exception as exc:
         log.warning("Could not read admin_exits.json (%s)", exc)
     return {}
+
+
+def _refresh_stale_signals(outcomes: list) -> int:
+    """
+    Re-derive signals for records logged while the screener source was dead.
+
+    Every outcome written before 2026-08-02 has regime "UNKNOWN" and all
+    signals False, because _get_signals read a file that no longer exists.
+    Those records are otherwise fine — the P&L is real — so rather than
+    discard them, re-enrich from the shadow log using each trade's entry date.
+
+    Idempotent: only touches records whose regime is still UNKNOWN.
+    """
+    fixed = 0
+    for rec in outcomes:
+        sig = rec.get("signals") or {}
+        if str(sig.get("regime", "")).upper() not in ("", "UNKNOWN"):
+            continue
+        fresh = _get_signals(rec.get("ticker"), rec.get("entry_date"))
+        if str(fresh.get("regime", "")).upper() in ("", "UNKNOWN") and not fresh.get("scores"):
+            continue        # nothing better available
+        rec["signals"] = fresh
+        rec["signals_refreshed"] = True
+        fixed += 1
+        log.info("  SIGNALS %s (%s): regime=%s bucket=%s%s",
+                 rec.get("ticker"), rec.get("entry_date"), fresh.get("regime"),
+                 fresh.get("bucket"),
+                 f" scored_on={fresh['scored_on']}" if fresh.get("scored_on") else "")
+    return fixed
 
 
 def _retag_admin_exits(outcomes: list) -> int:
@@ -281,9 +363,13 @@ def _run_repair_only(reason: str) -> None:
     """
     log.info("%s — running administrative-exit repair only", reason)
     outcomes = _load_outcomes()
-    repaired = _retag_admin_exits(outcomes)
-    if repaired:
+    repaired  = _retag_admin_exits(outcomes)
+    refreshed = _refresh_stale_signals(outcomes)
+    if repaired or refreshed:
         _save_outcomes(outcomes)
+    if refreshed:
+        log.info("Signals re-derived for %d record(s) logged while the screener "
+                 "source was dead", refreshed)
     model = [o for o in outcomes if not o.get("exclude_from_learning")]
     log.info("Repair pass: %d retagged (total %d outcomes, %d count as MODEL trades)",
              repaired, len(outcomes), len(model))
@@ -337,7 +423,9 @@ def main():
                 except Exception:
                     pass
 
-            signals = _get_signals(ticker)
+            # Pass entry_date so the recorded scores are what the model knew
+            # when it BOUGHT, not a re-score using today's data.
+            signals = _get_signals(ticker, entry_date)
 
             record = {
                 "ticker":        ticker,
@@ -375,7 +463,8 @@ def main():
             )
 
     # Repair pass — see _retag_admin_exits for why this runs unconditionally.
-    repaired = _retag_admin_exits(outcomes)
+    repaired  = _retag_admin_exits(outcomes)
+    _refresh_stale_signals(outcomes)
 
     _save_outcomes(outcomes)
     model = [o for o in outcomes if not o.get("exclude_from_learning")]

@@ -545,6 +545,35 @@ class TestEvidenceThresholds(unittest.TestCase):
                              "a sustained false positive can drag a weight "
                              "arbitrarily far from the chosen baseline")
 
+    def test_signal_enrichment_uses_pipeline_not_screener(self):
+        """
+        Every trade was logged regime=UNKNOWN with all signals False, because
+        _get_signals read screener/daily_sentiment_data.json — a file the
+        pipeline does not produce and which does not exist. Factor analysis
+        therefore had no explanatory variables at all.
+        """
+        src = _src(ROOT / "scripts" / "trade_outcome_logger.py")
+        code = "\n".join(_code_lines_from_text(src))
+        self.assertIn("_SHADOW_LOG", code,
+                      "signal enrichment does not read the pipeline's shadow log")
+        self.assertNotIn("_SCREENER_DATA)", code,
+                         "still reading the retired screener data file")
+
+    def test_signals_are_captured_as_of_entry(self):
+        """Scores must reflect what the model saw when it BOUGHT, not today."""
+        src = _src(ROOT / "scripts" / "trade_outcome_logger.py")
+        self.assertIn("def _shadow_snapshot_for", src)
+        self.assertIn("entry_date", src.split("def _get_signals")[1][:400],
+                      "_get_signals ignores entry date — it would attribute "
+                      "today's scores to a trade opened weeks ago")
+
+    def test_universe_has_no_known_dead_tickers(self):
+        dead = {"BK", "CTRA", "HOLX", "SEE", "CFLT", "EXAS"}
+        still = dead & set(config.ALL_TICKERS)
+        self.assertEqual(still, set(),
+                         f"delisted tickers back in the universe: {still} — they "
+                         "fail on every run and bury real errors in log noise")
+
     def test_performance_report_separates_open_from_closed(self):
         src = _src(ROOT / "pipeline" / "performance_tracker.py")
         self.assertIn("positions_in_profit", src,

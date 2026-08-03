@@ -12,7 +12,7 @@
       "pnl_pct": 1.06,
       "pnl_dollars": 22.15,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
         "insider_buy": false,
@@ -22,7 +22,8 @@
       },
       "win": true,
       "entry_date_backfilled": true,
-      "entry_date_is_floor": true
+      "entry_date_is_floor": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "MU",
@@ -36,7 +37,7 @@
       "pnl_pct": 7.85,
       "pnl_dollars": 178.09,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
         "insider_buy": false,
@@ -46,7 +47,8 @@
       },
       "win": true,
       "entry_date_backfilled": true,
-      "entry_date_is_floor": true
+      "entry_date_is_floor": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "ABBV",
@@ -60,7 +62,7 @@
       "pnl_pct": 1.94,
       "pnl_dollars": 42.4,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
         "insider_buy": false,
@@ -70,7 +72,8 @@
       },
       "win": true,
       "entry_date_backfilled": true,
-      "entry_date_is_floor": false
+      "entry_date_is_floor": false,
+      "signals_refreshed": true
     },
     {
       "ticker": "MATX",
@@ -84,17 +87,28 @@
       "pnl_pct": 18.85,
       "pnl_dollars": 1540.05,
       "signals": {
-        "regime": "UNKNOWN",
-        "bucket": "unknown",
-        "score": 0,
+        "regime": "BULL",
+        "bucket": "mid",
+        "score": 0.592,
         "insider_buy": false,
         "congress_buy": false,
         "earnings_beat": false,
-        "rs_vs_spy": 0
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.7307,
+          "trend": 0.6746,
+          "quality": 0.4671,
+          "valuation": 0.8845,
+          "sentiment": 0.5857,
+          "volatility": 0.5217
+        },
+        "rank_at_entry": 3,
+        "scored_on": "2026-06-24"
       },
       "win": true,
       "entry_date_backfilled": true,
-      "entry_date_is_floor": true
+      "entry_date_is_floor": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "AAPL",
@@ -108,10 +122,10 @@
       "pnl_pct": 19.73,
       "pnl_dollars": 1649.17,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
-        "insider_buy": false,
+        "insider_buy": true,
         "congress_buy": false,
         "earnings_beat": false,
         "rs_vs_spy": 0
@@ -119,7 +133,8 @@
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "screener_account_retirement_bulk_exit",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "ABBV",
@@ -133,7 +148,7 @@
       "pnl_pct": 7.17,
       "pnl_dollars": 1300.5,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
         "insider_buy": false,
@@ -144,7 +159,8 @@
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "screener_account_retirement_bulk_exit",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "ABT",
@@ -158,7 +174,7 @@
       "pnl_pct": 10.57,
       "pnl_dollars": 1704.05,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
         "insider_buy": false,
@@ -169,7 +185,8 @@
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "screener_account_retirement_bulk_exit",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "BAC",
@@ -183,7 +200,7 @@
       "pnl_pct": 6.81,
       "pnl_dollars": 1031.89,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
         "insider_buy": false,
@@ -194,7 +211,8 @@
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "screener_account_retirement_bulk_exit",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "MSFT",
@@ -208,7 +226,7 @@
       "pnl_pct": 7.17,
       "pnl_dollars": 51.12,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
         "insider_buy": false,
@@ -219,7 +237,8 @@
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "screener_account_retirement_bulk_exit",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "REGN",
@@ -233,7 +252,7 @@
       "pnl_pct": 4.79,
       "pnl_dollars": 809.73,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
         "insider_buy": false,
@@ -244,7 +263,8 @@
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "screener_account_retirement_bulk_exit",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "TMO",
@@ -258,7 +278,7 @@
       "pnl_pct": 11.77,
       "pnl_dollars": 2273.54,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
         "insider_buy": false,
@@ -269,7 +289,8 @@
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "screener_account_retirement_bulk_exit",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "VRTX",
@@ -283,7 +304,7 @@
       "pnl_pct": -0.63,
       "pnl_dollars": -88.45,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
         "insider_buy": false,
@@ -294,7 +315,8 @@
       "win": false,
       "exclude_from_learning": true,
       "admin_reason": "screener_account_retirement_bulk_exit",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "EIX",
@@ -308,18 +330,29 @@
       "pnl_pct": 13.21,
       "pnl_dollars": 647.78,
       "signals": {
-        "regime": "UNKNOWN",
-        "bucket": "unknown",
-        "score": 0,
+        "regime": "NEUTRAL",
+        "bucket": "mid",
+        "score": 0.5712,
         "insider_buy": false,
         "congress_buy": false,
         "earnings_beat": false,
-        "rs_vs_spy": 0
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.6675,
+          "trend": 0.6977,
+          "quality": 0.4531,
+          "valuation": 0.8562,
+          "sentiment": 0.3574,
+          "volatility": 0.2014
+        },
+        "rank_at_entry": 7,
+        "scored_on": "2026-06-11"
       },
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "screener_account_retirement_bulk_exit",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "BIIB",
@@ -333,18 +366,29 @@
       "pnl_pct": 3.25,
       "pnl_dollars": 263.68,
       "signals": {
-        "regime": "UNKNOWN",
-        "bucket": "unknown",
-        "score": 0,
+        "regime": "BULL",
+        "bucket": "mid",
+        "score": 0.565,
         "insider_buy": false,
         "congress_buy": false,
         "earnings_beat": false,
-        "rs_vs_spy": 0
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.5888,
+          "trend": 0.6811,
+          "quality": 0.6522,
+          "valuation": 0.7677,
+          "sentiment": 0.5043,
+          "volatility": 0.5409
+        },
+        "rank_at_entry": 6,
+        "scored_on": "2026-06-24"
       },
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "BMY",
@@ -358,7 +402,7 @@
       "pnl_pct": 15.31,
       "pnl_dollars": 1880.89,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
         "insider_buy": false,
@@ -369,7 +413,8 @@
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "DAL",
@@ -383,18 +428,29 @@
       "pnl_pct": 3.13,
       "pnl_dollars": 3.23,
       "signals": {
-        "regime": "UNKNOWN",
-        "bucket": "unknown",
-        "score": 0,
+        "regime": "BULL",
+        "bucket": "mid",
+        "score": 0.5694,
         "insider_buy": false,
         "congress_buy": false,
         "earnings_beat": false,
-        "rs_vs_spy": 0
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.8111,
+          "trend": 0.586,
+          "quality": 0.4085,
+          "valuation": 0.9454,
+          "sentiment": 0.6114,
+          "volatility": 0.6265
+        },
+        "rank_at_entry": 9,
+        "scored_on": "2026-07-27"
       },
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "DE",
@@ -408,7 +464,7 @@
       "pnl_pct": 1.92,
       "pnl_dollars": 42.14,
       "signals": {
-        "regime": "UNKNOWN",
+        "regime": "BULL",
         "bucket": "unknown",
         "score": 0,
         "insider_buy": false,
@@ -419,7 +475,8 @@
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "EIX",
@@ -433,18 +490,29 @@
       "pnl_pct": 11.36,
       "pnl_dollars": 1323.14,
       "signals": {
-        "regime": "UNKNOWN",
-        "bucket": "unknown",
-        "score": 0,
+        "regime": "NEUTRAL",
+        "bucket": "mid",
+        "score": 0.5712,
         "insider_buy": false,
         "congress_buy": false,
         "earnings_beat": false,
-        "rs_vs_spy": 0
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.6675,
+          "trend": 0.6977,
+          "quality": 0.4531,
+          "valuation": 0.8562,
+          "sentiment": 0.3574,
+          "volatility": 0.2014
+        },
+        "rank_at_entry": 7,
+        "scored_on": "2026-06-11"
       },
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "MRK",
@@ -458,18 +526,29 @@
       "pnl_pct": 14.05,
       "pnl_dollars": 985.48,
       "signals": {
-        "regime": "UNKNOWN",
-        "bucket": "unknown",
-        "score": 0,
+        "regime": "BULL",
+        "bucket": "mid",
+        "score": 0.5596,
         "insider_buy": false,
         "congress_buy": false,
         "earnings_beat": false,
-        "rs_vs_spy": 0
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.6434,
+          "trend": 0.6196,
+          "quality": 0.5999,
+          "valuation": 0.6893,
+          "sentiment": 0.508,
+          "volatility": 0.3583
+        },
+        "rank_at_entry": 9,
+        "scored_on": "2026-06-24"
       },
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     },
     {
       "ticker": "MTCH",
@@ -483,19 +562,30 @@
       "pnl_pct": 12.15,
       "pnl_dollars": 1050.48,
       "signals": {
-        "regime": "UNKNOWN",
-        "bucket": "unknown",
-        "score": 0,
+        "regime": "BULL",
+        "bucket": "mid",
+        "score": 0.5758,
         "insider_buy": false,
         "congress_buy": false,
         "earnings_beat": false,
-        "rs_vs_spy": 0
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.621,
+          "trend": 0.5617,
+          "quality": 0.7198,
+          "valuation": 0.8781,
+          "sentiment": 0.471,
+          "volatility": 0.4609
+        },
+        "rank_at_entry": 5,
+        "scored_on": "2026-06-24"
       },
       "win": true,
       "exclude_from_learning": true,
       "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
-      "retagged": true
+      "retagged": true,
+      "signals_refreshed": true
     }
   ],
-  "last_updated": "2026-08-01T18:15:54.720982+00:00"
+  "last_updated": "2026-08-03T10:15:10.030864+00:00"
 }
