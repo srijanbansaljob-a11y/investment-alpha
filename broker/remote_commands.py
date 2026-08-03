@@ -483,6 +483,20 @@ def _format_pipeline_fields(summary: dict, execute: bool) -> list[dict]:
 
     if execute:
         orders = summary.get("orders") or []
+
+        # Was this run forced to dry-run? (kill switch, EXECUTION_ENABLED, or
+        # the market-closed guard). If so NOTHING was submitted, and the embed
+        # must not imply otherwise.
+        #
+        # Observed 2026-08-02 during the kill-switch drill: the card was
+        # headed "EXECUTED — see what actually happened" and listed
+        # "EXIT MATX — submitted, fill NOT confirmed (status=dry_run)".
+        # Zero orders reached Alpaca. A glance at that message would have you
+        # believe you had sold MATX.
+        forced_dry = bool(summary.get("dry_run")) or any(
+            (o.get("status") or "") in ("dry_run", "skipped_trading_paused")
+            for o in orders)
+
         lines = []
         for o in orders:
             action = o.get("action")
@@ -491,8 +505,14 @@ def _format_pipeline_fields(summary: dict, execute: bool) -> list[dict]:
                 continue
             if status in ("held", "at_target"):
                 continue
-            if status in ("skipped_insufficient_cash", "skipped_cooldown",
-                          "skipped_no_price", "no_position"):
+            if status == "skipped_trading_paused":
+                lines.append(f"🔴 {action} {o.get('ticker')} — BLOCKED (trading paused)")
+            elif status == "dry_run":
+                lines.append(f"🚫 {action} {o.get('ticker')} — NOT placed (run was dry)")
+            elif status in ("skipped_insufficient_cash", "skipped_cooldown",
+                            "skipped_no_price", "no_position",
+                            "skipped_exposure_cap", "skipped_drawdown_pause",
+                            "skipped_too_expensive"):
                 lines.append(f"⏭️ {action} {o.get('ticker')} — skipped ({status})")
             elif o.get("filled_avg_price"):
                 lines.append(
@@ -501,6 +521,17 @@ def _format_pipeline_fields(summary: dict, execute: bool) -> list[dict]:
                 )
             else:
                 lines.append(f"⚠️ {action} {o.get('ticker')} — submitted, fill NOT confirmed (status={status})")
+
+        if forced_dry:
+            fields.append({
+                "name": "🔴 NO ORDERS PLACED",
+                "value": ("This run was forced to **dry-run** — nothing reached Alpaca. "
+                          "Usual cause: trading is paused (`/pausetrading`), the market "
+                          "is closed, or `EXECUTION_ENABLED=False`.\n"
+                          "The list below is what the pipeline *wanted* to do, not what "
+                          "it did. Your positions are unchanged."),
+                "inline": False,
+            })
         if lines:
             fields.append({"name": "📝 Orders", "value": "\n".join(lines)[:1024], "inline": False})
         unconfirmed = summary.get("orders_unconfirmed", 0)
@@ -564,11 +595,39 @@ def cmd_pipeline_execute(payload):
     _journal({"decision": "pipeline_execute", "success": ok})
     summary = _load_run_summary() if ok else None
     fields = _format_pipeline_fields(summary, execute=True) if summary else []
-    desc = "Execution complete — see below for what actually happened." if ok else f"```\n{out}\n```"
-    _reply(payload, [_embed(
-        "🚀 Pipeline — EXECUTED" + ("" if ok else " (FAILED)"),
-        desc, _GREEN if ok else _RED, fields,
-    )])
+
+    # The headline must match reality. A run that was forced to dry-run — by
+    # the kill switch, a closed market, or EXECUTION_ENABLED=False — placed
+    # NOTHING, and saying "EXECUTED" invites you to believe your positions
+    # changed when they did not (seen live during the 2026-08-02 drill).
+    orders    = (summary or {}).get("orders") or []
+    forced_dry = bool((summary or {}).get("dry_run")) or any(
+        (o.get("status") or "") in ("dry_run", "skipped_trading_paused") for o in orders)
+    placed = sum(1 for o in orders
+                 if o.get("filled_avg_price") or
+                 (o.get("status") or "") not in (
+                     "dry_run", "skipped_trading_paused", "held", "at_target",
+                     "no_position", "skipped_cooldown", "skipped_no_price",
+                     "skipped_insufficient_cash", "skipped_exposure_cap",
+                     "skipped_drawdown_pause", "skipped_too_expensive"))
+
+    if not ok:
+        title, desc, colour = "🚀 Pipeline — EXECUTE (FAILED)", f"```\n{out}\n```", _RED
+    elif forced_dry:
+        title  = "🛑 Pipeline — NO ORDERS PLACED"
+        desc   = ("The pipeline ran but was blocked from trading. Nothing was sent "
+                  "to Alpaca and your positions are unchanged.")
+        colour = _ORANGE
+    elif placed == 0:
+        title  = "✅ Pipeline — no action needed"
+        desc   = "The pipeline ran and decided no orders were required."
+        colour = _BLUE
+    else:
+        title  = f"🚀 Pipeline — EXECUTED ({placed} order(s))"
+        desc   = "Execution complete — see below for what actually happened."
+        colour = _GREEN
+
+    _reply(payload, [_embed(title, desc, colour, fields)])
 
 
 def cmd_strategy(payload):

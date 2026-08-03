@@ -1959,7 +1959,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
       await env.KV.put("trading_paused", JSON.stringify({
         paused_at: new Date().toISOString(),
       }));
-      return ephemeral("🔴 **Trading paused.**\nThe pipeline executor, webhook buys and auto-sells are all disabled.\nAlpaca's resting stops still protect open positions.\n**This does not expire** — resume with `/resumetrading`.\nCheck state any time with `/status`.");
+      return ephemeral("🔴 **Trading paused.**\nThe pipeline executor, webhook buys and auto-sells are all disabled.\nAlpaca's resting stops still protect open positions.\n**This does not expire** — resume with `/resumetrading`.\n\n⏱️ Allow **up to 60 seconds** to reach all systems (Cloudflare KV is eventually consistent). `/status` may still show Active until then — that is propagation, not failure.");
     }
 
     if (name === "resumetrading") {

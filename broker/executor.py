@@ -511,6 +511,28 @@ def execute_signals(
         log.info("  Room for new buys: $%s (cap) vs $%s (cash) — lower of the two applies",
                  "{:,.0f}".format(exposure_budget), "{:,.0f}".format(available_cash))
 
+    # ── Re-check the kill switch immediately before the first order ──────
+    # Cloudflare KV is eventually consistent: a /pausetrading write takes up
+    # to 60 seconds to become visible everywhere. Measured 2026-08-02 — the
+    # pause was invisible for ~3 minutes to a GitHub Actions runner reading
+    # from a different edge location. A full pipeline run takes several
+    # minutes, so a pause pressed at run start would otherwise be honoured
+    # only on the NEXT run, after this one had already traded. Re-reading here
+    # closes most of that window at the cost of one HTTP call.
+    if buy_signals and not dry_run:
+        try:
+            from broker.kv_lock import is_trading_paused
+            if is_trading_paused() is True:
+                log.warning("  🔴 TRADING PAUSED (detected on re-check before the "
+                            "first order) — abandoning %d buy(s). No orders placed.",
+                            len(buy_signals))
+                for s in buy_signals:
+                    orders.append({"ticker": s["ticker"], "action": "BUY",
+                                   "status": "skipped_trading_paused"})
+                buy_signals = []
+        except Exception as exc:
+            log.warning("  Pause re-check failed (%s) — proceeding", exc)
+
     for sig in buy_signals:
         ticker           = sig["ticker"]
         weight           = sig.get("weight", config.EQUAL_WEIGHT)
@@ -670,6 +692,7 @@ def execute_signals(
         "dry_run", "held", "no_position", "at_target",
         "skipped_no_price", "skipped_insufficient_cash", "skipped_cooldown",
         "skipped_exposure_cap", "skipped_too_expensive", "skipped_drawdown_pause",
+        "skipped_trading_paused",
     }
     orders_submitted = [o for o in orders if o.get("status") not in terminal_statuses
                         and o.get("status") != "failed"]

@@ -265,6 +265,48 @@ class TestKillSwitchIsWired(unittest.TestCase):
                       "executor does not read the /pausetrading kill switch — "
                       "the switch stops nothing (ARCHITECTURE §2.2)")
 
+    def test_pause_is_rechecked_before_the_first_order(self):
+        """
+        Cloudflare KV is eventually consistent. Measured 2026-08-02: a
+        /pausetrading write was invisible to the GitHub Actions runner for
+        ~3 minutes. A pipeline run takes several minutes, so checking only at
+        the start means a pause pressed during the run is honoured on the NEXT
+        run — after this one has already traded.
+        """
+        src = _src(ROOT / "broker" / "executor.py")
+        self.assertGreaterEqual(
+            src.count("is_trading_paused"), 2,
+            "the kill switch is read only once, at run start — a pause pressed "
+            "while the pipeline is scoring would not stop this run's orders")
+        # The re-check must sit between the BUY header and the buy loop itself,
+        # so it runs after scoring (minutes of wall clock) and before any order.
+        buy_section = src.split("[BUY] Processing")[1].split("for sig in buy_signals:")[0]
+        self.assertIn("is_trading_paused", buy_section,
+                      "no pause re-check between the BUY stage and the order loop")
+
+    def test_blocked_run_is_not_reported_as_executed(self):
+        """
+        Observed live 2026-08-02: with trading paused, /pipeline mode:execute
+        replied "🚀 Pipeline — EXECUTED · Execution complete — see what actually
+        happened" and listed "EXIT MATX — submitted, fill NOT confirmed".
+        Zero orders reached Alpaca. The report claimed action that never
+        occurred — the same class of bug as a control that claims to work and
+        doesn't, only inverted.
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("rc", ROOT / "broker" / "remote_commands.py")
+        rc = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(rc)
+        summary = {"regime": {"label": "BULL"}, "dry_run": True,
+                   "orders": [{"ticker": "MATX", "action": "EXIT", "status": "dry_run"},
+                              {"ticker": "SWK", "action": "BUY", "status": "dry_run"}]}
+        rendered = " ".join(f["name"] + " " + str(f["value"])
+                            for f in rc._format_pipeline_fields(summary, execute=True))
+        self.assertIn("NO ORDERS PLACED", rendered,
+                      "a blocked run does not say so")
+        self.assertNotIn("submitted", rendered,
+                         "a blocked run still describes orders as 'submitted'")
+
     def test_pause_check_distinguishes_unknown_from_running(self):
         src = _src(ROOT / "broker" / "kv_lock.py")
         self.assertIn("def is_trading_paused", src)
