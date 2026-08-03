@@ -1584,6 +1584,7 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
     if (name === "brief") {
       const mode = (opts.mode || "cached").toLowerCase();
 
+      // mode:fresh triggers a pipeline run, then the brief is read normally.
       if (mode === "fresh") {
         const appId = env.DISCORD_APP_ID || "";
         const token = i.token;
@@ -1598,331 +1599,37 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
                 "Content-Type": "application/json",
                 "User-Agent": "investment-alpha-worker",
               },
-              // Was "screener-refresh" (screener_daily.yml). That workflow is deleted;
-            // this now runs the pipeline dry, which is where picks come from.
-            body: JSON.stringify({ event_type: "discord-command",
-                                   client_payload: { command: "pipeline_dry" } }),
+              body: JSON.stringify({ event_type: "discord-command",
+                                     client_payload: { command: "pipeline_dry" } }),
             }
           );
           const ok = ghR.status === 204;
           await fetch(`https://discord.com/api/v10/webhooks/${appId}/${token}/messages/@original`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              embeds: [{
-                title: ok ? "🔄 Fresh Pipeline Run Triggered" : "❌ Pipeline Trigger Failed",
-                description: ok
-                  ? "Screener is running on GitHub Actions (~5 min).\nRun `/brief` again once it completes to see updated picks with buy buttons."
-                  : `Failed to trigger screener (HTTP ${ghR.status}). Try from GitHub Actions manually.`,
-                color: ok ? 0x2ECC71 : 0xE74C3C,
-                footer: { text: "GitHub → Actions → Scheduled Pipeline Proposal → Run workflow" },
-              }],
-            }),
+            body: JSON.stringify({ embeds: [{
+              title: ok ? "🔄 Fresh Pipeline Run Triggered" : "❌ Pipeline Trigger Failed",
+              description: ok
+                ? "Scoring ~574 stocks on GitHub Actions (~5 min). It will post the ranked picks when it finishes."
+                : `Failed to trigger the pipeline (HTTP ${ghR.status}). Try from GitHub Actions manually.`,
+              color: ok ? 0x2ECC71 : 0xE74C3C,
+            }], components: [] }),
           });
         })());
         return json({ type: R_DEFERRED_MESSAGE, data: { flags: EPHEMERAL } });
       }
 
-      // cached mode — build brief inline from KV + live Alpaca positions
-      try {
-        const alpacaBase = "https://paper-api.alpaca.markets";
-        let sPos = [], pPos = [], sAcct = null, pAcct = null, regime = null, summary = null, perfSnap = null, pSummary = null;
-        const [spR, saR, ppR, paR, rr, sr, perfR, psR] = await Promise.all([
-          fetch(`${alpacaBase}/v2/positions`, { headers: portfolioHeaders(env, "screener") }),
-          fetch(`${alpacaBase}/v2/account`,   { headers: portfolioHeaders(env, "screener") }),
-          fetch(`${alpacaBase}/v2/positions`, { headers: portfolioHeaders(env, "pipeline") }),
-          fetch(`${alpacaBase}/v2/account`,   { headers: portfolioHeaders(env, "pipeline") }),
-          env.KV.get("regime_signal"),
-          env.KV.get("screener_summary"),
-          env.KV.get("performance_snapshot"),
-          env.KV.get("pipeline_screener_summary"),
-        ]);
-        if (spR.ok) sPos     = await spR.json();
-        if (saR.ok) sAcct    = await saR.json();
-        if (ppR.ok) pPos     = await ppR.json();
-        if (paR.ok) pAcct    = await paR.json();
-        if (rr)     regime   = JSON.parse(rr);
-        if (sr)     summary  = JSON.parse(sr);
-        if (perfR)  perfSnap = JSON.parse(perfR);
-        if (psR)    pSummary = JSON.parse(psR);
-
-        const fmtPos = (positions) => {
-          const pnl = positions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
-          const val = positions.reduce((s, p) => s + parseFloat(p.market_value  || 0), 0);
-          const lines = positions.length
-            ? positions.map(p => {
-                const pp = parseFloat(p.unrealized_pl || 0);
-                const pc = parseFloat(p.unrealized_plpc || 0) * 100;
-                return `${pp >= 0 ? "📈" : "📉"} **${p.symbol}** ${pp >= 0 ? "+" : ""}$${pp.toFixed(2)} (${pc.toFixed(1)}%)`;
-              }).join("\n")
-            : "_No positions_";
-          return { pnl, val, lines };
-        };
-
-        const sc = fmtPos(Array.isArray(sPos) ? sPos : []);
-        const pc = fmtPos(Array.isArray(pPos) ? pPos : []);
-        const totalPnl = sc.pnl + pc.pnl;
-        // Show CASH, not buying_power — buying_power is margin-inflated (2-4x
-        // equity) and made the account look far richer than it is. Sizing uses
-        // cash/equity now, so the brief should report the same number.
-        const sBp      = parseFloat(sAcct?.cash || 0);
-        const pBp      = parseFloat(pAcct?.cash || 0);
-        const sEq      = parseFloat(sAcct?.equity || 0);
-        const pEq      = parseFloat(pAcct?.equity || 0);
-        const sInvPct  = sEq > 0 ? (sc.val / sEq * 100) : 0;
-        const pInvPct  = pEq > 0 ? (pc.val / pEq * 100) : 0;
-        const regLabel = regime?.label || "UNKNOWN";
-        const regScore = regime?.total  || 0;
-        const today    = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-        const allPicks = summary?.top_picks || [];
-
-        const heldSymbols = new Set((Array.isArray(sPos) ? sPos : []).map(p => p.symbol));
-        const newPicks    = allPicks.filter(p => !heldSymbols.has(p.ticker));
-        const heldPicks   = allPicks.filter(p =>  heldSymbols.has(p.ticker));
-
-        const picksLine = allPicks.length
-          ? allPicks.map(p => `${heldSymbols.has(p.ticker) ? "✅" : "🆕"} **${p.ticker}** ${p.score}/100`).join("  ·  ")
-          : "_No picks today — use mode:fresh to re-run the screener_";
-
-        // NOTE: this is NOT the pipeline engine's own scoring (pipeline/scoring.py).
-        // It's the screener algorithm run 3x/day against the pipeline account's
-        // credentials purely for display (pipeline_screener_summary KV). The
-        // pipeline engine's actual picks come from its weekly rebalance proposal
-        // (data/proposed_rebalance.json via /rebalance or the Monday Discord post),
-        // not from here. Labelled explicitly below so it isn't mistaken for that.
-        const pAllPicks = pSummary?.top_picks || [];
-        const pPicksLine = pAllPicks.length
-          ? pAllPicks.map(p => `${p.conviction_ok ? "✅" : "⚠️"} **${p.ticker}** ${p.score}/100`).join("  ·  ")
-          : "_No signal yet_";
-
-        const dataAge = summary?.date ? `Screener data from ${summary.date}` : "Screener data age unknown";
-
-        // Performance snapshot from KV (written by daily_performance.py at 8AM)
-        const perf    = perfSnap || {};
-        const perfSc  = perf.screener || {};
-        const perfPc  = perf.pipeline || {};
-        const spy     = perf.spy_daily;
-        const win     = perf.win_stats || {};
-        const perfDate = perf.date || null;
-
-        const fmtDailyPnl = (p) => {
-          if (!p || p.error) return "—";
-          const sign = p.daily_pl >= 0 ? "+" : "";
-          return `${sign}$${Math.abs(p.daily_pl).toFixed(0)} (${sign}${(p.daily_pl_pct || 0).toFixed(1)}%)`;
-        };
-
-        const perfFields = perfDate ? [
-          { name: "📈 Screener — Today",   value: fmtDailyPnl(perfSc), inline: true },
-          { name: "📈 Pipeline — Today",   value: fmtDailyPnl(perfPc), inline: true },
-          { name: spy != null ? `📊 SPY ${spy >= 0 ? "+" : ""}${spy?.toFixed(2)}%` : "📊 SPY",
-            value: (() => {
-              const parts = [];
-              if (perfSc.daily_pl_pct != null && spy != null) parts.push(`Screener α ${(perfSc.daily_pl_pct - spy).toFixed(1)}pp`);
-              if (perfPc.daily_pl_pct != null && spy != null) parts.push(`Pipeline α ${(perfPc.daily_pl_pct - spy).toFixed(1)}pp`);
-              return parts.join("  ·  ") || "—";
-            })(),
-            inline: true },
-        ] : [];
-
-        const winField = win.total > 0 ? [{
-          name:   `🎯 Win Rate — ${win.wins}/${win.total} trades`,
-          value:  `**${win.win_rate?.toFixed(0)}%** · avg win ${win.avg_win >= 0 ? "+" : ""}${win.avg_win?.toFixed(1)}% · avg loss ${win.avg_loss?.toFixed(1)}% · E[P&L] ${win.expectancy >= 0 ? "+" : ""}${win.expectancy?.toFixed(1)}%`,
-          inline: false,
-        }] : [];
-
-        // Up to 4 buy buttons (leave room for Refresh in a second row)
-        const buyBtns = newPicks.slice(0, 4).map(p => ({
-          type: 2, style: 1,
-          label: `🛒 Buy ${p.ticker}${p.conviction_ok ? " ✅" : ""}`,
-          custom_id: `ia|screener_buy|${p.ticker}|screener`,
-        }));
-        const refreshBtn = { type: 2, style: 2, label: "🔄 Run Fresh Screener", custom_id: "ia|brief_refresh|_|_" };
-
-        const components = [
-          ...(buyBtns.length ? [{ type: 1, components: buyBtns }] : []),
-          { type: 1, components: [refreshBtn] },
-        ];
-
+      // Same builder as the scheduled 09:25 brief — one implementation, so the
+      // two can never drift apart (they had, and both were screener-shaped).
+      const payload = await buildBriefPayload(env);
+      if (!payload) {
         return json({ type: R_CHANNEL_MESSAGE, data: {
-          flags: EPHEMERAL,
-          embeds: [{
-            title: `☀️ Morning Brief — ${today}`,
-            color: totalPnl >= 0 ? C_GREEN : C_RED,
-            description: `**📊 Screener positions**\n${sc.lines}\n\n**🔄 Pipeline positions**\n${pc.lines}`,
-            fields: [
-              { name: "Regime",              value: `${regLabel} (${regScore}/100)`,                    inline: true },
-              { name: "Screener open P&L",   value: `${sc.pnl >= 0 ? "+" : ""}$${sc.pnl.toFixed(0)}`, inline: true },
-              { name: "Pipeline open P&L",   value: `${pc.pnl >= 0 ? "+" : ""}$${pc.pnl.toFixed(0)}`, inline: true },
-              { name: "Screener cash",       value: `$${sBp.toFixed(0)} · ${sInvPct.toFixed(0)}% invested`, inline: true },
-              { name: "Pipeline cash",       value: `$${pBp.toFixed(0)} · ${pInvPct.toFixed(0)}% invested`, inline: true },
-              { name: "​",              value: "​",                                            inline: true },
-              ...perfFields,
-              ...winField,
-              { name: `📊 Screener picks (${newPicks.length} new · ${heldPicks.length} held)`,
-                value: picksLine, inline: false },
-              { name: "📡 Screener signal (on Pipeline acct, informational)", value: pPicksLine, inline: false },
-            ],
-            footer: { text: `${dataAge} · 🛒 = preview & confirm buy · ✅ ≥55 = high conviction · 🔄 = trigger fresh run · Pipeline's own picks: /rebalance or Monday's weekly proposal` },
-            timestamp: new Date().toISOString(),
-          }],
-          components,
+          flags: EPHEMERAL, content: "❌ Could not build the brief — Alpaca or KV unreachable.",
         }});
-      } catch (e) {
-        return ephemeral(`Error building brief: ${e.message}`);
       }
-    }
-
-    // /rebalance — check exposure vs regime limit, suggest 50% trims on winners
-    if (name === "rebalance") {
-      const portfolio = (opts.portfolio || "pipeline").toLowerCase();
-      const err = await dispatchToGitHub(env, {
-        command: "rebalance_suggest", portfolio, ...common,
-      }, "rebalance-check");
       return json({ type: R_CHANNEL_MESSAGE, data: {
-        flags: EPHEMERAL,
-        content: err
-          ? `❌ Could not trigger rebalance check — ${err}`
-          : `⚖️ Rebalance check running on **${portfolio}** account — suggestions appear in ~1 min.`,
+        flags: EPHEMERAL, embeds: payload.embeds, components: payload.components,
       }});
-    }
-
-    // /health — run the daily QA checker on demand
-    // Dispatches to health_check.yml (repository_dispatch: health-check), which
-    // runs the SAME scripts/health_check.py as the scheduled 8:30 AM job, so an
-    // on-demand result can never disagree with the scheduled one.
-    if (name === "health") {
-      const portfolio = (opts.portfolio || "both").toLowerCase();
-      const err = await dispatchToGitHub(env, {
-        command: "health", portfolio, ...common,
-      }, "health-check");
-      return json({ type: R_CHANNEL_MESSAGE, data: {
-        flags: EPHEMERAL,
-        content: err
-          ? `❌ Could not trigger health check — ${err}`
-          : `🩺 Health check running on **${portfolio}** — results in ~1-2 min.\n` +
-            `Checks: margin/exposure · stop levels · broker reconciliation · data freshness · factor sanity · trade log.`,
-      }});
-    }
-
-        // /regime — served directly from KV (updated 3x daily by screener)
-    if (name === "regime") {
-      try {
-        const raw = await env.KV.get("regime_signal");
-        if (!raw) {
-          return json({ type: R_CHANNEL_MESSAGE, data: {
-            flags: EPHEMERAL,
-            content: "No regime data yet — runs at 8 AM ET on weekdays.",
-          }});
-        }
-        const r = JSON.parse(raw);
-        const label = (r.label || "UNKNOWN").toUpperCase();
-        const score = r.total ?? r.score ?? 0;
-        const color = label === "BULL" ? C_GREEN : label === "BEAR" ? C_RED : C_ORANGE;
-        const d = r.details || {};
-        const noteParts = [];
-        if (d.spy_pct_from_200ma != null) noteParts.push(`SPY ${d.spy_pct_from_200ma > 0 ? "+" : ""}${Number(d.spy_pct_from_200ma).toFixed(1)}% vs 200MA`);
-        if (d.adx != null)                noteParts.push(`ADX ${Number(d.adx).toFixed(0)} (${d.spy_trend || "flat"})`);
-        if (d.breadth_pct != null)        noteParts.push(`Breadth ${d.breadth_pct}%`);
-        if (d.fg != null)                 noteParts.push(`F&G ${d.fg}`);
-        if (d.vix_struct)                 noteParts.push(`VIX ${d.vix_struct}`);
-        const autoNotes = noteParts.length ? noteParts.join(" · ") : "—";
-        return json({ type: R_CHANNEL_MESSAGE, data: {
-          flags: EPHEMERAL,
-          embeds: [{
-            title: `🧭 Market Regime: ${label}`,
-            description: "Regime measures the **structural trend** (200-day MA, volatility, credit) — not today's move. A red day inside an uptrend is still BULL.",
-            color,
-            fields: [
-              { name: "Score",       value: `${score}/100`,                                    inline: true },
-              { name: "Permitted",   value: (r.permitted_strategies || []).join(", ") || "—",  inline: true },
-              { name: "VIX",         value: (r.vix ?? r.vix_value) != null ? String(r.vix ?? r.vix_value) : "n/a", inline: true },
-              { name: "Notes",       value: autoNotes,                                         inline: false },
-            ],
-            footer: { text: `Updated 3× daily (8 AM, 11 AM, 3:30 PM ET) · as of ${r.date || new Date().toISOString().slice(0,10)}` },
-          }],
-        }});
-      } catch (e) {
-        return ephemeral(`Error reading regime: ${e.message}`);
-      }
-    }
-
-    // /buy — enriched calculator preview with Change qty support
-    if (name === "buy") {
-      const symbol = (opts.symbol || "").toUpperCase();
-      const portfolio = (opts.portfolio || "pipeline").toLowerCase();
-      if (!symbol) return ephemeral("Provide a ticker: `/buy symbol:AAPL`");
-
-      // Regime + bucket gates (same as before)
-      let regimeLabel = "UNKNOWN", regimeScore = 0, permitted = [];
-      try {
-        const raw = await env.KV.get("regime_signal");
-        if (raw) { const r = JSON.parse(raw); regimeLabel = r.label || "UNKNOWN"; regimeScore = r.total ?? r.score ?? 0; permitted = r.permitted_strategies || []; }
-      } catch {}
-
-      let bucket = "unknown", regimeOk = true, nearEarnings = false;
-      try {
-        const raw = await env.KV.get("stock_buckets");
-        if (raw) { const b = JSON.parse(raw); const info = b[symbol]; if (info) { bucket = info.bucket || "unknown"; regimeOk = info.regime_ok !== false; nearEarnings = info.near_earnings === true; } }
-      } catch {}
-
-      if (nearEarnings) return ephemeral(`⚠️ **${symbol}** is in earnings blackout (within 14 days). Wait until after earnings to avoid gap risk.`);
-      if (!regimeOk)    return ephemeral(`🚫 **${symbol}** bucket \`${bucket}\` is not permitted in **${regimeLabel}** market.\nPermitted: ${permitted.join(", ") || "none"}`);
-
-      // Build enriched preview (handles duplicate guard, max positions, ATR targets)
-      const preview = await buildBuyPreview(env, symbol, null, portfolio);
-      if (preview.error) return ephemeral(preview.error);
-      return json({ type: R_CHANNEL_MESSAGE, data: { flags: EPHEMERAL, embeds: preview.embeds, components: preview.components } });
-    }
-
-
-    // /sell — preview position then confirm close
-    if (name === "sell") {
-      const symbol = (opts.symbol || "").toUpperCase();
-      const portfolio = (opts.portfolio || "pipeline").toLowerCase();
-      const customQty = opts.qty ? parseInt(opts.qty) : null;
-      if (!symbol) return ephemeral("Provide a ticker: `/sell symbol:AAPL`");
-
-      const alpacaBase = "https://paper-api.alpaca.markets";
-      const ah = portfolioHeaders(env, portfolio);
-
-      let position = null;
-      let posApiErr = null;
-      try {
-        const r = await fetch(`${alpacaBase}/v2/positions/${symbol}`, { headers: ah });
-        if (r.ok) { position = await r.json(); }
-        else if (r.status === 404) { posApiErr = null; }
-        else { const b = await r.json().catch(() => ({})); posApiErr = `Alpaca API error ${r.status}: ${b?.message || 'unknown'}`; }
-      } catch (e) { posApiErr = `Network error: ${e.message}`; }
-      if (posApiErr) return ephemeral(`❌ Alpaca API error for **${symbol}**: ${posApiErr}`);
-      if (!position) return ephemeral(`❌ No open position found for **${symbol}**. Confirmed via Alpaca API (404).`);
-
-      const totalQty = parseInt(position.qty || 0);
-      const sellQty  = (customQty && customQty > 0 && customQty < totalQty) ? customQty : totalQty;
-      const partial  = sellQty < totalQty;
-      const price    = parseFloat(position.current_price || 0);
-      const pnl      = parseFloat(position.unrealized_pl || 0);
-      const pnlPct   = parseFloat(position.unrealized_plpc || 0) * 100;
-      const pnlStr   = `$${pnl.toFixed(2)} (${pnl >= 0 ? "+" : ""}${pnlPct.toFixed(1)}%)`;
-      const label    = partial
-        ? `🔴 Sell ${sellQty} of ${totalQty} [${portfolio === 'screener' ? 'Screener' : 'Pipeline'}]`
-        : `🔴 Sell all ${totalQty} shares [${portfolio === 'screener' ? 'Screener' : 'Pipeline'}]`;
-      const footerTxt = partial
-        ? `Partial sell — ${totalQty - sellQty} shares remain · Paper trading`
-        : "Closes entire position (cancels bracket legs first) · Paper trading";
-
-      return json({ type: R_CHANNEL_MESSAGE, data: { flags: EPHEMERAL, embeds: [{
-        title: `⚠️ Confirm SELL ${symbol}?`,
-        color: C_ORANGE,
-        fields: [
-          { name: "Shares",        value: `${sellQty}${partial ? ` of ${totalQty}` : ""}`, inline: true },
-          { name: "Current price", value: `$${price.toFixed(2)}`,                           inline: true },
-          { name: "Unrealised P&L",value: pnlStr,                                           inline: true },
-        ],
-        footer: { text: footerTxt },
-      }], components: [{ type: 1, components: [
-        { type: 2, style: 4, label, custom_id: `ia|confirm_sell_execute|${symbol}|sell|${sellQty}:${totalQty}|${portfolio}` },
-        { type: 2, style: 2, label: "❌ Cancel", custom_id: `ia|cancel||sell` },
-      ]}]}});
     }
 
     if (name === "pausetrading") {
@@ -2007,97 +1714,157 @@ async function handleDiscordInteraction(bodyText, env, ctx) {
 //  MORNING BRIEF — fires at 9:25am ET (13:25 UTC) on weekdays
 //  Summarises: regime, positions P&L, buying power, top screener pick
 // ══════════════════════════════════════════════════════════════════════════
+
+// ── Morning brief ──────────────────────────────────────────────────────────
+// Rewritten 2026-08-03. The old brief was a screener P&L dump: two accounts,
+// per-position profit lines, "conviction" badges, and a regime that read
+// "UNKNOWN (0/100)". None of it answered the questions that actually matter
+// each morning:
+//
+//     Am I protected?   Every position must have a resting stop.
+//     What can I lose?  Distance from price to stop, in dollars.
+//     What is closest?  Which position is nearest being sold.
+//     Can I act?        Exposure headroom, and whether trading is paused.
+//     What is due?      Monday means a proposal is waiting.
+//
+// Per-position P&L lives in /status. This answers "is anything wrong, and is
+// anything required of me?" — nothing else.
+async function buildBriefPayload(env) {
+  const alpacaBase = "https://paper-api.alpaca.markets";
+  const H = portfolioHeaders(env, "pipeline");
+
+  let positions = [], acct = null, orders = [], regime = null, summary = null, paused = null;
+  try {
+    const [pR, aR, oR, rr, sr, tp] = await Promise.all([
+      fetch(`${alpacaBase}/v2/positions`, { headers: H }),
+      fetch(`${alpacaBase}/v2/account`,   { headers: H }),
+      fetch(`${alpacaBase}/v2/orders?status=open&limit=200`, { headers: H }),
+      env.KV.get("regime_signal"),
+      env.KV.get("pipeline_summary").then(v => v || env.KV.get("screener_summary")),
+      env.KV.get("trading_paused"),
+    ]);
+    if (pR.ok) positions = await pR.json();
+    if (aR.ok) acct      = await aR.json();
+    if (oR.ok) orders    = await oR.json();
+    if (rr) regime  = JSON.parse(rr);
+    if (sr) summary = JSON.parse(sr);
+    paused = !!tp;
+  } catch (e) {
+    console.error("brief fetch error:", e.message);
+    return null;
+  }
+  if (!Array.isArray(positions)) positions = [];
+  if (!Array.isArray(orders))    orders    = [];
+
+  const equity = parseFloat(acct?.equity || 0);
+  const cash   = parseFloat(acct?.cash   || 0);
+  const invested = equity - cash;
+  const invPct   = equity > 0 ? (invested / equity * 100) : 0;
+  const openPnl  = positions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
+
+  // Resting protective stops, by symbol
+  const stops = {};
+  for (const o of orders) {
+    const type = String(o.type || o.order_type || "").toLowerCase();
+    const side = String(o.side || "").toLowerCase();
+    if (type.includes("stop") && side === "sell" && o.stop_price) {
+      stops[o.symbol] = parseFloat(o.stop_price);
+    }
+  }
+
+  // Protection + risk-to-stop
+  let riskTotal = 0, unprotected = [], nearest = null;
+  for (const p of positions) {
+    const qty   = Math.abs(parseFloat(p.qty || 0));
+    const price = parseFloat(p.current_price || 0);
+    const stop  = stops[p.symbol];
+    if (!stop) { unprotected.push(p.symbol); continue; }
+    riskTotal += Math.max(0, (price - stop) * qty);
+    const awayPct = price > 0 ? ((price - stop) / price * 100) : 0;
+    if (!nearest || awayPct < nearest.awayPct) {
+      nearest = { symbol: p.symbol, awayPct, stop, price };
+    }
+  }
+  const withStops = positions.length - unprotected.length;
+  const riskPct   = equity > 0 ? (riskTotal / equity * 100) : 0;
+
+  // Exposure headroom against the regime cap
+  const CAPS = { "MOD BULL": 0.95, "STRONG BULL": 0.95, "NEUTRAL": 0.75, "BEARISH": 0.40 };
+  const regLabel = regime?.label || "UNKNOWN";
+  const cap      = CAPS[regLabel] ?? 0.75;
+  const headroom = Math.max(0, equity * cap - invested);
+
+  const now   = new Date();
+  const today = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const dow   = now.getUTCDay();
+
+  // What is due today
+  let due = "Nothing scheduled — the pipeline proposes weekly on Mondays.";
+  if (dow === 1) due = "📅 **Weekly proposal at 09:45 ET** — review, then tap Execute if you agree.";
+  else if (dow === 6 || dow === 0) due = "Markets closed. Learning loop runs Saturday.";
+
+  // Headline reflects the thing most worth knowing
+  let title, colour, headline;
+  if (unprotected.length) {
+    title = "⚠️ Morning Brief — UNPROTECTED POSITIONS";
+    colour = C_RED;
+    headline = `**${unprotected.length} position(s) have no stop at the broker: ${unprotected.join(", ")}**\nRun \`python scripts/protect_positions.py\` before anything else.`;
+  } else if (paused) {
+    title = "🔴 Morning Brief — TRADING PAUSED";
+    colour = 0xE67E22;
+    headline = `All ${positions.length} positions protected. Trading is paused — no new orders will be placed. \`/resumetrading\` to re-enable.`;
+  } else {
+    title = `☀️ Morning Brief — ${today}`;
+    colour = C_GREEN;
+    headline = positions.length
+      ? `All **${positions.length}** positions carry a resting stop. Worst case if every stop fires: **-$${riskTotal.toFixed(0)}** (${riskPct.toFixed(1)}% of equity).`
+      : "No open positions.";
+  }
+
+  const fields = [
+    { name: "🛡️ Protection",
+      value: positions.length ? `${withStops}/${positions.length} stops resting` : "—",
+      inline: true },
+    { name: "💰 Risk to stops",
+      value: positions.length ? `$${riskTotal.toFixed(0)} (${riskPct.toFixed(1)}%)` : "—",
+      inline: true },
+    { name: "⚠️ Closest to stop",
+      value: nearest ? `${nearest.symbol} ${nearest.awayPct.toFixed(1)}% away` : "—",
+      inline: true },
+    { name: "📊 Regime",
+      value: `${regLabel}${regime?.vix ? ` · VIX ${Number(regime.vix).toFixed(1)}` : ""}`,
+      inline: true },
+    { name: "📈 Exposure",
+      value: `${invPct.toFixed(0)}% of ${(cap * 100).toFixed(0)}% cap` +
+             (headroom > 0 ? ` · $${headroom.toFixed(0)} room` : " · **at cap**"),
+      inline: true },
+    { name: "🔦 Trading",
+      value: paused ? "🔴 PAUSED" : "🟢 Active",
+      inline: true },
+    { name: "💼 Account",
+      value: `Equity $${equity.toFixed(0)} · Cash $${cash.toFixed(0)} · Open P&L ${openPnl >= 0 ? "+" : ""}$${openPnl.toFixed(0)}`,
+      inline: false },
+    { name: "📅 Today", value: due, inline: false },
+  ];
+
+  const stale = regLabel === "UNKNOWN"
+    ? "⚠️ Regime unknown — scripts/publish_pipeline_kv.py has not run yet today."
+    : "Per-position detail: /status · Stop levels: /stoploss mode:check";
+
+  return {
+    embeds: [{ title, color: colour, description: headline, fields,
+               footer: { text: stale }, timestamp: new Date().toISOString() }],
+    components: [],
+  };
+}
+
+
 async function runMorningBrief(env) {
   const webhookUrl = env.DISCORD_WEBHOOK_URL || "";
   if (!webhookUrl) return;
-
-  const alpacaBase = "https://paper-api.alpaca.markets";
-
-  let sPos = [], pPos = [], sAcct = null, pAcct = null, regime = null, summary = null;
-  try {
-    const [spR, saR, ppR, paR, rr, sr] = await Promise.all([
-      fetch(`${alpacaBase}/v2/positions`, { headers: portfolioHeaders(env, "screener") }),
-      fetch(`${alpacaBase}/v2/account`,   { headers: portfolioHeaders(env, "screener") }),
-      fetch(`${alpacaBase}/v2/positions`, { headers: portfolioHeaders(env, "pipeline") }),
-      fetch(`${alpacaBase}/v2/account`,   { headers: portfolioHeaders(env, "pipeline") }),
-      env.KV.get("regime_signal"),
-      env.KV.get("screener_summary"),
-    ]);
-    if (spR.ok) sPos  = await spR.json();
-    if (saR.ok) sAcct = await saR.json();
-    if (ppR.ok) pPos  = await ppR.json();
-    if (paR.ok) pAcct = await paR.json();
-    if (rr) regime  = JSON.parse(rr);
-    if (sr) summary = JSON.parse(sr);
-  } catch (e) { console.error("Morning brief fetch error:", e.message); return; }
-
-  const fmtPositions = (positions, label) => {
-    const pnl = positions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
-    const val = positions.reduce((s, p) => s + parseFloat(p.market_value  || 0), 0);
-    const lines = positions.length
-      ? positions.map(p => {
-          const pp = parseFloat(p.unrealized_pl || 0);
-          const pc = parseFloat(p.unrealized_plpc || 0) * 100;
-          return `${pp >= 0 ? "📈" : "📉"} **${p.symbol}** ${pp >= 0 ? "+" : ""}$${pp.toFixed(2)} (${pc.toFixed(1)}%)`;
-        }).join("\n")
-      : "_No positions_";
-    return { pnl, val, lines };
-  };
-
-  const sc = fmtPositions(Array.isArray(sPos) ? sPos : [], "Screener");
-  const pc = fmtPositions(Array.isArray(pPos) ? pPos : [], "Pipeline");
-  const totalPnl = sc.pnl + pc.pnl;
-  // Cash, not buying_power — see note in the /brief handler above.
-  const sBp      = parseFloat(sAcct?.cash || 0);
-  const pBp      = parseFloat(pAcct?.cash || 0);
-  const sEq2     = parseFloat(sAcct?.equity || 0);
-  const pEq2     = parseFloat(pAcct?.equity || 0);
-  const sInv2    = sEq2 > 0 ? (sc.val / sEq2 * 100) : 0;
-  const pInv2    = pEq2 > 0 ? (pc.val / pEq2 * 100) : 0;
-  const regLabel = regime?.label || "UNKNOWN";
-  const regScore = regime?.total  || 0;
-  const today     = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  const allPicks  = summary?.top_picks || [];
-
-  // New picks = top picks not already held in the Screener account
-  const heldSymbols = new Set((Array.isArray(sPos) ? sPos : []).map(p => p.symbol));
-  const newPicks    = allPicks.filter(p => !heldSymbols.has(p.ticker));
-  const heldPicks   = allPicks.filter(p =>  heldSymbols.has(p.ticker));
-
-  // Top picks summary line
-  const picksLine = allPicks.length
-    ? allPicks.map(p => `${heldSymbols.has(p.ticker) ? "✅" : "🆕"} **${p.ticker}** ${p.score}/100`).join("  ·  ")
-    : "_No picks today_";
-
-  // Buy buttons for new picks (max 5 per Discord row)
-  const buyButtons = newPicks.slice(0, 5).map(p => ({
-    type: 2, style: 1,
-    label: `🛒 Buy ${p.ticker}${p.conviction_ok ? " ✅" : ""}`,
-    custom_id: `ia|screener_buy|${p.ticker}|screener`,
-  }));
-
-  const components = buyButtons.length
-    ? [{ type: 1, components: buyButtons }]
-    : [];
-
-  await postDiscordWebhook(webhookUrl, [{
-    title:       `☀️ Morning Brief — ${today}`,
-    color:       totalPnl >= 0 ? C_GREEN : C_RED,
-    description: `**📊 Screener**\n${sc.lines}\n\n**🔧 Pipeline**\n${pc.lines}`,
-    fields: [
-      { name: "Regime",              value: `${regLabel} (${regScore}/100)`,                     inline: true },
-      { name: "Screener P&L",        value: `${sc.pnl >= 0 ? "+" : ""}$${sc.pnl.toFixed(2)}`,  inline: true },
-      { name: "Pipeline P&L",        value: `${pc.pnl >= 0 ? "+" : ""}$${pc.pnl.toFixed(2)}`,  inline: true },
-      { name: "Screener value",      value: `$${sc.val.toFixed(2)}`,                             inline: true },
-      { name: "Pipeline value",      value: `$${pc.val.toFixed(2)}`,                             inline: true },
-      { name: "Screener cash",       value: `$${sBp.toFixed(0)} · ${sInv2.toFixed(0)}% invested`, inline: true },
-      { name: "Pipeline cash",       value: `$${pBp.toFixed(0)} · ${pInv2.toFixed(0)}% invested`, inline: true },
-      { name: `Today's picks (${newPicks.length} new · ${heldPicks.length} held)`,
-        value: picksLine, inline: false },
-    ],
-    footer:    { text: newPicks.length ? "Click a 🛒 button to preview & confirm the buy · ✅ = high conviction" : "All top picks already held · Paper trading" },
-    timestamp: new Date().toISOString(),
-  }], components);
+  const payload = await buildBriefPayload(env);
+  if (!payload) return;
+  await postDiscordWebhook(webhookUrl, payload.embeds, payload.components);
 }
 
 async function runTakeProfitMonitor(env) {
