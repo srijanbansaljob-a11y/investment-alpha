@@ -1,92 +1,50 @@
 {
   "schema_version": 2,
-  "run_date": "2026-07-31",
+  "run_date": "2026-08-03",
   "regime": "bull",
   "regime_detail": {
     "regime": "bull",
-    "vix_current": 17.09,
-    "spx_price": 7433.29,
-    "spx_200ma": 7023.82,
-    "spx_vs_200ma_pct": 5.83,
-    "yield_curve_spread": 1.055,
-    "credit_spread_momentum": 0.021068,
+    "vix_current": 15.99,
+    "spx_price": 7489.72,
+    "spx_200ma": 7024.11,
+    "spx_vs_200ma_pct": 6.63,
+    "yield_curve_spread": 0.86,
+    "credit_spread_momentum": 0.02088,
     "active_top_n": 10,
     "active_stop_loss": 0.85,
-    "timestamp": "2026-07-31T15:43:36.272014+00:00",
-    "notes": "SPX 5.8% above 200MA, VIX=17.1 (benign)"
+    "timestamp": "2026-08-03T10:31:31.690235+00:00",
+    "notes": "SPX 6.6% above 200MA, VIX=16.0 (benign)"
   },
   "signal_summary": {
-    "total_signals": 10,
-    "buy": 10,
-    "hold": 0,
-    "exit": 0,
-    "run_date": "2026-07-31",
+    "total_signals": 11,
+    "buy": 2,
+    "hold": 8,
+    "exit": 1,
+    "run_date": "2026-08-03",
     "regime": "bull"
   },
   "portfolio": [
     {
       "ticker": "HST",
       "name": "Host Hotels & Resorts, Inc.",
-      "action": "BUY",
-      "weight": 0.13836,
-      "score": 0.6522,
-      "entry_price": 25.09,
+      "action": "HOLD",
+      "weight": 0.148092,
+      "score": 0.6534,
+      "entry_price": 25.18,
       "entry_date": "2026-07-31",
       "signals": {
         "trend": "bullish",
         "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "APA",
-      "name": "APA Corporation",
-      "action": "BUY",
-      "weight": 0.069103,
-      "score": 0.6068,
-      "entry_price": 36.33,
-      "entry_date": "2026-07-31",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "CVS",
-      "name": "CVS Health Corporation",
-      "action": "BUY",
-      "weight": 0.104123,
-      "score": 0.606,
-      "entry_price": 105.22,
-      "entry_date": "2026-07-31",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "EIX",
-      "name": "Edison International",
-      "action": "BUY",
-      "weight": 0.141462,
-      "score": 0.6058,
-      "entry_price": 78.73,
-      "entry_date": "2026-07-31",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "moderate",
         "above_ma200": true
       }
     },
     {
       "ticker": "INCY",
       "name": "Incyte Corporation",
-      "action": "BUY",
-      "weight": 0.080417,
-      "score": 0.6023,
-      "entry_price": 122.99,
+      "action": "HOLD",
+      "weight": 0.083682,
+      "score": 0.6213,
+      "entry_price": 119.61,
       "entry_date": "2026-07-31",
       "signals": {
         "trend": "bullish",
@@ -97,24 +55,52 @@
     {
       "ticker": "ALL",
       "name": "The Allstate Corporation",
-      "action": "BUY",
-      "weight": 0.10568,
-      "score": 0.5849,
-      "entry_price": 265.38,
+      "action": "HOLD",
+      "weight": 0.111664,
+      "score": 0.6018,
+      "entry_price": 267.1616,
       "entry_date": "2026-07-31",
       "signals": {
         "trend": "bullish",
-        "momentum": "moderate",
+        "momentum": "strong",
         "above_ma200": true
       }
     },
     {
       "ticker": "VTRS",
       "name": "Viatris Inc.",
-      "action": "BUY",
-      "weight": 0.090284,
-      "score": 0.5832,
-      "entry_price": 17.76,
+      "action": "HOLD",
+      "weight": 0.0956,
+      "score": 0.6001,
+      "entry_price": 17.53,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "APA",
+      "name": "APA Corporation",
+      "action": "HOLD",
+      "weight": 0.07243,
+      "score": 0.5977,
+      "entry_price": 36.62,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "CVS",
+      "name": "CVS Health Corporation",
+      "action": "HOLD",
+      "weight": 0.110709,
+      "score": 0.5946,
+      "entry_price": 105.5018,
       "entry_date": "2026-07-31",
       "signals": {
         "trend": "bullish",
@@ -125,10 +111,10 @@
     {
       "ticker": "DAL",
       "name": "Delta Air Lines, Inc.",
-      "action": "BUY",
-      "weight": 0.076644,
-      "score": 0.5784,
-      "entry_price": 88.59,
+      "action": "HOLD",
+      "weight": 0.081581,
+      "score": 0.5904,
+      "entry_price": 87.79,
       "entry_date": "2026-07-31",
       "signals": {
         "trend": "bullish",
@@ -137,13 +123,13 @@
       }
     },
     {
-      "ticker": "MATX",
-      "name": "Matson, Inc.",
+      "ticker": "SWK",
+      "name": "Stanley Black & Decker, Inc.",
       "action": "BUY",
-      "weight": 0.082806,
-      "score": 0.578,
-      "entry_price": 203.65,
-      "entry_date": "2026-07-31",
+      "weight": 0.086185,
+      "score": 0.5858,
+      "entry_price": 94.58,
+      "entry_date": "2026-08-03",
       "signals": {
         "trend": "bullish",
         "momentum": "strong",
@@ -153,14 +139,28 @@
     {
       "ticker": "TRV",
       "name": "The Travelers Companies, Inc.",
-      "action": "BUY",
-      "weight": 0.111121,
-      "score": 0.5767,
-      "entry_price": 375.99,
+      "action": "HOLD",
+      "weight": 0.117199,
+      "score": 0.5818,
+      "entry_price": 379.31,
       "entry_date": "2026-07-31",
       "signals": {
         "trend": "bullish",
-        "momentum": "moderate",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "NUE",
+      "name": "Nucor Corporation",
+      "action": "BUY",
+      "weight": 0.092858,
+      "score": 0.5685,
+      "entry_price": 257.29,
+      "entry_date": "2026-08-03",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
         "above_ma200": true
       }
     }

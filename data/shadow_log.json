@@ -1066,5 +1066,2310 @@
         }
       }
     ]
+  },
+  {
+    "date": "2026-08-03",
+    "regime": "bull",
+    "evaluated": false,
+    "universe_n": 573,
+    "source": "scored universe",
+    "stocks": [
+      {
+        "ticker": "HST",
+        "rank": 1,
+        "composite": 0.6534,
+        "price": 25.13,
+        "scores": {
+          "momentum": 0.7193,
+          "trend": 0.6283,
+          "quality": 0.6794,
+          "valuation": 0.8658,
+          "sentiment": 0.4428,
+          "volatility": 0.1012
+        }
+      },
+      {
+        "ticker": "INCY",
+        "rank": 2,
+        "composite": 0.6213,
+        "price": 119.52,
+        "scores": {
+          "momentum": 0.741,
+          "trend": 0.7561,
+          "quality": 0.7481,
+          "valuation": 0.7261,
+          "sentiment": 0.4179,
+          "volatility": 0.6161
+        }
+      },
+      {
+        "ticker": "ALL",
+        "rank": 3,
+        "composite": 0.6018,
+        "price": 264.08,
+        "scores": {
+          "momentum": 0.6281,
+          "trend": 0.7312,
+          "quality": 0.6555,
+          "valuation": 0.7717,
+          "sentiment": 0.393,
+          "volatility": 0.3211
+        }
+      },
+      {
+        "ticker": "MU",
+        "rank": 4,
+        "composite": 0.6001,
+        "price": 823.03,
+        "scores": {
+          "momentum": 0.9703,
+          "trend": 0.3525,
+          "quality": 0.6579,
+          "valuation": 0.9449,
+          "sentiment": 0.6501,
+          "volatility": 0.993
+        }
+      },
+      {
+        "ticker": "VTRS",
+        "rank": 5,
+        "composite": 0.6001,
+        "price": 17.56,
+        "scores": {
+          "momentum": 0.7368,
+          "trend": 0.6819,
+          "quality": 0.5029,
+          "valuation": 0.9558,
+          "sentiment": 0.4307,
+          "volatility": 0.4939
+        }
+      },
+      {
+        "ticker": "HPE",
+        "rank": 6,
+        "composite": 0.5994,
+        "price": 47.9,
+        "scores": {
+          "momentum": 0.8925,
+          "trend": 0.7059,
+          "quality": 0.432,
+          "valuation": 0.8373,
+          "sentiment": 0.6103,
+          "volatility": 0.9424
+        }
+      },
+      {
+        "ticker": "APA",
+        "rank": 7,
+        "composite": 0.5977,
+        "price": 37.32,
+        "scores": {
+          "momentum": 0.6792,
+          "trend": 0.6518,
+          "quality": 0.7984,
+          "valuation": 0.8706,
+          "sentiment": 0.4174,
+          "volatility": 0.7138
+        }
+      },
+      {
+        "ticker": "CVS",
+        "rank": 8,
+        "composite": 0.5946,
+        "price": 104.43,
+        "scores": {
+          "momentum": 0.7598,
+          "trend": 0.6274,
+          "quality": 0.5173,
+          "valuation": 0.7411,
+          "sentiment": 0.5377,
+          "volatility": 0.3281
+        }
+      },
+      {
+        "ticker": "DAL",
+        "rank": 9,
+        "composite": 0.5904,
+        "price": 87.44,
+        "scores": {
+          "momentum": 0.8028,
+          "trend": 0.7158,
+          "quality": 0.4048,
+          "valuation": 0.9394,
+          "sentiment": 0.613,
+          "volatility": 0.6318
+        }
+      },
+      {
+        "ticker": "SWK",
+        "rank": 10,
+        "composite": 0.5858,
+        "price": 94.58,
+        "scores": {
+          "momentum": 0.6515,
+          "trend": 0.716,
+          "quality": 0.6478,
+          "valuation": 0.8511,
+          "sentiment": 0.4057,
+          "volatility": 0.6003
+        }
+      },
+      {
+        "ticker": "TRV",
+        "rank": 11,
+        "composite": 0.5818,
+        "price": 374.36,
+        "scores": {
+          "momentum": 0.6253,
+          "trend": 0.7304,
+          "quality": 0.6929,
+          "valuation": 0.5715,
+          "sentiment": 0.3671,
+          "volatility": 0.2897
+        }
+      },
+      {
+        "ticker": "NUE",
+        "rank": 12,
+        "composite": 0.5685,
+        "price": 257.29,
+        "scores": {
+          "momentum": 0.7423,
+          "trend": 0.7284,
+          "quality": 0.5568,
+          "valuation": 0.6355,
+          "sentiment": 0.5351,
+          "volatility": 0.534
+        }
+      },
+      {
+        "ticker": "CF",
+        "rank": 13,
+        "composite": 0.5675,
+        "price": 125.19,
+        "scores": {
+          "momentum": 0.539,
+          "trend": 0.7199,
+          "quality": 0.7467,
+          "valuation": 0.8484,
+          "sentiment": 0.3755,
+          "volatility": 0.6457
+        }
+      },
+      {
+        "ticker": "AIZ",
+        "rank": 14,
+        "composite": 0.566,
+        "price": 279.19,
+        "scores": {
+          "momentum": 0.6383,
+          "trend": 0.5633,
+          "quality": 0.6368,
+          "valuation": 0.5443,
+          "sentiment": 0.5197,
+          "volatility": 0.0175
+        }
+      },
+      {
+        "ticker": "EIX",
+        "rank": 15,
+        "composite": 0.5658,
+        "price": 73.37,
+        "scores": {
+          "momentum": 0.6641,
+          "trend": 0.3656,
+          "quality": 0.7128,
+          "valuation": 0.8691,
+          "sentiment": 0.3898,
+          "volatility": 0.2513
+        }
+      },
+      {
+        "ticker": "MATX",
+        "rank": 16,
+        "composite": 0.5656,
+        "price": 202.59,
+        "scores": {
+          "momentum": 0.8185,
+          "trend": 0.5127,
+          "quality": 0.438,
+          "valuation": 0.8892,
+          "sentiment": 0.3596,
+          "volatility": 0.4293
+        }
+      },
+      {
+        "ticker": "UAL",
+        "rank": 17,
+        "composite": 0.5629,
+        "price": 121.33,
+        "scores": {
+          "momentum": 0.7863,
+          "trend": 0.6185,
+          "quality": 0.3984,
+          "valuation": 0.976,
+          "sentiment": 0.6353,
+          "volatility": 0.801
+        }
+      },
+      {
+        "ticker": "MTCH",
+        "rank": 18,
+        "composite": 0.556,
+        "price": 39.41,
+        "scores": {
+          "momentum": 0.5571,
+          "trend": 0.6401,
+          "quality": 0.6779,
+          "valuation": 0.85,
+          "sentiment": 0.4259,
+          "volatility": 0.4729
+        }
+      },
+      {
+        "ticker": "KIM",
+        "rank": 19,
+        "composite": 0.5528,
+        "price": 25.48,
+        "scores": {
+          "momentum": 0.5883,
+          "trend": 0.596,
+          "quality": 0.5904,
+          "valuation": 0.7128,
+          "sentiment": 0.4285,
+          "volatility": 0.0698
+        }
+      },
+      {
+        "ticker": "BMY",
+        "rank": 20,
+        "composite": 0.5513,
+        "price": 65.31,
+        "scores": {
+          "momentum": 0.4403,
+          "trend": 0.6392,
+          "quality": 0.6943,
+          "valuation": 0.8842,
+          "sentiment": 0.3904,
+          "volatility": 0.3072
+        }
+      },
+      {
+        "ticker": "AES",
+        "rank": 21,
+        "composite": 0.5457,
+        "price": 14.68,
+        "scores": {
+          "momentum": 0.587,
+          "trend": 0.3933,
+          "quality": 0.5271,
+          "valuation": 0.8733,
+          "sentiment": 0.3734,
+          "volatility": 0.0035
+        }
+      },
+      {
+        "ticker": "BEN",
+        "rank": 22,
+        "composite": 0.544,
+        "price": 33.86,
+        "scores": {
+          "momentum": 0.7262,
+          "trend": 0.6486,
+          "quality": 0.4917,
+          "valuation": 0.5869,
+          "sentiment": 0.3877,
+          "volatility": 0.274
+        }
+      },
+      {
+        "ticker": "CNC",
+        "rank": 23,
+        "composite": 0.5396,
+        "price": 62.22,
+        "scores": {
+          "momentum": 0.7184,
+          "trend": 0.4444,
+          "quality": 0.5536,
+          "valuation": 0.843,
+          "sentiment": 0.4476,
+          "volatility": 0.6178
+        }
+      },
+      {
+        "ticker": "MRK",
+        "rank": 24,
+        "composite": 0.5382,
+        "price": 130.2,
+        "scores": {
+          "momentum": 0.6205,
+          "trend": 0.6601,
+          "quality": 0.4614,
+          "valuation": 0.7094,
+          "sentiment": 0.4762,
+          "volatility": 0.3316
+        }
+      },
+      {
+        "ticker": "GOOGL",
+        "rank": 25,
+        "composite": 0.5279,
+        "price": 356.13,
+        "scores": {
+          "momentum": 0.7626,
+          "trend": 0.6263,
+          "quality": 0.6049,
+          "valuation": 0.1928,
+          "sentiment": 0.6071,
+          "volatility": 0.5672
+        }
+      },
+      {
+        "ticker": "WDC",
+        "rank": 26,
+        "composite": 0.5241,
+        "price": 544.84,
+        "scores": {
+          "momentum": 0.9497,
+          "trend": 0.6322,
+          "quality": 0.6553,
+          "valuation": 0.1212,
+          "sentiment": 0.5966,
+          "volatility": 0.9878
+        }
+      },
+      {
+        "ticker": "HOPE",
+        "rank": 27,
+        "composite": 0.5208,
+        "price": 14.01,
+        "scores": {
+          "momentum": 0.5893,
+          "trend": 0.6147,
+          "quality": 0.4061,
+          "valuation": 0.7234,
+          "sentiment": 0.4794,
+          "volatility": 0.0977
+        }
+      },
+      {
+        "ticker": "IEX",
+        "rank": 28,
+        "composite": 0.5191,
+        "price": 230.45,
+        "scores": {
+          "momentum": 0.5869,
+          "trend": 0.6558,
+          "quality": 0.5275,
+          "valuation": 0.3913,
+          "sentiment": 0.472,
+          "volatility": 0.0471
+        }
+      },
+      {
+        "ticker": "KVUE",
+        "rank": 29,
+        "composite": 0.5165,
+        "price": 19.24,
+        "scores": {
+          "momentum": 0.4805,
+          "trend": 0.6573,
+          "quality": 0.622,
+          "valuation": 0.5126,
+          "sentiment": 0.3845,
+          "volatility": 0.1361
+        }
+      },
+      {
+        "ticker": "PSA",
+        "rank": 30,
+        "composite": 0.5129,
+        "price": 324.17,
+        "scores": {
+          "momentum": 0.5529,
+          "trend": 0.6887,
+          "quality": 0.6325,
+          "valuation": 0.5831,
+          "sentiment": 0.4047,
+          "volatility": 0.2077
+        }
+      },
+      {
+        "ticker": "SBH",
+        "rank": 31,
+        "composite": 0.5096,
+        "price": 14.97,
+        "scores": {
+          "momentum": 0.5531,
+          "trend": 0.6091,
+          "quality": 0.6002,
+          "valuation": 0.9464,
+          "sentiment": 0.3538,
+          "volatility": 0.6963
+        }
+      },
+      {
+        "ticker": "USB",
+        "rank": 32,
+        "composite": 0.507,
+        "price": 63.01,
+        "scores": {
+          "momentum": 0.6065,
+          "trend": 0.6403,
+          "quality": 0.4028,
+          "valuation": 0.5826,
+          "sentiment": 0.508,
+          "volatility": 0.1675
+        }
+      },
+      {
+        "ticker": "KRYS",
+        "rank": 33,
+        "composite": 0.5045,
+        "price": 341.12,
+        "scores": {
+          "momentum": 0.8569,
+          "trend": 0.5299,
+          "quality": 0.6292,
+          "valuation": 0.0589,
+          "sentiment": 0.595,
+          "volatility": 0.6597
+        }
+      },
+      {
+        "ticker": "LMT",
+        "rank": 34,
+        "composite": 0.503,
+        "price": 582.74,
+        "scores": {
+          "momentum": 0.494,
+          "trend": 0.6272,
+          "quality": 0.6246,
+          "valuation": 0.6945,
+          "sentiment": 0.42,
+          "volatility": 0.445
+        }
+      },
+      {
+        "ticker": "CHRD",
+        "rank": 35,
+        "composite": 0.5019,
+        "price": 140.38,
+        "scores": {
+          "momentum": 0.4594,
+          "trend": 0.7212,
+          "quality": 0.4213,
+          "valuation": 0.8378,
+          "sentiment": 0.5981,
+          "volatility": 0.6789
+        }
+      },
+      {
+        "ticker": "RF",
+        "rank": 36,
+        "composite": 0.4999,
+        "price": 30.95,
+        "scores": {
+          "momentum": 0.581,
+          "trend": 0.6322,
+          "quality": 0.4119,
+          "valuation": 0.5853,
+          "sentiment": 0.392,
+          "volatility": 0.1274
+        }
+      },
+      {
+        "ticker": "FFIV",
+        "rank": 37,
+        "composite": 0.4975,
+        "price": 402.57,
+        "scores": {
+          "momentum": 0.7506,
+          "trend": 0.5473,
+          "quality": 0.5378,
+          "valuation": 0.3056,
+          "sentiment": 0.4216,
+          "volatility": 0.438
+        }
+      },
+      {
+        "ticker": "DD",
+        "rank": 38,
+        "composite": 0.4964,
+        "price": 137.0,
+        "scores": {
+          "momentum": 0.6373,
+          "trend": 0.4985,
+          "quality": 0.5196,
+          "valuation": 0.4132,
+          "sentiment": 0.6082,
+          "volatility": 0.3002
+        }
+      },
+      {
+        "ticker": "EWBC",
+        "rank": 39,
+        "composite": 0.4949,
+        "price": 131.0,
+        "scores": {
+          "momentum": 0.5844,
+          "trend": 0.5873,
+          "quality": 0.4501,
+          "valuation": 0.5379,
+          "sentiment": 0.5398,
+          "volatility": 0.0506
+        }
+      },
+      {
+        "ticker": "IESC",
+        "rank": 40,
+        "composite": 0.494,
+        "price": 744.54,
+        "scores": {
+          "momentum": 0.7857,
+          "trend": 0.8168,
+          "quality": 0.5547,
+          "valuation": 0.186,
+          "sentiment": 0.3517,
+          "volatility": 0.9756
+        }
+      },
+      {
+        "ticker": "C",
+        "rank": 41,
+        "composite": 0.4923,
+        "price": 132.45,
+        "scores": {
+          "momentum": 0.749,
+          "trend": 0.4533,
+          "quality": 0.2431,
+          "valuation": 0.6286,
+          "sentiment": 0.5563,
+          "volatility": 0.3333
+        }
+      },
+      {
+        "ticker": "BDX",
+        "rank": 42,
+        "composite": 0.4915,
+        "price": 165.62,
+        "scores": {
+          "momentum": 0.4587,
+          "trend": 0.6209,
+          "quality": 0.5766,
+          "valuation": 0.7917,
+          "sentiment": 0.4688,
+          "volatility": 0.4241
+        }
+      },
+      {
+        "ticker": "CAH",
+        "rank": 43,
+        "composite": 0.49,
+        "price": 230.03,
+        "scores": {
+          "momentum": 0.6128,
+          "trend": 0.5761,
+          "quality": 0.4344,
+          "valuation": 0.3829,
+          "sentiment": 0.5489,
+          "volatility": 0.1972
+        }
+      },
+      {
+        "ticker": "TPR",
+        "rank": 44,
+        "composite": 0.4891,
+        "price": 152.37,
+        "scores": {
+          "momentum": 0.5748,
+          "trend": 0.6562,
+          "quality": 0.7377,
+          "valuation": 0.286,
+          "sentiment": 0.4953,
+          "volatility": 0.6859
+        }
+      },
+      {
+        "ticker": "COF",
+        "rank": 45,
+        "composite": 0.488,
+        "price": 209.01,
+        "scores": {
+          "momentum": 0.3981,
+          "trend": 0.5502,
+          "quality": 0.5453,
+          "valuation": 0.7301,
+          "sentiment": 0.6024,
+          "volatility": 0.363
+        }
+      },
+      {
+        "ticker": "PWR",
+        "rank": 46,
+        "composite": 0.4864,
+        "price": 667.36,
+        "scores": {
+          "momentum": 0.8338,
+          "trend": 0.7461,
+          "quality": 0.3977,
+          "valuation": 0.1273,
+          "sentiment": 0.5616,
+          "volatility": 0.8517
+        }
+      },
+      {
+        "ticker": "FIVN",
+        "rank": 47,
+        "composite": 0.4846,
+        "price": 27.51,
+        "scores": {
+          "momentum": 0.4162,
+          "trend": 0.7051,
+          "quality": 0.6294,
+          "valuation": 0.9005,
+          "sentiment": 0.4577,
+          "volatility": 0.911
+        }
+      },
+      {
+        "ticker": "CATO",
+        "rank": 48,
+        "composite": 0.4817,
+        "price": 3.42,
+        "scores": {
+          "momentum": 0.6297,
+          "trend": 0.5814,
+          "quality": 0.5112,
+          "valuation": 0.7529,
+          "sentiment": 0.5006,
+          "volatility": 0.8342
+        }
+      },
+      {
+        "ticker": "FCX",
+        "rank": 49,
+        "composite": 0.4807,
+        "price": 62.63,
+        "scores": {
+          "momentum": 0.6201,
+          "trend": 0.6134,
+          "quality": 0.514,
+          "valuation": 0.574,
+          "sentiment": 0.543,
+          "volatility": 0.8307
+        }
+      },
+      {
+        "ticker": "AMT",
+        "rank": 50,
+        "composite": 0.4781,
+        "price": 173.36,
+        "scores": {
+          "momentum": 0.2915,
+          "trend": 0.5918,
+          "quality": 0.585,
+          "valuation": 0.7895,
+          "sentiment": 0.6077,
+          "volatility": 0.3962
+        }
+      },
+      {
+        "ticker": "AIG",
+        "rank": 51,
+        "composite": 0.4763,
+        "price": 78.58,
+        "scores": {
+          "momentum": 0.3241,
+          "trend": 0.5255,
+          "quality": 0.5546,
+          "valuation": 0.833,
+          "sentiment": 0.4561,
+          "volatility": 0.1571
+        }
+      },
+      {
+        "ticker": "DVN",
+        "rank": 52,
+        "composite": 0.4754,
+        "price": 45.13,
+        "scores": {
+          "momentum": 0.5122,
+          "trend": 0.5951,
+          "quality": 0.4953,
+          "valuation": 0.8557,
+          "sentiment": 0.6326,
+          "volatility": 0.637
+        }
+      },
+      {
+        "ticker": "BALL",
+        "rank": 53,
+        "composite": 0.475,
+        "price": 64.9,
+        "scores": {
+          "momentum": 0.4558,
+          "trend": 0.6383,
+          "quality": 0.3875,
+          "valuation": 0.6104,
+          "sentiment": 0.5303,
+          "volatility": 0.2147
+        }
+      },
+      {
+        "ticker": "BBWI",
+        "rank": 54,
+        "composite": 0.4737,
+        "price": 20.12,
+        "scores": {
+          "momentum": 0.4447,
+          "trend": 0.4531,
+          "quality": 0.7306,
+          "valuation": 0.9529,
+          "sentiment": 0.4784,
+          "volatility": 0.8569
+        }
+      },
+      {
+        "ticker": "MNST",
+        "rank": 55,
+        "composite": 0.4728,
+        "price": 96.38,
+        "scores": {
+          "momentum": 0.7221,
+          "trend": 0.6654,
+          "quality": 0.551,
+          "valuation": 0.0475,
+          "sentiment": 0.4301,
+          "volatility": 0.4311
+        }
+      },
+      {
+        "ticker": "NTRS",
+        "rank": 56,
+        "composite": 0.4691,
+        "price": 182.19,
+        "scores": {
+          "momentum": 0.6969,
+          "trend": 0.6228,
+          "quality": 0.3789,
+          "valuation": 0.3619,
+          "sentiment": 0.3713,
+          "volatility": 0.0995
+        }
+      },
+      {
+        "ticker": "ADM",
+        "rank": 57,
+        "composite": 0.468,
+        "price": 79.27,
+        "scores": {
+          "momentum": 0.6816,
+          "trend": 0.3785,
+          "quality": 0.4966,
+          "valuation": 0.4987,
+          "sentiment": 0.3612,
+          "volatility": 0.2182
+        }
+      },
+      {
+        "ticker": "OXY",
+        "rank": 58,
+        "composite": 0.4672,
+        "price": 57.07,
+        "scores": {
+          "momentum": 0.4856,
+          "trend": 0.6379,
+          "quality": 0.5918,
+          "valuation": 0.4554,
+          "sentiment": 0.4529,
+          "volatility": 0.5986
+        }
+      },
+      {
+        "ticker": "KDP",
+        "rank": 59,
+        "composite": 0.4655,
+        "price": 31.12,
+        "scores": {
+          "momentum": 0.5566,
+          "trend": 0.6326,
+          "quality": 0.2985,
+          "valuation": 0.6249,
+          "sentiment": 0.4974,
+          "volatility": 0.267
+        }
+      },
+      {
+        "ticker": "GPN",
+        "rank": 60,
+        "composite": 0.4632,
+        "price": 84.08,
+        "scores": {
+          "momentum": 0.4006,
+          "trend": 0.7186,
+          "quality": 0.4041,
+          "valuation": 0.9714,
+          "sentiment": 0.445,
+          "volatility": 0.6824
+        }
+      },
+      {
+        "ticker": "COP",
+        "rank": 61,
+        "composite": 0.4619,
+        "price": 120.48,
+        "scores": {
+          "momentum": 0.4461,
+          "trend": 0.63,
+          "quality": 0.4973,
+          "valuation": 0.5247,
+          "sentiment": 0.5499,
+          "volatility": 0.4014
+        }
+      },
+      {
+        "ticker": "IFF",
+        "rank": 62,
+        "composite": 0.461,
+        "price": 79.22,
+        "scores": {
+          "momentum": 0.5578,
+          "trend": 0.6473,
+          "quality": 0.5218,
+          "valuation": 0.451,
+          "sentiment": 0.5573,
+          "volatility": 0.7609
+        }
+      },
+      {
+        "ticker": "TFC",
+        "rank": 63,
+        "composite": 0.4601,
+        "price": 51.84,
+        "scores": {
+          "momentum": 0.4866,
+          "trend": 0.6115,
+          "quality": 0.3656,
+          "valuation": 0.6245,
+          "sentiment": 0.3999,
+          "volatility": 0.281
+        }
+      },
+      {
+        "ticker": "ZBRA",
+        "rank": 64,
+        "composite": 0.4585,
+        "price": 293.82,
+        "scores": {
+          "momentum": 0.4619,
+          "trend": 0.6994,
+          "quality": 0.4287,
+          "valuation": 0.7322,
+          "sentiment": 0.5282,
+          "volatility": 0.7714
+        }
+      },
+      {
+        "ticker": "TRGP",
+        "rank": 65,
+        "composite": 0.4575,
+        "price": 270.37,
+        "scores": {
+          "momentum": 0.6631,
+          "trend": 0.5271,
+          "quality": 0.5671,
+          "valuation": 0.1231,
+          "sentiment": 0.5414,
+          "volatility": 0.3386
+        }
+      },
+      {
+        "ticker": "GATX",
+        "rank": 66,
+        "composite": 0.4567,
+        "price": 178.87,
+        "scores": {
+          "momentum": 0.4426,
+          "trend": 0.5046,
+          "quality": 0.337,
+          "valuation": 0.7541,
+          "sentiment": 0.6305,
+          "volatility": 0.3525
+        }
+      },
+      {
+        "ticker": "IRM",
+        "rank": 67,
+        "composite": 0.455,
+        "price": 122.32,
+        "scores": {
+          "momentum": 0.6434,
+          "trend": 0.5321,
+          "quality": 0.4453,
+          "valuation": 0.3562,
+          "sentiment": 0.3533,
+          "volatility": 0.349
+        }
+      },
+      {
+        "ticker": "T",
+        "rank": 68,
+        "composite": 0.4539,
+        "price": 23.25,
+        "scores": {
+          "momentum": 0.2235,
+          "trend": 0.5364,
+          "quality": 0.5891,
+          "valuation": 0.9179,
+          "sentiment": 0.5462,
+          "volatility": 0.3752
+        }
+      },
+      {
+        "ticker": "SBUX",
+        "rank": 69,
+        "composite": 0.4533,
+        "price": 105.25,
+        "scores": {
+          "momentum": 0.5187,
+          "trend": 0.6065,
+          "quality": 0.5589,
+          "valuation": 0.0774,
+          "sentiment": 0.4248,
+          "volatility": 0.1117
+        }
+      },
+      {
+        "ticker": "VICI",
+        "rank": 70,
+        "composite": 0.4522,
+        "price": 26.35,
+        "scores": {
+          "momentum": 0.3461,
+          "trend": 0.363,
+          "quality": 0.5679,
+          "valuation": 0.9473,
+          "sentiment": 0.5822,
+          "volatility": 0.1187
+        }
+      },
+      {
+        "ticker": "JBL",
+        "rank": 71,
+        "composite": 0.4518,
+        "price": 315.05,
+        "scores": {
+          "momentum": 0.8394,
+          "trend": 0.4991,
+          "quality": 0.3852,
+          "valuation": 0.537,
+          "sentiment": 0.4587,
+          "volatility": 0.8482
+        }
+      },
+      {
+        "ticker": "STZ",
+        "rank": 72,
+        "composite": 0.4504,
+        "price": 130.23,
+        "scores": {
+          "momentum": 0.3244,
+          "trend": 0.3449,
+          "quality": 0.6909,
+          "valuation": 0.8278,
+          "sentiment": 0.5849,
+          "volatility": 0.3421
+        }
+      },
+      {
+        "ticker": "HAS",
+        "rank": 73,
+        "composite": 0.4488,
+        "price": 93.94,
+        "scores": {
+          "momentum": 0.3609,
+          "trend": 0.6217,
+          "quality": 0.5744,
+          "valuation": 0.6057,
+          "sentiment": 0.5838,
+          "volatility": 0.5829
+        }
+      },
+      {
+        "ticker": "HWM",
+        "rank": 74,
+        "composite": 0.4468,
+        "price": 282.26,
+        "scores": {
+          "momentum": 0.6589,
+          "trend": 0.6248,
+          "quality": 0.5154,
+          "valuation": 0.0557,
+          "sentiment": 0.5589,
+          "volatility": 0.5113
+        }
+      },
+      {
+        "ticker": "ALLE",
+        "rank": 75,
+        "composite": 0.4464,
+        "price": 157.4,
+        "scores": {
+          "momentum": 0.3126,
+          "trend": 0.5921,
+          "quality": 0.5779,
+          "valuation": 0.7685,
+          "sentiment": 0.4492,
+          "volatility": 0.4503
+        }
+      },
+      {
+        "ticker": "JACK",
+        "rank": 76,
+        "composite": 0.4448,
+        "price": 16.37,
+        "scores": {
+          "momentum": 0.5021,
+          "trend": 0.6104,
+          "quality": 0.5724,
+          "valuation": 0.882,
+          "sentiment": 0.3893,
+          "volatility": 0.9825
+        }
+      },
+      {
+        "ticker": "VTR",
+        "rank": 77,
+        "composite": 0.4438,
+        "price": 93.51,
+        "scores": {
+          "momentum": 0.6662,
+          "trend": 0.611,
+          "quality": 0.3069,
+          "valuation": 0.0853,
+          "sentiment": 0.5144,
+          "volatility": 0.3037
+        }
+      },
+      {
+        "ticker": "AVGO",
+        "rank": 78,
+        "composite": 0.4429,
+        "price": 389.28,
+        "scores": {
+          "momentum": 0.6571,
+          "trend": 0.6274,
+          "quality": 0.5476,
+          "valuation": 0.3149,
+          "sentiment": 0.6379,
+          "volatility": 0.8534
+        }
+      },
+      {
+        "ticker": "MAR",
+        "rank": 79,
+        "composite": 0.4412,
+        "price": 372.83,
+        "scores": {
+          "momentum": 0.6295,
+          "trend": 0.6113,
+          "quality": 0.4013,
+          "valuation": 0.1104,
+          "sentiment": 0.4317,
+          "volatility": 0.1326
+        }
+      },
+      {
+        "ticker": "JCI",
+        "rank": 80,
+        "composite": 0.4405,
+        "price": 146.66,
+        "scores": {
+          "momentum": 0.5237,
+          "trend": 0.6226,
+          "quality": 0.5284,
+          "valuation": 0.348,
+          "sentiment": 0.4672,
+          "volatility": 0.5148
+        }
+      },
+      {
+        "ticker": "NSC",
+        "rank": 81,
+        "composite": 0.4386,
+        "price": 335.48,
+        "scores": {
+          "momentum": 0.5387,
+          "trend": 0.5524,
+          "quality": 0.3637,
+          "valuation": 0.4628,
+          "sentiment": 0.4158,
+          "volatility": 0.185
+        }
+      },
+      {
+        "ticker": "ITW",
+        "rank": 82,
+        "composite": 0.4372,
+        "price": 286.95,
+        "scores": {
+          "momentum": 0.3996,
+          "trend": 0.6636,
+          "quality": 0.5324,
+          "valuation": 0.4309,
+          "sentiment": 0.3676,
+          "volatility": 0.1204
+        }
+      },
+      {
+        "ticker": "GPC",
+        "rank": 83,
+        "composite": 0.4368,
+        "price": 124.37,
+        "scores": {
+          "momentum": 0.5728,
+          "trend": 0.5868,
+          "quality": 0.4184,
+          "valuation": 0.5905,
+          "sentiment": 0.4768,
+          "volatility": 0.6335
+        }
+      },
+      {
+        "ticker": "NVAX",
+        "rank": 84,
+        "composite": 0.4365,
+        "price": 7.32,
+        "scores": {
+          "momentum": 0.8481,
+          "trend": 0.1431,
+          "quality": 0.4128,
+          "valuation": 0.5578,
+          "sentiment": 0.6265,
+          "volatility": 0.9232
+        }
+      },
+      {
+        "ticker": "CRL",
+        "rank": 85,
+        "composite": 0.4355,
+        "price": 232.51,
+        "scores": {
+          "momentum": 0.6645,
+          "trend": 0.6226,
+          "quality": 0.4507,
+          "valuation": 0.3669,
+          "sentiment": 0.4481,
+          "volatility": 0.7452
+        }
+      },
+      {
+        "ticker": "DUK",
+        "rank": 86,
+        "composite": 0.4348,
+        "price": 125.43,
+        "scores": {
+          "momentum": 0.4199,
+          "trend": 0.3992,
+          "quality": 0.5137,
+          "valuation": 0.5302,
+          "sentiment": 0.4704,
+          "volatility": 0.0279
+        }
+      },
+      {
+        "ticker": "SOLV",
+        "rank": 87,
+        "composite": 0.4335,
+        "price": 85.44,
+        "scores": {
+          "momentum": 0.3975,
+          "trend": 0.6704,
+          "quality": 0.37,
+          "valuation": 0.6823,
+          "sentiment": 0.4153,
+          "volatility": 0.4642
+        }
+      },
+      {
+        "ticker": "D",
+        "rank": 88,
+        "composite": 0.4312,
+        "price": 69.17,
+        "scores": {
+          "momentum": 0.575,
+          "trend": 0.469,
+          "quality": 0.3301,
+          "valuation": 0.4435,
+          "sentiment": 0.3824,
+          "volatility": 0.2234
+        }
+      },
+      {
+        "ticker": "ADI",
+        "rank": 89,
+        "composite": 0.4294,
+        "price": 367.41,
+        "scores": {
+          "momentum": 0.8062,
+          "trend": 0.2949,
+          "quality": 0.5731,
+          "valuation": 0.225,
+          "sentiment": 0.6093,
+          "volatility": 0.7557
+        }
+      },
+      {
+        "ticker": "CRM",
+        "rank": 90,
+        "composite": 0.4283,
+        "price": 184.02,
+        "scores": {
+          "momentum": 0.2248,
+          "trend": 0.5805,
+          "quality": 0.5932,
+          "valuation": 0.8423,
+          "sentiment": 0.6172,
+          "volatility": 0.7958
+        }
+      },
+      {
+        "ticker": "OMC",
+        "rank": 91,
+        "composite": 0.4272,
+        "price": 78.7,
+        "scores": {
+          "momentum": 0.429,
+          "trend": 0.4738,
+          "quality": 0.4078,
+          "valuation": 0.9443,
+          "sentiment": 0.5748,
+          "volatility": 0.5794
+        }
+      },
+      {
+        "ticker": "EA",
+        "rank": 92,
+        "composite": 0.425,
+        "price": 209.86,
+        "scores": {
+          "momentum": 0.4249,
+          "trend": 0.3569,
+          "quality": 0.6821,
+          "valuation": 0.2098,
+          "sentiment": 0.3707,
+          "volatility": 0.0017
+        }
+      },
+      {
+        "ticker": "WFC",
+        "rank": 93,
+        "composite": 0.4242,
+        "price": 86.45,
+        "scores": {
+          "momentum": 0.3975,
+          "trend": 0.5384,
+          "quality": 0.317,
+          "valuation": 0.5799,
+          "sentiment": 0.5239,
+          "volatility": 0.2373
+        }
+      },
+      {
+        "ticker": "WELL",
+        "rank": 94,
+        "composite": 0.4218,
+        "price": 234.44,
+        "scores": {
+          "momentum": 0.7284,
+          "trend": 0.5445,
+          "quality": 0.3939,
+          "valuation": 0.0929,
+          "sentiment": 0.5054,
+          "volatility": 0.2775
+        }
+      },
+      {
+        "ticker": "COO",
+        "rank": 95,
+        "composite": 0.4201,
+        "price": 72.32,
+        "scores": {
+          "momentum": 0.3853,
+          "trend": 0.5196,
+          "quality": 0.4862,
+          "valuation": 0.5517,
+          "sentiment": 0.4916,
+          "volatility": 0.3822
+        }
+      },
+      {
+        "ticker": "WYNN",
+        "rank": 96,
+        "composite": 0.4195,
+        "price": 99.31,
+        "scores": {
+          "momentum": 0.3224,
+          "trend": 0.5486,
+          "quality": 0.5965,
+          "valuation": 0.4076,
+          "sentiment": 0.6389,
+          "volatility": 0.3141
+        }
+      },
+      {
+        "ticker": "CAT",
+        "rank": 97,
+        "composite": 0.4186,
+        "price": 814.81,
+        "scores": {
+          "momentum": 0.905,
+          "trend": 0.1985,
+          "quality": 0.4171,
+          "valuation": 0.2509,
+          "sentiment": 0.5033,
+          "volatility": 0.7574
+        }
+      },
+      {
+        "ticker": "PAYX",
+        "rank": 98,
+        "composite": 0.4182,
+        "price": 116.84,
+        "scores": {
+          "momentum": 0.3819,
+          "trend": 0.6741,
+          "quality": 0.6574,
+          "valuation": 0.4225,
+          "sentiment": 0.3602,
+          "volatility": 0.4747
+        }
+      },
+      {
+        "ticker": "IT",
+        "rank": 99,
+        "composite": 0.4163,
+        "price": 151.02,
+        "scores": {
+          "momentum": 0.2244,
+          "trend": 0.5814,
+          "quality": 0.6721,
+          "valuation": 0.9253,
+          "sentiment": 0.3925,
+          "volatility": 0.8866
+        }
+      },
+      {
+        "ticker": "AWK",
+        "rank": 100,
+        "composite": 0.4153,
+        "price": 134.17,
+        "scores": {
+          "momentum": 0.3419,
+          "trend": 0.6233,
+          "quality": 0.5678,
+          "valuation": 0.3554,
+          "sentiment": 0.3994,
+          "volatility": 0.1518
+        }
+      },
+      {
+        "ticker": "CPB",
+        "rank": 101,
+        "composite": 0.4151,
+        "price": 21.98,
+        "scores": {
+          "momentum": 0.3621,
+          "trend": 0.4551,
+          "quality": 0.5573,
+          "valuation": 0.8256,
+          "sentiment": 0.3617,
+          "volatility": 0.4904
+        }
+      },
+      {
+        "ticker": "FAST",
+        "rank": 102,
+        "composite": 0.4148,
+        "price": 47.71,
+        "scores": {
+          "momentum": 0.4712,
+          "trend": 0.5997,
+          "quality": 0.5837,
+          "valuation": 0.1595,
+          "sentiment": 0.3819,
+          "volatility": 0.1396
+        }
+      },
+      {
+        "ticker": "AMZN",
+        "rank": 103,
+        "composite": 0.4123,
+        "price": 271.58,
+        "scores": {
+          "momentum": 0.4119,
+          "trend": 0.654,
+          "quality": 0.5593,
+          "valuation": 0.1661,
+          "sentiment": 0.605,
+          "volatility": 0.6754
+        }
+      },
+      {
+        "ticker": "GEHC",
+        "rank": 104,
+        "composite": 0.4111,
+        "price": 68.02,
+        "scores": {
+          "momentum": 0.2829,
+          "trend": 0.5827,
+          "quality": 0.4752,
+          "valuation": 0.7627,
+          "sentiment": 0.5759,
+          "volatility": 0.6492
+        }
+      },
+      {
+        "ticker": "MDLZ",
+        "rank": 105,
+        "composite": 0.4103,
+        "price": 62.31,
+        "scores": {
+          "momentum": 0.351,
+          "trend": 0.639,
+          "quality": 0.4851,
+          "valuation": 0.3262,
+          "sentiment": 0.4905,
+          "volatility": 0.2461
+        }
+      },
+      {
+        "ticker": "AVB",
+        "rank": 106,
+        "composite": 0.4088,
+        "price": 185.61,
+        "scores": {
+          "momentum": 0.4229,
+          "trend": 0.334,
+          "quality": 0.5607,
+          "valuation": 0.5393,
+          "sentiment": 0.4206,
+          "volatility": 0.0785
+        }
+      },
+      {
+        "ticker": "YUM",
+        "rank": 107,
+        "composite": 0.4074,
+        "price": 153.28,
+        "scores": {
+          "momentum": 0.466,
+          "trend": 0.5094,
+          "quality": 0.5211,
+          "valuation": 0.25,
+          "sentiment": 0.4799,
+          "volatility": 0.1885
+        }
+      },
+      {
+        "ticker": "MGM",
+        "rank": 108,
+        "composite": 0.4066,
+        "price": 44.57,
+        "scores": {
+          "momentum": 0.7265,
+          "trend": 0.3752,
+          "quality": 0.5918,
+          "valuation": 0.2355,
+          "sentiment": 0.4497,
+          "volatility": 0.6911
+        }
+      },
+      {
+        "ticker": "OTIS",
+        "rank": 109,
+        "composite": 0.4054,
+        "price": 71.95,
+        "scores": {
+          "momentum": 0.2619,
+          "trend": 0.3894,
+          "quality": 0.5236,
+          "valuation": 0.7945,
+          "sentiment": 0.5446,
+          "volatility": 0.1483
+        }
+      },
+      {
+        "ticker": "APD",
+        "rank": 110,
+        "composite": 0.4049,
+        "price": 294.89,
+        "scores": {
+          "momentum": 0.5354,
+          "trend": 0.5292,
+          "quality": 0.4452,
+          "valuation": 0.1899,
+          "sentiment": 0.5366,
+          "volatility": 0.2862
+        }
+      },
+      {
+        "ticker": "GIS",
+        "rank": 111,
+        "composite": 0.4043,
+        "price": 35.75,
+        "scores": {
+          "momentum": 0.3013,
+          "trend": 0.414,
+          "quality": 0.5178,
+          "valuation": 0.8482,
+          "sentiment": 0.3766,
+          "volatility": 0.5288
+        }
+      },
+      {
+        "ticker": "NXRT",
+        "rank": 112,
+        "composite": 0.4026,
+        "price": 26.11,
+        "scores": {
+          "momentum": 0.4543,
+          "trend": 0.2692,
+          "quality": 0.49,
+          "valuation": 0.5152,
+          "sentiment": 0.4052,
+          "volatility": 0.2304
+        }
+      },
+      {
+        "ticker": "GBCI",
+        "rank": 113,
+        "composite": 0.4012,
+        "price": 49.29,
+        "scores": {
+          "momentum": 0.5823,
+          "trend": 0.3547,
+          "quality": 0.4082,
+          "valuation": 0.3971,
+          "sentiment": 0.5292,
+          "volatility": 0.2269
+        }
+      },
+      {
+        "ticker": "V",
+        "rank": 114,
+        "composite": 0.4,
+        "price": 366.13,
+        "scores": {
+          "momentum": 0.3968,
+          "trend": 0.5633,
+          "quality": 0.5373,
+          "valuation": 0.0889,
+          "sentiment": 0.5812,
+          "volatility": 0.0646
+        }
+      },
+      {
+        "ticker": "CHD",
+        "rank": 115,
+        "composite": 0.3991,
+        "price": 98.81,
+        "scores": {
+          "momentum": 0.4289,
+          "trend": 0.6193,
+          "quality": 0.5518,
+          "valuation": 0.1795,
+          "sentiment": 0.4381,
+          "volatility": 0.1937
+        }
+      },
+      {
+        "ticker": "IR",
+        "rank": 116,
+        "composite": 0.3968,
+        "price": 83.38,
+        "scores": {
+          "momentum": 0.3656,
+          "trend": 0.6019,
+          "quality": 0.467,
+          "valuation": 0.5066,
+          "sentiment": 0.4831,
+          "volatility": 0.4782
+        }
+      },
+      {
+        "ticker": "PYPL",
+        "rank": 117,
+        "composite": 0.3948,
+        "price": 57.21,
+        "scores": {
+          "momentum": 0.2622,
+          "trend": 0.5668,
+          "quality": 0.5911,
+          "valuation": 0.7346,
+          "sentiment": 0.3792,
+          "volatility": 0.6771
+        }
+      },
+      {
+        "ticker": "MKC",
+        "rank": 118,
+        "composite": 0.3934,
+        "price": 50.9,
+        "scores": {
+          "momentum": 0.3296,
+          "trend": 0.4457,
+          "quality": 0.4903,
+          "valuation": 0.5164,
+          "sentiment": 0.5123,
+          "volatility": 0.37
+        }
+      },
+      {
+        "ticker": "ADSK",
+        "rank": 119,
+        "composite": 0.3903,
+        "price": 234.2,
+        "scores": {
+          "momentum": 0.2248,
+          "trend": 0.5855,
+          "quality": 0.6703,
+          "valuation": 0.5513,
+          "sentiment": 0.631,
+          "volatility": 0.7208
+        }
+      },
+      {
+        "ticker": "JKHY",
+        "rank": 120,
+        "composite": 0.3897,
+        "price": 154.04,
+        "scores": {
+          "momentum": 0.2717,
+          "trend": 0.5746,
+          "quality": 0.5668,
+          "valuation": 0.4244,
+          "sentiment": 0.5716,
+          "volatility": 0.5218
+        }
+      },
+      {
+        "ticker": "LOW",
+        "rank": 121,
+        "composite": 0.3891,
+        "price": 207.81,
+        "scores": {
+          "momentum": 0.4024,
+          "trend": 0.4064,
+          "quality": 0.4581,
+          "valuation": 0.5359,
+          "sentiment": 0.5881,
+          "volatility": 0.3438
+        }
+      },
+      {
+        "ticker": "BG",
+        "rank": 122,
+        "composite": 0.388,
+        "price": 106.23,
+        "scores": {
+          "momentum": 0.604,
+          "trend": 0.1174,
+          "quality": 0.306,
+          "valuation": 0.8108,
+          "sentiment": 0.623,
+          "volatility": 0.5131
+        }
+      },
+      {
+        "ticker": "NWSA",
+        "rank": 123,
+        "composite": 0.3874,
+        "price": 27.56,
+        "scores": {
+          "momentum": 0.3618,
+          "trend": 0.6357,
+          "quality": 0.4741,
+          "valuation": 0.326,
+          "sentiment": 0.3782,
+          "volatility": 0.3229
+        }
+      },
+      {
+        "ticker": "J",
+        "rank": 124,
+        "composite": 0.3867,
+        "price": 134.93,
+        "scores": {
+          "momentum": 0.3754,
+          "trend": 0.5772,
+          "quality": 0.279,
+          "valuation": 0.6949,
+          "sentiment": 0.5202,
+          "volatility": 0.5934
+        }
+      },
+      {
+        "ticker": "KMX",
+        "rank": 125,
+        "composite": 0.3856,
+        "price": 57.26,
+        "scores": {
+          "momentum": 0.4521,
+          "trend": 0.6909,
+          "quality": 0.4347,
+          "valuation": 0.2723,
+          "sentiment": 0.3718,
+          "volatility": 0.7818
+        }
+      },
+      {
+        "ticker": "STE",
+        "rank": 126,
+        "composite": 0.3831,
+        "price": 228.4,
+        "scores": {
+          "momentum": 0.3028,
+          "trend": 0.5846,
+          "quality": 0.5694,
+          "valuation": 0.3919,
+          "sentiment": 0.5186,
+          "volatility": 0.3455
+        }
+      },
+      {
+        "ticker": "CTVA",
+        "rank": 127,
+        "composite": 0.3825,
+        "price": 78.71,
+        "scores": {
+          "momentum": 0.5623,
+          "trend": 0.2253,
+          "quality": 0.602,
+          "valuation": 0.3679,
+          "sentiment": 0.5494,
+          "volatility": 0.5079
+        }
+      },
+      {
+        "ticker": "NWS",
+        "rank": 128,
+        "composite": 0.3811,
+        "price": 31.27,
+        "scores": {
+          "momentum": 0.3506,
+          "trend": 0.6344,
+          "quality": 0.4687,
+          "valuation": 0.2506,
+          "sentiment": 0.5006,
+          "volatility": 0.3595
+        }
+      },
+      {
+        "ticker": "IONS",
+        "rank": 129,
+        "composite": 0.3781,
+        "price": 51.77,
+        "scores": {
+          "momentum": 0.7441,
+          "trend": 0.1235,
+          "quality": 0.3033,
+          "valuation": 0.5,
+          "sentiment": 0.6464,
+          "volatility": 0.9092
+        }
+      },
+      {
+        "ticker": "CDW",
+        "rank": 130,
+        "composite": 0.3768,
+        "price": 147.81,
+        "scores": {
+          "momentum": 0.3366,
+          "trend": 0.6736,
+          "quality": 0.3731,
+          "valuation": 0.8389,
+          "sentiment": 0.4746,
+          "volatility": 0.9197
+        }
+      },
+      {
+        "ticker": "SWKS",
+        "rank": 131,
+        "composite": 0.3739,
+        "price": 62.28,
+        "scores": {
+          "momentum": 0.4403,
+          "trend": 0.4442,
+          "quality": 0.401,
+          "valuation": 0.8573,
+          "sentiment": 0.3872,
+          "volatility": 0.8935
+        }
+      },
+      {
+        "ticker": "LESL",
+        "rank": 132,
+        "composite": 0.3703,
+        "price": 0.95,
+        "scores": {
+          "momentum": 0.7633,
+          "trend": 0.0833,
+          "quality": 0.6517,
+          "valuation": 0.4137,
+          "sentiment": 0.6265,
+          "volatility": 0.9983
+        }
+      },
+      {
+        "ticker": "ATRC",
+        "rank": 133,
+        "composite": 0.3694,
+        "price": 37.76,
+        "scores": {
+          "momentum": 0.3709,
+          "trend": 0.6968,
+          "quality": 0.5241,
+          "valuation": 0.0182,
+          "sentiment": 0.5971,
+          "volatility": 0.8028
+        }
+      },
+      {
+        "ticker": "BOOT",
+        "rank": 134,
+        "composite": 0.368,
+        "price": 148.99,
+        "scores": {
+          "momentum": 0.4498,
+          "trend": 0.2653,
+          "quality": 0.4922,
+          "valuation": 0.5647,
+          "sentiment": 0.6458,
+          "volatility": 0.7766
+        }
+      },
+      {
+        "ticker": "RRGB",
+        "rank": 135,
+        "composite": 0.3677,
+        "price": 7.84,
+        "scores": {
+          "momentum": 0.6091,
+          "trend": 0.6414,
+          "quality": 0.4972,
+          "valuation": 0.2062,
+          "sentiment": 0.384,
+          "volatility": 0.9581
+        }
+      },
+      {
+        "ticker": "BANF",
+        "rank": 136,
+        "composite": 0.3653,
+        "price": 112.82,
+        "scores": {
+          "momentum": 0.3942,
+          "trend": 0.3508,
+          "quality": 0.4389,
+          "valuation": 0.343,
+          "sentiment": 0.3909,
+          "volatility": 0.1169
+        }
+      },
+      {
+        "ticker": "TXRH",
+        "rank": 137,
+        "composite": 0.3621,
+        "price": 205.44,
+        "scores": {
+          "momentum": 0.461,
+          "trend": 0.6907,
+          "quality": 0.4309,
+          "valuation": 0.1386,
+          "sentiment": 0.4211,
+          "volatility": 0.623
+        }
+      },
+      {
+        "ticker": "GOOS",
+        "rank": 138,
+        "composite": 0.3611,
+        "price": 8.93,
+        "scores": {
+          "momentum": 0.308,
+          "trend": 0.1815,
+          "quality": 0.6257,
+          "valuation": 0.8674,
+          "sentiment": 0.375,
+          "volatility": 0.6579
+        }
+      },
+      {
+        "ticker": "ZTS",
+        "rank": 139,
+        "composite": 0.3596,
+        "price": 77.29,
+        "scores": {
+          "momentum": 0.2098,
+          "trend": 0.5382,
+          "quality": 0.5255,
+          "valuation": 0.8643,
+          "sentiment": 0.622,
+          "volatility": 0.8883
+        }
+      },
+      {
+        "ticker": "FDS",
+        "rank": 140,
+        "composite": 0.3582,
+        "price": 263.2,
+        "scores": {
+          "momentum": 0.3358,
+          "trend": 0.7284,
+          "quality": 0.5552,
+          "valuation": 0.4167,
+          "sentiment": 0.3591,
+          "volatility": 0.8813
+        }
+      },
+      {
+        "ticker": "HUBS",
+        "rank": 141,
+        "composite": 0.3576,
+        "price": 237.36,
+        "scores": {
+          "momentum": 0.2098,
+          "trend": 0.6326,
+          "quality": 0.6263,
+          "valuation": 0.5234,
+          "sentiment": 0.5234,
+          "volatility": 0.9791
+        }
+      },
+      {
+        "ticker": "PG",
+        "rank": 142,
+        "composite": 0.3548,
+        "price": 144.49,
+        "scores": {
+          "momentum": 0.4048,
+          "trend": 0.3093,
+          "quality": 0.5133,
+          "valuation": 0.2954,
+          "sentiment": 0.4752,
+          "volatility": 0.1344
+        }
+      },
+      {
+        "ticker": "CPT",
+        "rank": 143,
+        "composite": 0.3536,
+        "price": 110.81,
+        "scores": {
+          "momentum": 0.4813,
+          "trend": 0.3757,
+          "quality": 0.4857,
+          "valuation": 0.1509,
+          "sentiment": 0.4041,
+          "volatility": 0.0663
+        }
+      },
+      {
+        "ticker": "IDXX",
+        "rank": 144,
+        "composite": 0.3499,
+        "price": 559.07,
+        "scores": {
+          "momentum": 0.3902,
+          "trend": 0.5515,
+          "quality": 0.5287,
+          "valuation": 0.0842,
+          "sentiment": 0.5515,
+          "volatility": 0.4415
+        }
+      },
+      {
+        "ticker": "QCOM",
+        "rank": 145,
+        "composite": 0.3474,
+        "price": 147.61,
+        "scores": {
+          "momentum": 0.6503,
+          "trend": 0.0532,
+          "quality": 0.4688,
+          "valuation": 0.7552,
+          "sentiment": 0.525,
+          "volatility": 0.9476
+        }
+      },
+      {
+        "ticker": "DPZ",
+        "rank": 146,
+        "composite": 0.345,
+        "price": 347.44,
+        "scores": {
+          "momentum": 0.2245,
+          "trend": 0.5923,
+          "quality": 0.5755,
+          "valuation": 0.4154,
+          "sentiment": 0.4884,
+          "volatility": 0.5236
+        }
+      },
+      {
+        "ticker": "EXPO",
+        "rank": 147,
+        "composite": 0.3427,
+        "price": 66.85,
+        "scores": {
+          "momentum": 0.2657,
+          "trend": 0.5332,
+          "quality": 0.5676,
+          "valuation": 0.3554,
+          "sentiment": 0.5902,
+          "volatility": 0.5846
+        }
+      },
+      {
+        "ticker": "RSG",
+        "rank": 148,
+        "composite": 0.3382,
+        "price": 210.55,
+        "scores": {
+          "momentum": 0.3199,
+          "trend": 0.2539,
+          "quality": 0.4985,
+          "valuation": 0.4047,
+          "sentiment": 0.5155,
+          "volatility": 0.1728
+        }
+      },
+      {
+        "ticker": "UBER",
+        "rank": 149,
+        "composite": 0.3336,
+        "price": 70.36,
+        "scores": {
+          "momentum": 0.3485,
+          "trend": 0.3399,
+          "quality": 0.4705,
+          "valuation": 0.5839,
+          "sentiment": 0.6437,
+          "volatility": 0.6353
+        }
+      },
+      {
+        "ticker": "POOL",
+        "rank": 150,
+        "composite": 0.3316,
+        "price": 185.71,
+        "scores": {
+          "momentum": 0.3987,
+          "trend": 0.1147,
+          "quality": 0.4574,
+          "valuation": 0.7973,
+          "sentiment": 0.4847,
+          "volatility": 0.555
+        }
+      },
+      {
+        "ticker": "VMC",
+        "rank": 151,
+        "composite": 0.3266,
+        "price": 268.57,
+        "scores": {
+          "momentum": 0.5358,
+          "trend": 0.1237,
+          "quality": 0.4884,
+          "valuation": 0.1923,
+          "sentiment": 0.5584,
+          "volatility": 0.3944
+        }
+      },
+      {
+        "ticker": "BRO",
+        "rank": 152,
+        "composite": 0.3241,
+        "price": 70.4,
+        "scores": {
+          "momentum": 0.3219,
+          "trend": 0.6051,
+          "quality": 0.3936,
+          "valuation": 0.3754,
+          "sentiment": 0.3962,
+          "volatility": 0.5724
+        }
+      },
+      {
+        "ticker": "SDGR",
+        "rank": 153,
+        "composite": 0.3205,
+        "price": 15.14,
+        "scores": {
+          "momentum": 0.4846,
+          "trend": 0.3881,
+          "quality": 0.4018,
+          "valuation": 0.5,
+          "sentiment": 0.4275,
+          "volatility": 0.8098
+        }
+      },
+      {
+        "ticker": "LEN",
+        "rank": 154,
+        "composite": 0.3193,
+        "price": 82.35,
+        "scores": {
+          "momentum": 0.3484,
+          "trend": 0.2725,
+          "quality": 0.3611,
+          "valuation": 0.7254,
+          "sentiment": 0.366,
+          "volatility": 0.6038
+        }
+      },
+      {
+        "ticker": "PRPL",
+        "rank": 155,
+        "composite": 0.316,
+        "price": 8.1,
+        "scores": {
+          "momentum": 0.2175,
+          "trend": 0.688,
+          "quality": 0.4385,
+          "valuation": 0.5,
+          "sentiment": 0.6299,
+          "volatility": 1.0
+        }
+      },
+      {
+        "ticker": "MOH",
+        "rank": 156,
+        "composite": 0.311,
+        "price": 195.62,
+        "scores": {
+          "momentum": 0.5662,
+          "trend": 0.2391,
+          "quality": 0.3039,
+          "valuation": 0.3697,
+          "sentiment": 0.3973,
+          "volatility": 0.6928
+        }
+      },
+      {
+        "ticker": "TYL",
+        "rank": 157,
+        "composite": 0.3074,
+        "price": 309.6,
+        "scores": {
+          "momentum": 0.2594,
+          "trend": 0.5545,
+          "quality": 0.4282,
+          "valuation": 0.3488,
+          "sentiment": 0.6321,
+          "volatility": 0.7417
+        }
+      },
+      {
+        "ticker": "SPGI",
+        "rank": 158,
+        "composite": 0.2962,
+        "price": 411.93,
+        "scores": {
+          "momentum": 0.381,
+          "trend": 0.2646,
+          "quality": 0.5581,
+          "valuation": 0.1478,
+          "sentiment": 0.6199,
+          "volatility": 0.5166
+        }
+      },
+      {
+        "ticker": "SAIL",
+        "rank": 159,
+        "composite": 0.2799,
+        "price": 16.77,
+        "scores": {
+          "momentum": 0.3386,
+          "trend": 0.5299,
+          "quality": 0.5336,
+          "valuation": 0.0394,
+          "sentiment": 0.3543,
+          "volatility": 0.9337
+        }
+      },
+      {
+        "ticker": "META",
+        "rank": 160,
+        "composite": 0.274,
+        "price": 556.71,
+        "scores": {
+          "momentum": 0.3272,
+          "trend": 0.0899,
+          "quality": 0.5046,
+          "valuation": 0.5713,
+          "sentiment": 0.6384,
+          "volatility": 0.7295
+        }
+      },
+      {
+        "ticker": "WHR",
+        "rank": 161,
+        "composite": 0.2708,
+        "price": 37.5,
+        "scores": {
+          "momentum": 0.2098,
+          "trend": 0.327,
+          "quality": 0.356,
+          "valuation": 0.8575,
+          "sentiment": 0.4895,
+          "volatility": 0.8674
+        }
+      },
+      {
+        "ticker": "ELME",
+        "rank": 162,
+        "composite": 0.2608,
+        "price": 1.61,
+        "scores": {
+          "momentum": 0.2378,
+          "trend": 0.3394,
+          "quality": 0.4276,
+          "valuation": 0.6029,
+          "sentiment": 0.6265,
+          "volatility": 0.9773
+        }
+      },
+      {
+        "ticker": "ISRG",
+        "rank": 163,
+        "composite": 0.2531,
+        "price": 353.33,
+        "scores": {
+          "momentum": 0.2947,
+          "trend": 0.1828,
+          "quality": 0.5644,
+          "valuation": 0.1088,
+          "sentiment": 0.614,
+          "volatility": 0.7801
+        }
+      },
+      {
+        "ticker": "TSLA",
+        "rank": 164,
+        "composite": 0.189,
+        "price": 311.21,
+        "scores": {
+          "momentum": 0.5792,
+          "trend": 0.0314,
+          "quality": 0.2951,
+          "valuation": 0.0116,
+          "sentiment": 0.5266,
+          "volatility": 0.8796
+        }
+      }
+    ]
   }
 ]
