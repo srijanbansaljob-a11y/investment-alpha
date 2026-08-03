@@ -28,6 +28,9 @@ owner — do not reimplement it, do not add a parallel path "just for this case"
 | Stop *levels* to display or act on | `alpaca_client.get_resting_stops()` | Recompute an entry-anchored level and present it as the stop. The broker's resting order is what actually fires |
 | Exposure caps | `config.PIPELINE_MAX_INVESTED_PCT` | A second table. `MAX_INVESTED_PCTS` is DERIVED from it and must stay derived |
 | Regime classification | `pipeline/regime.py`, 3-tier `bull/neutral/bear` | Introduce a 4-tier or differently-named taxonomy in a new surface |
+| Factor weights | `pipeline/learning.py` | Write `learned_weights.json` from anywhere else. `feedback.py` is v1 and reports only — it must never save weights |
+| Rank correlation | `learning._spearman` (numpy) | Import scipy — it isn't installed locally, so the caller runs in the cloud and fails on the owner's machine |
+| Trade signal enrichment | `data/shadow_log.json` | Read screener files — they are no longer produced |
 | Tunable parameters | `config.py` | Hardcode a threshold, percentage, or lookback in a module |
 
 **The test to apply before adding code:** *"Does something here already own

@@ -76,13 +76,21 @@ def load_weights():
 
 
 def save_weights(weights, dry_run=False):
-    """Save updated weights to JSON file."""
-    if dry_run:
-        log.info("[DRY RUN] Would save weights: %s", weights)
-        return
-    LEARNED_WEIGHTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    LEARNED_WEIGHTS_FILE.write_text(json.dumps(weights, indent=2))
-    log.info("Saved learned weights -> %s", LEARNED_WEIGHTS_FILE)
+    """
+    ⚠️ DEPRECATED 2026-08-02 — do not call.
+
+    Factor weights are owned solely by pipeline/learning.py. This function
+    remains only so external callers don't crash; it refuses to write.
+    See the note in run() for why two writers was a bug rather than redundancy.
+    """
+    log.warning("save_weights() is deprecated and did nothing — factor weights "
+                "are owned by pipeline/learning.py")
+    return
+
+
+# The old writer lived here and has been DELETED, not commented out.
+# Keeping a disabled copy would have left a working weight-writer one rename
+# away from being live again — which is exactly what the ownership test flags.
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +163,13 @@ def compute_factor_correlations(positions, actual_returns):
     Returns:
         dict {factor_name: spearman_correlation}
     """
-    from scipy.stats import spearmanr
+    # Rank correlation via pipeline.learning's numpy implementation.
+    # scipy was a hard dependency that is NOT installed on the owner's
+    # machine, so this whole function raised ModuleNotFoundError on every
+    # local run — the pipeline logged 'Feedback loop failed (non-fatal)'
+    # and carried on, meaning the analysis ran in the cloud but never
+    # locally. One implementation, no dependency, same answer.
+    from pipeline.learning import _spearman as _rank_corr
 
     # Extract factor scores from the portfolio state
     factor_data = {}
@@ -181,7 +195,10 @@ def compute_factor_correlations(positions, actual_returns):
         if len(scores) != len(return_data):
             continue
         try:
-            corr, pval = spearmanr(scores, return_data)
+            import numpy as _np
+            corr = _rank_corr(_np.asarray(scores, dtype=float),
+                              _np.asarray(return_data, dtype=float))
+            pval = float('nan')
             correlations[factor] = round(float(corr), 4)
             log.info("  Factor %-12s: corr=%.3f  pval=%.3f  %s",
                      factor, corr, pval,
@@ -373,8 +390,10 @@ def run(dry_run=False, reset=False):
         scores  = [p.get("score", 0.5) for p in positions if p["ticker"] in actual_returns]
         returns = [actual_returns[p["ticker"]] for p in positions if p["ticker"] in actual_returns]
         if len(scores) >= 3:
-            from scipy.stats import spearmanr
-            corr, _ = spearmanr(scores, returns)
+            import numpy as _np
+            from pipeline.learning import _spearman as _rank_corr
+            corr = _rank_corr(_np.asarray(scores, dtype=float),
+                              _np.asarray(returns, dtype=float))
             correlations = {f: round(float(corr) * 0.5, 4) for f in old_weights}
             log.info("  Composite score correlation: %.3f", corr)
         else:
@@ -415,12 +434,35 @@ def run(dry_run=False, reset=False):
     record["min_observations_req"]  = min_obs
     print_report(record, old_weights, new_weights)
 
+    # ── WEIGHTS ARE NOT WRITTEN HERE (2026-08-02) ────────────────────────
+    #
+    # pipeline/learning.py is the single owner of factor weights. This module
+    # is v1 of the feedback loop; learning.py is v2, and v1 was never retired,
+    # so BOTH wrote data/learned_weights.json — the file scoring.py prefers
+    # over config. They disagreed on when a weight may move:
+    #
+    #     learning.py : >=12 independent weekly cross-sections, mean IC must
+    #                   clear |t| >= 2.5, drift leashed to +/-6pp of baseline
+    #     feedback.py : 25 position-months of BOUGHT-ONLY data, no significance
+    #                   test, no leash, +/-5% monthly drift
+    #
+    # feedback.py runs on every `main.py --execute`, learning.py weekly — so
+    # the weaker rule could overwrite the stronger one days later, silently.
+    # Same failure as the two exposure-cap tables: one capability, two owners,
+    # different answers.
+    #
+    # This function now REPORTS what it would have done and changes nothing.
+    # The analysis is still useful; the write is not its to make.
+    record["weights_written"] = False
+    record["weights_owner"]   = "pipeline/learning.py"
     if weight_update_allowed:
-        save_weights(new_weights, dry_run=dry_run)
-        log.info("Weights updated after %d accumulated observations (threshold: %d)",
+        log.info("Feedback would have adjusted weights after %d observations "
+                 "(threshold %d) — NOT applied. Factor weights are owned by "
+                 "pipeline/learning.py, which requires evidence across periods.",
                  new_obs, min_obs)
     else:
-        log.info("Weights NOT saved (accumulating data, %d/%d observations met)",
+        log.info("Feedback analysis complete (%d/%d observations). Weights are "
+                 "owned by pipeline/learning.py and were not touched.",
                  new_obs, min_obs)
 
     return record

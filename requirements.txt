@@ -21,7 +21,10 @@ requests>=2.31.0         # SEC EDGAR insider, Capitol Trades, Discord webhook
 finnhub-python>=2.4.19   # analyst sentiment (Phase 2)
 
 # ── Learning & charts ──────────────────────────────────────────────────────
-scipy>=1.11.0            # Spearman IC (feedback.py, learning.py)
+# scipy REMOVED 2026-08-02 — rank correlation is implemented in numpy
+# (pipeline/learning.py::_spearman). It was a hard dependency that was
+# absent on the owner's machine, so the feedback loop ran in the cloud
+# and failed locally on every run — a silent cloud/local divergence.
 matplotlib>=3.8.0        # /chart command renders (remote_commands.py)
 
 # ── API server (optional — only needed if running api/server.py) ───────────

@@ -447,6 +447,38 @@ class TestEvidenceThresholds(unittest.TestCase):
                           "bogus '-92pp' verdict against insider signals")
         self.assertFalse(d["sufficient"])
 
+    def test_only_one_module_writes_factor_weights(self):
+        """
+        ARCHITECTURE §1: factor weights have exactly one owner.
+
+        learning.py calls itself "v2 of the feedback loop", but v1 was never
+        retired — BOTH wrote data/learned_weights.json, the file scoring.py
+        prefers over config, with incompatible rules:
+          learning.py  >=12 weekly cross-sections, |t|>=2.5, +/-6pp leash
+          feedback.py  25 position-months, no significance test, no leash
+        feedback.py runs on every --execute and learning.py weekly, so the
+        weaker rule could silently overwrite the stronger one.
+        """
+        fb = _code_lines(ROOT / "pipeline" / "feedback.py")
+        offenders = [f"feedback.py:{i}: {l.strip()}"
+                     for i, l in enumerate(fb, 1)
+                     if "LEARNED_WEIGHTS_FILE.write" in l]
+        self.assertEqual(offenders, [],
+                         "feedback.py writes the factor weights owned by "
+                         "learning.py\n" + "\n".join(offenders))
+
+    def test_no_scipy_dependency_anywhere_in_pipeline(self):
+        """scipy is not installed locally; importing it made the feedback loop
+        run in the cloud and fail on the owner's machine every run."""
+        offenders = []
+        for p in _py_files():
+            for i, line in enumerate(_code_lines(p), 1):
+                if "scipy" in line:
+                    offenders.append(f"{p.relative_to(ROOT).as_posix()}:{i}: {line.strip()}")
+        self.assertEqual(offenders, [],
+                         "scipy imported — creates a cloud/local divergence\n"
+                         + "\n".join(offenders))
+
     def test_learned_weights_not_gitignored(self):
         ignored = _src(ROOT / ".gitignore")
         active = [l.strip() for l in ignored.splitlines()
