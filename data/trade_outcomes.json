@@ -585,7 +585,39 @@
       "admin_reason": "full_liquidation_clean_restart_on_fixed_code",
       "retagged": true,
       "signals_refreshed": true
+    },
+    {
+      "ticker": "CVS",
+      "portfolio": "pipeline",
+      "exit_date": "2026-08-05",
+      "entry_date": "2026-07-31",
+      "duration_days": 5,
+      "exit_type": "full",
+      "entry_price": 105.5018,
+      "exit_price": 104.42,
+      "pnl_pct": -1.03,
+      "pnl_dollars": -122.24,
+      "signals": {
+        "regime": "BULL",
+        "bucket": "high",
+        "score": 0.606,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.7567,
+          "trend": 0.6924,
+          "quality": 0.5221,
+          "valuation": 0.7315,
+          "sentiment": 0.5365,
+          "volatility": 0.3298
+        },
+        "rank_at_entry": 3,
+        "scored_on": "2026-07-31"
+      },
+      "win": false
     }
   ],
-  "last_updated": "2026-08-04T22:35:42.857172+00:00"
+  "last_updated": "2026-08-05T22:34:22.403451+00:00"
 }

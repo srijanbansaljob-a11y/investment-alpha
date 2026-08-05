@@ -1,0 +1,79 @@
+{
+  "date": "2026-08-05",
+  "timestamp": "2026-08-05T22:34:22.284047+00:00",
+  "screener": {},
+  "pipeline": {
+    "ALL": {
+      "qty": 45.0,
+      "avg_entry_price": 267.161556,
+      "market_value": 11906.55,
+      "current_price": 264.59,
+      "unrealized_pl": -115.72002,
+      "unrealized_plpc": -0.00963,
+      "cost_basis": 12022.27002
+    },
+    "APA": {
+      "qty": 217.0,
+      "avg_entry_price": 36.62,
+      "market_value": 7568.96,
+      "current_price": 34.88,
+      "unrealized_pl": -377.58,
+      "unrealized_plpc": -0.04752,
+      "cost_basis": 7946.54
+    },
+    "DAL": {
+      "qty": 98.0,
+      "avg_entry_price": 87.79,
+      "market_value": 9127.72,
+      "current_price": 93.14,
+      "unrealized_pl": 524.3,
+      "unrealized_plpc": 0.06094,
+      "cost_basis": 8603.42
+    },
+    "HST": {
+      "qty": 629.0,
+      "avg_entry_price": 25.18,
+      "market_value": 15756.45,
+      "current_price": 25.05,
+      "unrealized_pl": -81.77,
+      "unrealized_plpc": -0.00516,
+      "cost_basis": 15838.22
+    },
+    "INCY": {
+      "qty": 74.0,
+      "avg_entry_price": 119.61,
+      "market_value": 8841.3424,
+      "current_price": 119.4776,
+      "unrealized_pl": -9.7976,
+      "unrealized_plpc": -0.00111,
+      "cost_basis": 8851.14
+    },
+    "MATX": {
+      "qty": 46.0,
+      "avg_entry_price": 203.03,
+      "market_value": 9453.46,
+      "current_price": 205.51,
+      "unrealized_pl": 114.08,
+      "unrealized_plpc": 0.01221,
+      "cost_basis": 9339.38
+    },
+    "TRV": {
+      "qty": 33.0,
+      "avg_entry_price": 379.31,
+      "market_value": 12620.85,
+      "current_price": 382.45,
+      "unrealized_pl": 103.62,
+      "unrealized_plpc": 0.00828,
+      "cost_basis": 12517.23
+    },
+    "VTRS": {
+      "qty": 580.0,
+      "avg_entry_price": 17.53,
+      "market_value": 10208.0,
+      "current_price": 17.6,
+      "unrealized_pl": 40.6,
+      "unrealized_plpc": 0.00399,
+      "cost_basis": 10167.4
+    }
+  }
+}
