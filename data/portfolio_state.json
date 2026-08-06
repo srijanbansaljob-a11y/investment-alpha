@@ -1,64 +1,36 @@
 {
   "schema_version": 2,
-  "run_date": "2026-08-03",
+  "run_date": "2026-08-06",
   "regime": "bull",
   "regime_detail": {
     "regime": "bull",
-    "vix_current": 15.99,
-    "spx_price": 7489.72,
-    "spx_200ma": 7024.11,
-    "spx_vs_200ma_pct": 6.63,
-    "yield_curve_spread": 0.86,
-    "credit_spread_momentum": 0.02088,
+    "vix_current": 15.81,
+    "spx_price": 7723.55,
+    "spx_200ma": 7039.69,
+    "spx_vs_200ma_pct": 9.71,
+    "yield_curve_spread": 0.74,
+    "credit_spread_momentum": 0.022453,
     "active_top_n": 10,
     "active_stop_loss": 0.85,
-    "timestamp": "2026-08-03T11:40:49.239608+00:00",
-    "notes": "SPX 6.6% above 200MA, VIX=16.0 (benign)"
+    "timestamp": "2026-08-06T07:38:13.633322+00:00",
+    "notes": "SPX 9.7% above 200MA, VIX=15.8 (benign)"
   },
   "signal_summary": {
-    "total_signals": 10,
-    "buy": 2,
-    "hold": 8,
-    "exit": 0,
-    "run_date": "2026-08-03",
+    "total_signals": 12,
+    "buy": 4,
+    "hold": 6,
+    "exit": 2,
+    "run_date": "2026-08-06",
     "regime": "bull"
   },
   "portfolio": [
     {
       "ticker": "HST",
-      "name": "HST",
+      "name": "Host Hotels & Resorts, Inc.",
       "action": "HOLD",
-      "weight": 0.148092,
-      "score": 0.6528,
+      "weight": 0.146924,
+      "score": 0.6193,
       "entry_price": 25.18,
-      "entry_date": "2026-07-31",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "INCY",
-      "name": "Incyte Corporation",
-      "action": "HOLD",
-      "weight": 0.083682,
-      "score": 0.6214,
-      "entry_price": 119.61,
-      "entry_date": "2026-07-31",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "ALL",
-      "name": "The Allstate Corporation",
-      "action": "HOLD",
-      "weight": 0.111664,
-      "score": 0.6018,
-      "entry_price": 267.1616,
       "entry_date": "2026-07-31",
       "signals": {
         "trend": "bullish",
@@ -70,8 +42,8 @@
       "ticker": "VTRS",
       "name": "Viatris Inc.",
       "action": "HOLD",
-      "weight": 0.0956,
-      "score": 0.6001,
+      "weight": 0.109225,
+      "score": 0.6138,
       "entry_price": 17.53,
       "entry_date": "2026-07-31",
       "signals": {
@@ -81,43 +53,99 @@
       }
     },
     {
-      "ticker": "APA",
-      "name": "APA",
+      "ticker": "MATX",
+      "name": "Matson, Inc.",
       "action": "HOLD",
-      "weight": 0.07243,
-      "score": 0.5977,
+      "weight": 0.093202,
+      "score": 0.611,
+      "entry_price": 203.03,
+      "entry_date": "2026-08-06",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "INCY",
+      "name": "Incyte Corporation",
+      "action": "HOLD",
+      "weight": 0.081026,
+      "score": 0.6025,
+      "entry_price": 119.61,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "CNC",
+      "name": "Centene Corporation",
+      "action": "BUY",
+      "weight": 0.079906,
+      "score": 0.5922,
+      "entry_price": 66.99,
+      "entry_date": "2026-08-06",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "VLO",
+      "name": "Valero Energy Corporation",
+      "action": "BUY",
+      "weight": 0.086166,
+      "score": 0.5802,
+      "entry_price": 302.39,
+      "entry_date": "2026-08-06",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "ALL",
+      "name": "The Allstate Corporation",
+      "action": "HOLD",
+      "weight": 0.108605,
+      "score": 0.5798,
+      "entry_price": 267.1616,
+      "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "DOC",
+      "name": "Healthpeak Properties, Inc.",
+      "action": "BUY",
+      "weight": 0.137172,
+      "score": 0.5625,
+      "entry_price": 21.79,
+      "entry_date": "2026-08-06",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "APA",
+      "name": "APA Corporation",
+      "action": "HOLD",
+      "weight": 0.075796,
+      "score": 0.5586,
       "entry_price": 36.62,
       "entry_date": "2026-07-31",
       "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "CVS",
-      "name": "CVS Health Corporation",
-      "action": "HOLD",
-      "weight": 0.110709,
-      "score": 0.5943,
-      "entry_price": 105.5018,
-      "entry_date": "2026-07-31",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "DAL",
-      "name": "DAL",
-      "action": "HOLD",
-      "weight": 0.081581,
-      "score": 0.5904,
-      "entry_price": 87.79,
-      "entry_date": "2026-07-31",
-      "signals": {
-        "trend": "bullish",
+        "trend": "neutral",
         "momentum": "strong",
         "above_ma200": true
       }
@@ -126,38 +154,10 @@
       "ticker": "SWK",
       "name": "Stanley Black & Decker, Inc.",
       "action": "BUY",
-      "weight": 0.086185,
-      "score": 0.5854,
-      "entry_price": 94.58,
-      "entry_date": "2026-08-03",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "TRV",
-      "name": "TRV",
-      "action": "HOLD",
-      "weight": 0.117199,
-      "score": 0.5818,
-      "entry_price": 379.31,
-      "entry_date": "2026-07-31",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "NUE",
-      "name": "NUE",
-      "action": "BUY",
-      "weight": 0.092858,
-      "score": 0.5685,
-      "entry_price": 257.29,
-      "entry_date": "2026-08-03",
+      "weight": 0.081978,
+      "score": 0.5577,
+      "entry_price": 103.27,
+      "entry_date": "2026-08-06",
       "signals": {
         "trend": "bullish",
         "momentum": "strong",
