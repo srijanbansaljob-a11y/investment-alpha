@@ -1,60 +1,60 @@
 {
   "date": "2026-08-07",
-  "timestamp": "2026-08-07T01:03:28.385526+00:00",
+  "timestamp": "2026-08-07T22:05:52.575562+00:00",
   "screener": {},
   "pipeline": {
     "ALL": {
       "qty": 45.0,
       "avg_entry_price": 267.161556,
-      "market_value": 12379.95,
-      "current_price": 275.11,
-      "unrealized_pl": 357.67998,
-      "unrealized_plpc": 0.02975,
+      "market_value": 12195.0,
+      "current_price": 271.0,
+      "unrealized_pl": 172.72998,
+      "unrealized_plpc": 0.01437,
       "cost_basis": 12022.27002
     },
     "APA": {
       "qty": 217.0,
       "avg_entry_price": 36.62,
-      "market_value": 7942.2,
-      "current_price": 36.6,
-      "unrealized_pl": -4.34,
-      "unrealized_plpc": -0.00055,
+      "market_value": 8187.41,
+      "current_price": 37.73,
+      "unrealized_pl": 240.87,
+      "unrealized_plpc": 0.03031,
       "cost_basis": 7946.54
     },
     "DAL": {
       "qty": 98.0,
       "avg_entry_price": 87.79,
-      "market_value": 9013.893,
-      "current_price": 91.9785,
-      "unrealized_pl": 410.473,
-      "unrealized_plpc": 0.04771,
+      "market_value": 8936.62,
+      "current_price": 91.19,
+      "unrealized_pl": 333.2,
+      "unrealized_plpc": 0.03873,
       "cost_basis": 8603.42
     },
     "INCY": {
       "qty": 74.0,
       "avg_entry_price": 119.61,
-      "market_value": 8760.12,
-      "current_price": 118.38,
-      "unrealized_pl": -91.02,
-      "unrealized_plpc": -0.01028,
+      "market_value": 8880.0,
+      "current_price": 120.0,
+      "unrealized_pl": 28.86,
+      "unrealized_plpc": 0.00326,
       "cost_basis": 8851.14
     },
     "MATX": {
       "qty": 46.0,
       "avg_entry_price": 203.03,
-      "market_value": 9487.96,
-      "current_price": 206.26,
-      "unrealized_pl": 148.58,
-      "unrealized_plpc": 0.01591,
+      "market_value": 9511.42,
+      "current_price": 206.77,
+      "unrealized_pl": 172.04,
+      "unrealized_plpc": 0.01842,
       "cost_basis": 9339.38
     },
     "TRV": {
       "qty": 33.0,
       "avg_entry_price": 379.31,
-      "market_value": 12738.0,
-      "current_price": 386.0,
-      "unrealized_pl": 220.77,
-      "unrealized_plpc": 0.01764,
+      "market_value": 12682.23,
+      "current_price": 384.31,
+      "unrealized_pl": 165.0,
+      "unrealized_plpc": 0.01318,
       "cost_basis": 12517.23
     }
   }
