@@ -1,33 +1,39 @@
 {
-  "total": 13,
-  "wins": 12,
-  "win_rate": 92.3,
-  "avg_pl": 8.48,
-  "avg_duration": 14.4,
+  "total": 5,
+  "wins": 4,
+  "win_rate": 80.0,
+  "avg_pl": 5.73,
+  "avg_duration": 4.2,
   "signals": {
     "insider_buy": {
       "with_n": 0,
-      "without_n": 13,
-      "with_wr": 0,
-      "without_wr": 92.3,
-      "with_avg_pl": 0,
-      "edge": -92.3
+      "without_n": 5,
+      "with_wr": null,
+      "without_wr": 80.0,
+      "with_avg_pl": null,
+      "sufficient": false,
+      "edge": null,
+      "note": "insufficient data (need 3+ trades in each group; have 0 with / 5 without)"
     },
     "congress_buy": {
       "with_n": 0,
-      "without_n": 13,
-      "with_wr": 0,
-      "without_wr": 92.3,
-      "with_avg_pl": 0,
-      "edge": -92.3
+      "without_n": 5,
+      "with_wr": null,
+      "without_wr": 80.0,
+      "with_avg_pl": null,
+      "sufficient": false,
+      "edge": null,
+      "note": "insufficient data (need 3+ trades in each group; have 0 with / 5 without)"
     },
     "earnings_beat": {
       "with_n": 0,
-      "without_n": 13,
-      "with_wr": 0,
-      "without_wr": 92.3,
-      "with_avg_pl": 0,
-      "edge": -92.3
+      "without_n": 5,
+      "with_wr": null,
+      "without_wr": 80.0,
+      "with_avg_pl": null,
+      "sufficient": false,
+      "edge": null,
+      "note": "insufficient data (need 3+ trades in each group; have 0 with / 5 without)"
     }
   },
   "rs_vs_spy": {
@@ -38,53 +44,53 @@
   },
   "by_regime": [
     {
-      "label": "UNKNOWN",
-      "trades": 13,
-      "wins": 12,
-      "win_rate": 92.3,
-      "avg_pl": 8.48
+      "label": "BULL",
+      "trades": 5,
+      "wins": 4,
+      "win_rate": 80.0,
+      "avg_pl": 5.73
     }
   ],
   "by_bucket": [
     {
       "label": "unknown",
-      "trades": 13,
-      "wins": 12,
-      "win_rate": 92.3,
-      "avg_pl": 8.48
+      "trades": 3,
+      "wins": 3,
+      "win_rate": 100.0,
+      "avg_pl": 3.62
+    },
+    {
+      "label": "mid",
+      "trades": 1,
+      "wins": 1,
+      "win_rate": 100.0,
+      "avg_pl": 18.85
+    },
+    {
+      "label": "high",
+      "trades": 1,
+      "wins": 0,
+      "win_rate": 0.0,
+      "avg_pl": -1.03
     }
   ],
   "by_portfolio": [
     {
-      "label": "screener",
-      "trades": 8,
-      "wins": 7,
-      "win_rate": 87.5,
-      "avg_pl": 8.42
-    },
-    {
       "label": "pipeline",
       "trades": 5,
-      "wins": 5,
-      "win_rate": 100.0,
-      "avg_pl": 8.58
+      "wins": 4,
+      "win_rate": 80.0,
+      "avg_pl": 5.73
     }
   ],
   "by_exit_type": [
     {
       "label": "full",
-      "trades": 12,
-      "wins": 11,
-      "win_rate": 91.7,
-      "avg_pl": 8.09
-    },
-    {
-      "label": "partial",
-      "trades": 1,
-      "wins": 1,
-      "win_rate": 100.0,
-      "avg_pl": 13.21
+      "trades": 5,
+      "wins": 4,
+      "win_rate": 80.0,
+      "avg_pl": 5.73
     }
   ],
-  "generated_at": "2026-08-01T15:03:30.887585+00:00"
+  "generated_at": "2026-08-08T13:46:15.376870+00:00"
 }
