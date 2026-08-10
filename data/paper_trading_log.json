@@ -5160,5 +5160,155 @@
       "start_date": "2026-07-31",
       "end_date": "2026-10-29"
     }
+  },
+  {
+    "timestamp": "2026-08-10T15:32:55.892405+00:00",
+    "run_date": "2026-08-10",
+    "regime": "bull",
+    "currency": "USD",
+    "equity": 112923.15,
+    "cash": 5997.32,
+    "invested_pct": 94.69,
+    "position_count": 10,
+    "positions_in_profit": 6,
+    "closed_trade_stats": {
+      "n": 5,
+      "win_rate_pct": 80.0,
+      "avg_pnl_pct": 5.73,
+      "excluded_admin": 16
+    },
+    "total_capital": 113884.3,
+    "baseline_date": "2026-07-31",
+    "portfolio_value": 106925.83,
+    "realised_pnl": -2551.19,
+    "total_portfolio_value": 112923.15,
+    "total_return_pct": -0.844,
+    "benchmark_return_pct": 3.5541,
+    "alpha_pct": -4.3981,
+    "sharpe_ratio": -3.3655,
+    "max_drawdown_pct": -0.9018,
+    "win_rate_pct": 60.0,
+    "avg_gain_pct": 3.08,
+    "avg_loss_pct": -0.03,
+    "positions": [
+      {
+        "ticker": "AIZ",
+        "qty": 53.0,
+        "weight": 0.135183,
+        "entry_price": 288.1534,
+        "current_price": 288.025,
+        "cost_basis": 15272.13,
+        "current_value": 15265.33,
+        "unrealised_pnl": -6.8,
+        "unrealised_pct": -0.04
+      },
+      {
+        "ticker": "ALL",
+        "qty": 45.0,
+        "weight": 0.108107,
+        "entry_price": 267.1616,
+        "current_price": 271.285,
+        "cost_basis": 12022.27,
+        "current_value": 12207.83,
+        "unrealised_pnl": 185.55,
+        "unrealised_pct": 1.54
+      },
+      {
+        "ticker": "APA",
+        "qty": 217.0,
+        "weight": 0.077059,
+        "entry_price": 36.62,
+        "current_price": 40.1,
+        "cost_basis": 7946.54,
+        "current_value": 8701.7,
+        "unrealised_pnl": 755.16,
+        "unrealised_pct": 9.5
+      },
+      {
+        "ticker": "CNC",
+        "qty": 139.0,
+        "weight": 0.081998,
+        "entry_price": 66.65,
+        "current_price": 66.615,
+        "cost_basis": 9264.35,
+        "current_value": 9259.49,
+        "unrealised_pnl": -4.87,
+        "unrealised_pct": -0.05
+      },
+      {
+        "ticker": "DAL",
+        "qty": 98.0,
+        "weight": 0.078115,
+        "entry_price": 87.79,
+        "current_price": 90.01,
+        "cost_basis": 8603.42,
+        "current_value": 8820.98,
+        "unrealised_pnl": 217.56,
+        "unrealised_pct": 2.53
+      },
+      {
+        "ticker": "INCY",
+        "qty": 74.0,
+        "weight": 0.080096,
+        "entry_price": 119.61,
+        "current_price": 122.225,
+        "cost_basis": 8851.14,
+        "current_value": 9044.65,
+        "unrealised_pnl": 193.51,
+        "unrealised_pct": 2.19
+      },
+      {
+        "ticker": "MATX",
+        "qty": 46.0,
+        "weight": 0.084934,
+        "entry_price": 203.03,
+        "current_price": 208.5,
+        "cost_basis": 9339.38,
+        "current_value": 9591.0,
+        "unrealised_pnl": 251.62,
+        "unrealised_pct": 2.69
+      },
+      {
+        "ticker": "MPC",
+        "qty": 36.0,
+        "weight": 0.099504,
+        "entry_price": 312.19,
+        "current_price": 312.12,
+        "cost_basis": 11238.84,
+        "current_value": 11236.32,
+        "unrealised_pnl": -2.52,
+        "unrealised_pct": -0.02
+      },
+      {
+        "ticker": "TRV",
+        "qty": 33.0,
+        "weight": 0.110874,
+        "entry_price": 379.31,
+        "current_price": 379.4,
+        "cost_basis": 12517.23,
+        "current_value": 12520.2,
+        "unrealised_pnl": 2.97,
+        "unrealised_pct": 0.02
+      },
+      {
+        "ticker": "VLO",
+        "qty": 33.0,
+        "weight": 0.091021,
+        "entry_price": 311.53,
+        "current_price": 311.4651,
+        "cost_basis": 10280.49,
+        "current_value": 10278.35,
+        "unrealised_pnl": -2.14,
+        "unrealised_pct": -0.02
+      }
+    ],
+    "closed_positions": [],
+    "paper_trading": {
+      "in_validation": true,
+      "days_elapsed": 10,
+      "days_remaining": 80,
+      "start_date": "2026-07-31",
+      "end_date": "2026-10-29"
+    }
   }
 ]

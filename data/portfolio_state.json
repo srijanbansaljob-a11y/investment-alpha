@@ -1,79 +1,37 @@
 {
   "schema_version": 2,
-  "run_date": "2026-08-06",
+  "run_date": "2026-08-10",
   "regime": "bull",
   "regime_detail": {
     "regime": "bull",
-    "vix_current": 15.81,
-    "spx_price": 7723.55,
-    "spx_200ma": 7039.69,
-    "spx_vs_200ma_pct": 9.71,
-    "yield_curve_spread": 0.74,
-    "credit_spread_momentum": 0.022453,
+    "vix_current": 14.9,
+    "spx_price": 7764.44,
+    "spx_200ma": 7055.18,
+    "spx_vs_200ma_pct": 10.05,
+    "yield_curve_spread": 0.79,
+    "credit_spread_momentum": 0.028977,
     "active_top_n": 10,
     "active_stop_loss": 0.85,
-    "timestamp": "2026-08-06T07:38:13.633322+00:00",
-    "notes": "SPX 9.7% above 200MA, VIX=15.8 (benign)"
+    "timestamp": "2026-08-10T15:15:55.272860+00:00",
+    "notes": "SPX 10.1% above 200MA, VIX=14.9 (benign)"
   },
   "signal_summary": {
-    "total_signals": 12,
-    "buy": 4,
-    "hold": 6,
-    "exit": 2,
-    "run_date": "2026-08-06",
+    "total_signals": 10,
+    "buy": 6,
+    "hold": 4,
+    "exit": 0,
+    "run_date": "2026-08-10",
     "regime": "bull"
   },
   "portfolio": [
     {
-      "ticker": "HST",
-      "name": "Host Hotels & Resorts, Inc.",
-      "action": "HOLD",
-      "weight": 0.146924,
-      "score": 0.6193,
-      "entry_price": 25.18,
-      "entry_date": "2026-07-31",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "VTRS",
-      "name": "Viatris Inc.",
-      "action": "HOLD",
-      "weight": 0.109225,
-      "score": 0.6138,
-      "entry_price": 17.53,
-      "entry_date": "2026-07-31",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
       "ticker": "MATX",
       "name": "Matson, Inc.",
       "action": "HOLD",
-      "weight": 0.093202,
-      "score": 0.611,
+      "weight": 0.095479,
+      "score": 0.6148,
       "entry_price": 203.03,
       "entry_date": "2026-08-06",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "INCY",
-      "name": "Incyte Corporation",
-      "action": "HOLD",
-      "weight": 0.081026,
-      "score": 0.6025,
-      "entry_price": 119.61,
-      "entry_date": "2026-07-31",
       "signals": {
         "trend": "bullish",
         "momentum": "strong",
@@ -84,10 +42,38 @@
       "ticker": "CNC",
       "name": "Centene Corporation",
       "action": "BUY",
-      "weight": 0.079906,
-      "score": 0.5922,
-      "entry_price": 66.99,
-      "entry_date": "2026-08-06",
+      "weight": 0.081181,
+      "score": 0.6077,
+      "entry_price": 65.77,
+      "entry_date": "2026-08-10",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "AIZ",
+      "name": "AIZ",
+      "action": "BUY",
+      "weight": 0.137191,
+      "score": 0.607,
+      "entry_price": 289.55,
+      "entry_date": "2026-08-10",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "MPC",
+      "name": "Marathon Petroleum Corporation",
+      "action": "BUY",
+      "weight": 0.095279,
+      "score": 0.5945,
+      "entry_price": 298.2,
+      "entry_date": "2026-08-10",
       "signals": {
         "trend": "bullish",
         "momentum": "strong",
@@ -98,12 +84,26 @@
       "ticker": "VLO",
       "name": "Valero Energy Corporation",
       "action": "BUY",
-      "weight": 0.086166,
-      "score": 0.5802,
-      "entry_price": 302.39,
-      "entry_date": "2026-08-06",
+      "weight": 0.088128,
+      "score": 0.5894,
+      "entry_price": 298.31,
+      "entry_date": "2026-08-10",
       "signals": {
         "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "HST",
+      "name": "HST",
+      "action": "BUY",
+      "weight": 0.123654,
+      "score": 0.5843,
+      "entry_price": 23.29,
+      "entry_date": "2026-08-10",
+      "signals": {
+        "trend": "bearish",
         "momentum": "strong",
         "above_ma200": true
       }
@@ -112,8 +112,8 @@
       "ticker": "ALL",
       "name": "The Allstate Corporation",
       "action": "HOLD",
-      "weight": 0.108605,
-      "score": 0.5798,
+      "weight": 0.104413,
+      "score": 0.5792,
       "entry_price": 267.1616,
       "entry_date": "2026-07-31",
       "signals": {
@@ -123,13 +123,27 @@
       }
     },
     {
-      "ticker": "DOC",
-      "name": "Healthpeak Properties, Inc.",
+      "ticker": "CVS",
+      "name": "CVS Health Corporation",
       "action": "BUY",
-      "weight": 0.137172,
-      "score": 0.5625,
-      "entry_price": 21.79,
-      "entry_date": "2026-08-06",
+      "weight": 0.117455,
+      "score": 0.579,
+      "entry_price": 95.7,
+      "entry_date": "2026-08-10",
+      "signals": {
+        "trend": "bearish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "INCY",
+      "name": "Incyte Corporation",
+      "action": "HOLD",
+      "weight": 0.082415,
+      "score": 0.5775,
+      "entry_price": 119.61,
+      "entry_date": "2026-07-31",
       "signals": {
         "trend": "bullish",
         "momentum": "strong",
@@ -138,26 +152,12 @@
     },
     {
       "ticker": "APA",
-      "name": "APA Corporation",
+      "name": "APA",
       "action": "HOLD",
-      "weight": 0.075796,
-      "score": 0.5586,
+      "weight": 0.074806,
+      "score": 0.5738,
       "entry_price": 36.62,
       "entry_date": "2026-07-31",
-      "signals": {
-        "trend": "neutral",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "SWK",
-      "name": "Stanley Black & Decker, Inc.",
-      "action": "BUY",
-      "weight": 0.081978,
-      "score": 0.5577,
-      "entry_price": 103.27,
-      "entry_date": "2026-08-06",
       "signals": {
         "trend": "bullish",
         "momentum": "strong",

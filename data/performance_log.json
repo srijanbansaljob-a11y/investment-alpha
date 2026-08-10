@@ -215,5 +215,36 @@
       "sentiment": 0.1002,
       "volatility": 0.0988
     }
+  },
+  {
+    "month": "2026-08",
+    "timestamp": "2026-08-10T15:32:55.891529+00:00",
+    "positions": 10,
+    "avg_return": 0.0225,
+    "hit_rate": 0.7,
+    "factor_correlations": {
+      "momentum": -0.0818,
+      "trend": -0.0818,
+      "quality": -0.0818,
+      "valuation": -0.0818,
+      "sentiment": -0.0818,
+      "volatility": -0.0818
+    },
+    "weights_before": {
+      "momentum": 0.28,
+      "trend": 0.2,
+      "quality": 0.18,
+      "valuation": 0.14,
+      "sentiment": 0.1,
+      "volatility": 0.1
+    },
+    "weights_after": {
+      "momentum": 0.2799,
+      "trend": 0.1999,
+      "quality": 0.1799,
+      "valuation": 0.1399,
+      "sentiment": 0.1,
+      "volatility": 0.1004
+    }
   }
 ]

@@ -180,5 +180,18 @@
     "decision": "pipeline_execute",
     "success": true,
     "timestamp": "2026-08-03T10:48:50.422223+00:00"
+  },
+  {
+    "decision": "approve_rebalance",
+    "regime": "bull",
+    "buy": 6,
+    "exit": 0,
+    "proposed_at": "2026-08-10",
+    "timestamp": "2026-08-10T15:15:53.426157+00:00"
+  },
+  {
+    "decision": "approve_rebalance_executed",
+    "success": true,
+    "timestamp": "2026-08-10T15:32:56.294917+00:00"
   }
 ]
