@@ -1,14 +1,14 @@
 {
   "schema_version": 2,
-  "proposed_at": "2026-08-10T15:14:54.744213+00:00",
-  "expires_at": "2026-08-10T21:00:00+00:00",
+  "proposed_at": "2026-08-17T14:47:34.660619+00:00",
+  "expires_at": "2026-08-17T21:00:00+00:00",
   "regime": "bull",
   "signal_summary": {
-    "total_signals": 10,
-    "buy": 6,
-    "hold": 4,
-    "exit": 0,
-    "run_date": "2026-08-10",
+    "total_signals": 11,
+    "buy": 2,
+    "hold": 8,
+    "exit": 1,
+    "run_date": "2026-08-17",
     "regime": "bull"
   },
   "portfolio": [
@@ -16,8 +16,8 @@
       "ticker": "MATX",
       "name": "Matson, Inc.",
       "action": "HOLD",
-      "weight": 0.095479,
-      "score": 0.615,
+      "weight": 0.09178,
+      "score": 0.619,
       "entry_price": 203.03,
       "entry_date": "2026-08-06",
       "signals": {
@@ -29,10 +29,10 @@
     {
       "ticker": "CNC",
       "name": "Centene Corporation",
-      "action": "BUY",
-      "weight": 0.081181,
-      "score": 0.6077,
-      "entry_price": 65.77,
+      "action": "HOLD",
+      "weight": 0.077758,
+      "score": 0.6064,
+      "entry_price": 66.65,
       "entry_date": "2026-08-10",
       "signals": {
         "trend": "bullish",
@@ -42,68 +42,12 @@
     },
     {
       "ticker": "AIZ",
-      "name": "AIZ",
-      "action": "BUY",
-      "weight": 0.137191,
-      "score": 0.6068,
-      "entry_price": 289.55,
-      "entry_date": "2026-08-10",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "MPC",
-      "name": "Marathon Petroleum Corporation",
-      "action": "BUY",
-      "weight": 0.095279,
-      "score": 0.5945,
-      "entry_price": 298.2,
-      "entry_date": "2026-08-10",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "VLO",
-      "name": "Valero Energy Corporation",
-      "action": "BUY",
-      "weight": 0.088128,
-      "score": 0.5908,
-      "entry_price": 298.31,
-      "entry_date": "2026-08-10",
-      "signals": {
-        "trend": "bullish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "HST",
-      "name": "HST",
-      "action": "BUY",
-      "weight": 0.123654,
-      "score": 0.585,
-      "entry_price": 23.29,
-      "entry_date": "2026-08-10",
-      "signals": {
-        "trend": "bearish",
-        "momentum": "strong",
-        "above_ma200": true
-      }
-    },
-    {
-      "ticker": "ALL",
-      "name": "The Allstate Corporation",
+      "name": "Assurant, Inc.",
       "action": "HOLD",
-      "weight": 0.104413,
-      "score": 0.579,
-      "entry_price": 267.1616,
-      "entry_date": "2026-07-31",
+      "weight": 0.141419,
+      "score": 0.6012,
+      "entry_price": 288.1534,
+      "entry_date": "2026-08-10",
       "signals": {
         "trend": "bullish",
         "momentum": "strong",
@@ -114,12 +58,26 @@
       "ticker": "CVS",
       "name": "CVS Health Corporation",
       "action": "BUY",
-      "weight": 0.117455,
-      "score": 0.5787,
-      "entry_price": 95.7,
-      "entry_date": "2026-08-10",
+      "weight": 0.117002,
+      "score": 0.6001,
+      "entry_price": 97.16,
+      "entry_date": "2026-08-17",
       "signals": {
         "trend": "bearish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "TRV",
+      "name": "The Travelers Companies, Inc.",
+      "action": "HOLD",
+      "weight": 0.111373,
+      "score": 0.5998,
+      "entry_price": 379.31,
+      "entry_date": "2026-08-17",
+      "signals": {
+        "trend": "bullish",
         "momentum": "strong",
         "above_ma200": true
       }
@@ -128,8 +86,8 @@
       "ticker": "INCY",
       "name": "Incyte Corporation",
       "action": "HOLD",
-      "weight": 0.082415,
-      "score": 0.5776,
+      "weight": 0.08224,
+      "score": 0.5883,
       "entry_price": 119.61,
       "entry_date": "2026-07-31",
       "signals": {
@@ -139,13 +97,55 @@
       }
     },
     {
-      "ticker": "APA",
-      "name": "APA",
+      "ticker": "ALL",
+      "name": "The Allstate Corporation",
       "action": "HOLD",
-      "weight": 0.074806,
-      "score": 0.574,
-      "entry_price": 36.62,
+      "weight": 0.099237,
+      "score": 0.5852,
+      "entry_price": 267.1616,
       "entry_date": "2026-07-31",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "EIX",
+      "name": "Edison International",
+      "action": "BUY",
+      "weight": 0.112813,
+      "score": 0.5831,
+      "entry_price": 71.41,
+      "entry_date": "2026-08-17",
+      "signals": {
+        "trend": "bearish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "MPC",
+      "name": "Marathon Petroleum Corporation",
+      "action": "HOLD",
+      "weight": 0.083519,
+      "score": 0.5824,
+      "entry_price": 312.19,
+      "entry_date": "2026-08-10",
+      "signals": {
+        "trend": "bullish",
+        "momentum": "strong",
+        "above_ma200": true
+      }
+    },
+    {
+      "ticker": "VLO",
+      "name": "Valero Energy Corporation",
+      "action": "HOLD",
+      "weight": 0.082859,
+      "score": 0.5801,
+      "entry_price": 311.53,
+      "entry_date": "2026-08-10",
       "signals": {
         "trend": "bullish",
         "momentum": "strong",
