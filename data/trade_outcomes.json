@@ -617,7 +617,71 @@
         "scored_on": "2026-07-31"
       },
       "win": false
+    },
+    {
+      "ticker": "APA",
+      "portfolio": "pipeline",
+      "exit_date": "2026-08-19",
+      "entry_date": "2026-07-27",
+      "duration_days": 23,
+      "exit_type": "full",
+      "entry_price": 36.62,
+      "exit_price": 42.18,
+      "pnl_pct": 15.18,
+      "pnl_dollars": 1206.52,
+      "signals": {
+        "regime": "BULL",
+        "bucket": "high",
+        "score": 0.6057,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.6952,
+          "trend": 0.654,
+          "quality": 0.8163,
+          "valuation": 0.8704,
+          "sentiment": 0.4307,
+          "volatility": 0.7312
+        },
+        "rank_at_entry": 3,
+        "scored_on": "2026-07-27"
+      },
+      "win": true
+    },
+    {
+      "ticker": "DAL",
+      "portfolio": "pipeline",
+      "exit_date": "2026-08-19",
+      "entry_date": "2026-07-27",
+      "duration_days": 23,
+      "exit_type": "full",
+      "entry_price": 87.79,
+      "exit_price": 85.88,
+      "pnl_pct": -2.18,
+      "pnl_dollars": -187.18,
+      "signals": {
+        "regime": "BULL",
+        "bucket": "mid",
+        "score": 0.5694,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.8111,
+          "trend": 0.586,
+          "quality": 0.4085,
+          "valuation": 0.9454,
+          "sentiment": 0.6114,
+          "volatility": 0.6265
+        },
+        "rank_at_entry": 9,
+        "scored_on": "2026-07-27"
+      },
+      "win": false
     }
   ],
-  "last_updated": "2026-08-18T21:47:56.592168+00:00"
+  "last_updated": "2026-08-19T21:50:35.028873+00:00"
 }
