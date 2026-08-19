@@ -193,5 +193,14 @@
     "decision": "approve_rebalance_executed",
     "success": true,
     "timestamp": "2026-08-10T15:32:56.294917+00:00"
+  },
+  {
+    "decision": "approve_sell",
+    "ticker": "APA",
+    "trigger": "profit_target",
+    "price_at_decision": 44.04,
+    "order_status": "OrderStatus.FILLED",
+    "pnl_pct_at_decision": 20.26,
+    "timestamp": "2026-08-19T14:18:40.968483+00:00"
   }
 ]
