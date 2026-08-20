@@ -681,7 +681,39 @@
         "scored_on": "2026-07-27"
       },
       "win": false
+    },
+    {
+      "ticker": "ALL",
+      "portfolio": "pipeline",
+      "exit_date": "2026-08-20",
+      "entry_date": "2026-07-31",
+      "duration_days": 20,
+      "exit_type": "full",
+      "entry_price": 267.1616,
+      "exit_price": 259.74,
+      "pnl_pct": -2.78,
+      "pnl_dollars": -333.97,
+      "signals": {
+        "regime": "BULL",
+        "bucket": "mid",
+        "score": 0.5849,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.5682,
+          "trend": 0.733,
+          "quality": 0.6533,
+          "valuation": 0.7704,
+          "sentiment": 0.3926,
+          "volatility": 0.3194
+        },
+        "rank_at_entry": 6,
+        "scored_on": "2026-07-31"
+      },
+      "win": false
     }
   ],
-  "last_updated": "2026-08-19T21:50:35.028873+00:00"
+  "last_updated": "2026-08-20T21:53:47.354501+00:00"
 }
