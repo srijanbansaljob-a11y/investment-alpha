@@ -713,7 +713,39 @@
         "scored_on": "2026-07-31"
       },
       "win": false
+    },
+    {
+      "ticker": "MPC",
+      "portfolio": "pipeline",
+      "exit_date": "2026-09-03",
+      "entry_date": "2026-08-10",
+      "duration_days": 24,
+      "exit_type": "full",
+      "entry_price": 312.19,
+      "exit_price": 387.0,
+      "pnl_pct": 23.96,
+      "pnl_dollars": 2693.16,
+      "signals": {
+        "regime": "BULL",
+        "bucket": "mid",
+        "score": 0.5945,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.802,
+          "trend": 0.6213,
+          "quality": 0.6399,
+          "valuation": 0.6521,
+          "sentiment": 0.4517,
+          "volatility": 0.4887
+        },
+        "rank_at_entry": 5,
+        "scored_on": "2026-08-10"
+      },
+      "win": true
     }
   ],
-  "last_updated": "2026-09-02T23:29:04.329425+00:00"
+  "last_updated": "2026-09-03T23:24:57.985898+00:00"
 }
