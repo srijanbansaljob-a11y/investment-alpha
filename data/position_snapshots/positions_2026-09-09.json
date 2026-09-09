@@ -1,0 +1,61 @@
+{
+  "date": "2026-09-09",
+  "timestamp": "2026-09-09T23:25:59.343719+00:00",
+  "screener": {},
+  "pipeline": {
+    "AIZ": {
+      "qty": 53.0,
+      "avg_entry_price": 288.153396,
+      "market_value": 14863.32,
+      "current_price": 280.44,
+      "unrealized_pl": -408.809988,
+      "unrealized_plpc": -0.02677,
+      "cost_basis": 15272.129988
+    },
+    "CNC": {
+      "qty": 139.0,
+      "avg_entry_price": 66.65,
+      "market_value": 8904.34,
+      "current_price": 64.06,
+      "unrealized_pl": -360.01,
+      "unrealized_plpc": -0.03886,
+      "cost_basis": 9264.35
+    },
+    "INCY": {
+      "qty": 74.0,
+      "avg_entry_price": 119.61,
+      "market_value": 9324.74,
+      "current_price": 126.01,
+      "unrealized_pl": 473.6,
+      "unrealized_plpc": 0.05351,
+      "cost_basis": 8851.14
+    },
+    "MATX": {
+      "qty": 46.0,
+      "avg_entry_price": 203.03,
+      "market_value": 10435.56,
+      "current_price": 226.86,
+      "unrealized_pl": 1096.18,
+      "unrealized_plpc": 0.11737,
+      "cost_basis": 9339.38
+    },
+    "TRV": {
+      "qty": 33.0,
+      "avg_entry_price": 379.31,
+      "market_value": 12106.05,
+      "current_price": 366.85,
+      "unrealized_pl": -411.18,
+      "unrealized_plpc": -0.03285,
+      "cost_basis": 12517.23
+    },
+    "VLO": {
+      "qty": 33.0,
+      "avg_entry_price": 311.53,
+      "market_value": 12937.5609,
+      "current_price": 392.0473,
+      "unrealized_pl": 2657.0709,
+      "unrealized_plpc": 0.25846,
+      "cost_basis": 10280.49
+    }
+  }
+}
