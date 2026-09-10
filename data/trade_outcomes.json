@@ -745,7 +745,39 @@
         "scored_on": "2026-08-10"
       },
       "win": true
+    },
+    {
+      "ticker": "VLO",
+      "portfolio": "pipeline",
+      "exit_date": "2026-09-10",
+      "entry_date": "2026-08-10",
+      "duration_days": 31,
+      "exit_type": "full",
+      "entry_price": 311.53,
+      "exit_price": 392.0473,
+      "pnl_pct": 25.85,
+      "pnl_dollars": 2657.07,
+      "signals": {
+        "regime": "BULL",
+        "bucket": "mid",
+        "score": 0.5894,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.7832,
+          "trend": 0.6616,
+          "quality": 0.6823,
+          "valuation": 0.624,
+          "sentiment": 0.43,
+          "volatility": 0.5742
+        },
+        "rank_at_entry": 6,
+        "scored_on": "2026-08-10"
+      },
+      "win": true
     }
   ],
-  "last_updated": "2026-09-09T23:25:59.478067+00:00"
+  "last_updated": "2026-09-10T23:19:40.999919+00:00"
 }
