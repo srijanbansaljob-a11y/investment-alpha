@@ -211,5 +211,14 @@
     "order_status": "OrderStatus.NEW",
     "pnl_pct_at_decision": 23.64,
     "timestamp": "2026-09-03T10:51:21.527245+00:00"
+  },
+  {
+    "decision": "approve_sell",
+    "ticker": "VLO",
+    "trigger": "profit_target",
+    "price_at_decision": 390.0,
+    "order_status": "OrderStatus.FILLED",
+    "pnl_pct_at_decision": 25.19,
+    "timestamp": "2026-09-10T17:03:34.948258+00:00"
   }
 ]
