@@ -777,7 +777,39 @@
         "scored_on": "2026-08-10"
       },
       "win": true
+    },
+    {
+      "ticker": "TRV",
+      "portfolio": "pipeline",
+      "exit_date": "2026-10-01",
+      "entry_date": "2026-08-18",
+      "duration_days": 44,
+      "exit_type": "full",
+      "entry_price": 379.31,
+      "exit_price": 363.21,
+      "pnl_pct": -4.25,
+      "pnl_dollars": -531.3,
+      "signals": {
+        "regime": "BULL",
+        "bucket": "mid",
+        "score": 0.5818,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.6253,
+          "trend": 0.7304,
+          "quality": 0.6929,
+          "valuation": 0.5715,
+          "sentiment": 0.3671,
+          "volatility": 0.2897
+        },
+        "rank_at_entry": 11,
+        "scored_on": "2026-08-03"
+      },
+      "win": false
     }
   ],
-  "last_updated": "2026-09-30T00:39:53.016882+00:00"
+  "last_updated": "2026-10-01T00:41:19.152937+00:00"
 }
