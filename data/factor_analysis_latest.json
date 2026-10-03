@@ -1,39 +1,39 @@
 {
-  "total": 10,
+  "total": 11,
   "wins": 7,
-  "win_rate": 70.0,
-  "avg_pl": 8.87,
-  "avg_duration": 14.2,
+  "win_rate": 63.6,
+  "avg_pl": 7.68,
+  "avg_duration": 16.9,
   "signals": {
     "insider_buy": {
       "with_n": 0,
-      "without_n": 10,
+      "without_n": 11,
       "with_wr": null,
-      "without_wr": 70.0,
+      "without_wr": 63.6,
       "with_avg_pl": null,
       "sufficient": false,
       "edge": null,
-      "note": "insufficient data (need 3+ trades in each group; have 0 with / 10 without)"
+      "note": "insufficient data (need 3+ trades in each group; have 0 with / 11 without)"
     },
     "congress_buy": {
       "with_n": 0,
-      "without_n": 10,
+      "without_n": 11,
       "with_wr": null,
-      "without_wr": 70.0,
+      "without_wr": 63.6,
       "with_avg_pl": null,
       "sufficient": false,
       "edge": null,
-      "note": "insufficient data (need 3+ trades in each group; have 0 with / 10 without)"
+      "note": "insufficient data (need 3+ trades in each group; have 0 with / 11 without)"
     },
     "earnings_beat": {
       "with_n": 0,
-      "without_n": 10,
+      "without_n": 11,
       "with_wr": null,
-      "without_wr": 70.0,
+      "without_wr": 63.6,
       "with_avg_pl": null,
       "sufficient": false,
       "edge": null,
-      "note": "insufficient data (need 3+ trades in each group; have 0 with / 10 without)"
+      "note": "insufficient data (need 3+ trades in each group; have 0 with / 11 without)"
     }
   },
   "rs_vs_spy": {
@@ -45,19 +45,19 @@
   "by_regime": [
     {
       "label": "BULL",
-      "trades": 10,
+      "trades": 11,
       "wins": 7,
-      "win_rate": 70.0,
-      "avg_pl": 8.87
+      "win_rate": 63.6,
+      "avg_pl": 7.68
     }
   ],
   "by_bucket": [
     {
       "label": "mid",
-      "trades": 5,
+      "trades": 6,
       "wins": 3,
-      "win_rate": 60.0,
-      "avg_pl": 12.74
+      "win_rate": 50.0,
+      "avg_pl": 9.91
     },
     {
       "label": "unknown",
@@ -77,20 +77,20 @@
   "by_portfolio": [
     {
       "label": "pipeline",
-      "trades": 10,
+      "trades": 11,
       "wins": 7,
-      "win_rate": 70.0,
-      "avg_pl": 8.87
+      "win_rate": 63.6,
+      "avg_pl": 7.68
     }
   ],
   "by_exit_type": [
     {
       "label": "full",
-      "trades": 10,
+      "trades": 11,
       "wins": 7,
-      "win_rate": 70.0,
-      "avg_pl": 8.87
+      "win_rate": 63.6,
+      "avg_pl": 7.68
     }
   ],
-  "generated_at": "2026-09-26T17:40:01.965238+00:00"
+  "generated_at": "2026-10-03T17:00:44.761659+00:00"
 }
