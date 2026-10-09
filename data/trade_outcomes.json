@@ -809,7 +809,39 @@
         "scored_on": "2026-08-03"
       },
       "win": false
+    },
+    {
+      "ticker": "INCY",
+      "portfolio": "pipeline",
+      "exit_date": "2026-10-09",
+      "entry_date": "2026-08-27",
+      "duration_days": 43,
+      "exit_type": "full",
+      "entry_price": 119.61,
+      "exit_price": 111.9682,
+      "pnl_pct": -6.39,
+      "pnl_dollars": -565.49,
+      "signals": {
+        "regime": "BULL",
+        "bucket": "mid",
+        "score": 0.5775,
+        "insider_buy": false,
+        "congress_buy": false,
+        "earnings_beat": false,
+        "rs_vs_spy": 0,
+        "scores": {
+          "momentum": 0.6973,
+          "trend": 0.6054,
+          "quality": 0.7467,
+          "valuation": 0.7256,
+          "sentiment": 0.4247,
+          "volatility": 0.637
+        },
+        "rank_at_entry": 10,
+        "scored_on": "2026-08-10"
+      },
+      "win": false
     }
   ],
-  "last_updated": "2026-10-08T01:10:50.194660+00:00"
+  "last_updated": "2026-10-09T01:19:49.215452+00:00"
 }
