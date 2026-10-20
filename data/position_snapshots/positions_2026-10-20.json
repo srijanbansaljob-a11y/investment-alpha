@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-20",
+  "timestamp": "2026-10-20T00:30:37.272147+00:00",
+  "screener": {},
+  "pipeline": {
+    "CNC": {
+      "qty": 139.0,
+      "avg_entry_price": 66.65,
+      "market_value": 9326.9,
+      "current_price": 67.1,
+      "unrealized_pl": 62.55,
+      "unrealized_plpc": 0.00675,
+      "cost_basis": 9264.35
+    },
+    "MATX": {
+      "qty": 46.0,
+      "avg_entry_price": 203.03,
+      "market_value": 10661.88,
+      "current_price": 231.78,
+      "unrealized_pl": 1322.5,
+      "unrealized_plpc": 0.1416,
+      "cost_basis": 9339.38
+    }
+  }
+}
